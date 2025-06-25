@@ -1,95 +1,106 @@
-'use client'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import axios from 'axios'
+'use client';
+import Image from 'next/image';
+import { useState } from 'react';
+import { loginAction } from './action';
+import { useRouter } from 'next/navigation'; // ✅ import useRouter
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [formData, setFormData] = useState({
-    student_id: '',
-    email: '',
-    password: ''
-  })
-  const [message, setMessage] = useState('')
+  const [error, setError] = useState('');
+  const router = useRouter(); // ✅ initialize router
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setMessage('')
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
 
     try {
-      const payload = formData.email
-        ? { email: formData.email, password: formData.password }
-        : { student_id: formData.student_id, password: formData.password }
-
-      const response = await axios.post('http://localhost:5000/api/auth/signin', payload)
-
-      localStorage.setItem('token', response.data.token)
-      setMessage(response.data.message)
-      setTimeout(() => router.push('/dashboard'), 1000)
-    } catch (error) {
-      const err = error.response?.data?.error || 'Login failed'
-      setMessage(err)
+      const res = await loginAction(formData);
+      if (res?.error) setError(res.error);
+    } catch (err) {
+      setError('Something went wrong.');
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
+    <div
+      className="flex justify-center items-center min-h-screen text-black"
+      style={{ backgroundColor: '#000C50' }}
+    >
+      <div className="bg-white w-full max-w-4xl h-[70%] rounded-xl shadow-lg flex overflow-hidden">
 
-        {/* Choose between Student ID or Email */}
-        <div className="mb-4">
-          <label className="block font-semibold mb-1">Student ID (for students)</label>
-          <input
-            type="text"
-            name="student_id"
-            value={formData.student_id}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-            placeholder="e.g. 2021001"
-          />
-        </div>
-
-        <div className="mb-4">
-          <label className="block font-semibold mb-1">Email (for admins)</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-            placeholder="e.g. admin@example.com"
-          />
-        </div>
-
-        <div className="mb-4">
-          <label className="block font-semibold mb-1">Password</label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
+        {/* Left Section */}
+        <div
+          className="w-1/2 p-10 border-r-4 flex flex-col justify-between"
+          style={{ borderColor: '#000C50' }}
         >
-          Login
-        </button>
+          <Image src="/images/cpc.png" alt="Logo" width={80} height={80} className="-mt-6" />
+          <h4 className="text-2xl font-bold">Log in to your <br />ESSEN account.</h4>
+          <p className="text-sm font-medium mt-4">
+            "Equip yourself for success, find everything you need to thrive in school, 
+            from study tools to personal essentials, all in one place."
+          </p>
+          <p className="text-xs text-gray-500 mt-6">ESSEN © 2024</p>
+        </div>
 
-        {message && (
-          <div className="mt-4 text-sm text-center text-red-600">{message}</div>
-        )}
-      </form>
+        {/* Right Section */}
+        <div className="w-1/2 h-[540px] p-10 relative">
+          <Image
+            src="/images/logo.png"
+            alt="ESSEN Logo"
+            width={250}
+            height={80}
+            className="absolute top-6 left-1/3 transform -translate-x-1/2"
+          />
+          <h4 className="mt-32 text-xl font-bold mb-8">Sign in</h4>
+
+          {error && <div className="bg-red-100 text-red-700 p-2 rounded mb-4">{error}</div>}
+
+          <form className="max-w-sm mx-auto" onSubmit={handleSubmit}>
+            <input
+              name="student_id"
+              placeholder="Student ID/User Admin"
+              required
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className="w-full border-b-2 border-black p-2 mb-6 focus:outline-none"
+            />
+
+            <div className="relative mb-6">
+              <input
+                name="password"
+                id="password"
+                type="password"
+                placeholder="Password"
+                required
+                className="w-full border-b-2 border-black p-2 focus:outline-none"
+                onInput={(e) => {
+                  e.target.value = e.target.value.replace(/^[ .]+/, '');
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full text-white py-2 font-semibold text-sm rounded-lg"
+              style={{ backgroundColor: '#000C50' }}
+            >
+              CONTINUE
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push('/reset-password')}
+              className="w-full py-2 font-semibold text-sm rounded-lg mt-2 border"
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderColor: '#000C50',
+                color: '#000C50',
+              }}
+            >
+              RESET PASSWORD
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
-  )
+  );
 }
