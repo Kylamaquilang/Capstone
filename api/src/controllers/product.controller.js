@@ -29,11 +29,14 @@ export const createProduct = async (req, res) => {
 export const getAllProducts = async (req, res) => {
   try {
     const [products] = await pool.query(`
-      SELECT id, name, description, price, stock, sizes, category, image FROM products
+      SELECT p.*, c.name AS category_name
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
     `)
+
     res.json(products)
-  } catch (error) {
-    console.error('Get Products Error:', error.message)
+  } catch (err) {
+    console.error('Get Products Error:', err)
     res.status(500).json({ error: 'Internal Server Error' })
   }
 }
@@ -54,17 +57,16 @@ export const getProductById = async (req, res) => {
   }
 }
 
-// ✅ Update Product
+// ✅ Update product (admin only)
 export const updateProduct = async (req, res) => {
-  try {
-    const { name, description, price, stock, sizes, category, image } = req.body
-    const { id } = req.params
+  const { id } = req.params
+  const { name, description, price, stock, sizes, category_id, image } = req.body
 
+  try {
     const [result] = await pool.query(
-      `UPDATE products
-       SET name = ?, description = ?, price = ?, stock = ?, sizes = ?, category = ?, image = ?
+      `UPDATE products SET name = ?, description = ?, price = ?, stock = ?, sizes = ?, category_id = ?, image = ?
        WHERE id = ?`,
-      [name, description, price, stock, sizes, category, image, id]
+      [name, description, price, stock, sizes, category_id, image, id]
     )
 
     if (result.affectedRows === 0) {
@@ -72,9 +74,9 @@ export const updateProduct = async (req, res) => {
     }
 
     res.json({ message: 'Product updated successfully' })
-  } catch (error) {
-    console.error('Update Product Error:', error.message)
-    res.status(500).json({ error: 'Internal Server Error' })
+  } catch (err) {
+    console.error('Update product error:', err)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }
 
