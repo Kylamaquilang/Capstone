@@ -1,11 +1,7 @@
 'use client';
 import Image from 'next/image';
-import {
-  MagnifyingGlassIcon,
-  UserCircleIcon,
-  BellIcon,
-  ShoppingCartIcon,
-} from '@heroicons/react/24/outline'; // ✅ Importing icons
+import Navbar from '@/components/common/nav-bar'; // ✅ Import Navbar
+import Footer from '@/components/common/footer'; // ✅ Import Footer
 
 const products = {
   "POLOS": [
@@ -31,24 +27,10 @@ const products = {
 export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-white">
-      {/* Navbar */}
-      <nav className="bg-[#000C50] text-white p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Image src="/images/cpc.png" alt="Logo" width={40} height={40} />
-        </div>
-        <div className="flex justify-center items-center">
-          <Image src="/images/logo1.png" alt="Logo" width={100} height={100} />
-        </div>
-        <div className="flex gap-4 items-center">
-          <button><MagnifyingGlassIcon className="h-6 w-6 text-white" /></button>
-          <button><BellIcon className="h-6 w-6 text-white" /></button>
-          <button><ShoppingCartIcon className="h-6 w-6 text-white" /></button>
-          <button><UserCircleIcon className="h-6 w-6 text-white" /></button>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Banner Section */}
-      <section className="flex w-300 h-[400px] mt-6 rounded-sm overflow-hidden shadow-md">
+      <section className="flex w-300 h-[400px] mt-20 mb-15 rounded-sm overflow-hidden shadow-md">
         <div className="relative w-3/4">
           <Image
             src="/images/school.png"
@@ -101,10 +83,7 @@ export default function UserDashboard() {
         ))}
       </div>
 
-      {/* Footer */}
-      <footer className="bg-[#000C50] text-white text-center py-3">
-        ESSEN © 2024
-      </footer>
+      <Footer /> 
     </div>
   );
 }

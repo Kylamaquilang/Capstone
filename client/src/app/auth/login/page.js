@@ -88,7 +88,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => router.push('/reset-password')}
+              onClick={() => router.push('/auth/reset-password')}
               className="w-full py-2 font-semibold text-sm rounded-lg mt-2 border"
               style={{
                 backgroundColor: '#FFFFFF',
