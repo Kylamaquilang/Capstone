@@ -1,24 +1,24 @@
 'use client';
+
 import Image from 'next/image';
 import { useState } from 'react';
-import { loginAction } from './action';
-import { useRouter } from 'next/navigation'; // ✅ import useRouter
+import useLogin from '@/hooks/useLogin';
 
 export default function LoginPage() {
-  const [error, setError] = useState('');
-  const router = useRouter(); // ✅ initialize router
+  const { login, error } = useLogin();
+  const [formData, setFormData] = useState({
+    student_id: '',
+    password: '',
+  });
 
-  async function handleSubmit(e) {
+  const handleChange = (e) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-
-    try {
-      const res = await loginAction(formData);
-      if (res?.error) setError(res.error);
-    } catch (err) {
-      setError('Something went wrong.');
-    }
-  }
+    await login(formData);
+  };
 
   return (
     <div
@@ -26,7 +26,6 @@ export default function LoginPage() {
       style={{ backgroundColor: '#000C50' }}
     >
       <div className="bg-white w-full max-w-4xl h-[70%] rounded-xl shadow-lg flex overflow-hidden">
-
         {/* Left Section */}
         <div
           className="w-1/2 p-10 border-r-4 flex flex-col justify-between"
@@ -57,26 +56,22 @@ export default function LoginPage() {
           <form className="max-w-sm mx-auto" onSubmit={handleSubmit}>
             <input
               name="student_id"
-              placeholder="Student ID/User Admin"
+              placeholder="Student ID / Admin Email"
+              value={formData.student_id}
+              onChange={handleChange}
               required
-              inputMode="numeric"
-              pattern="[0-9]*"
               className="w-full border-b-2 border-black p-2 mb-6 focus:outline-none"
             />
 
-            <div className="relative mb-6">
-              <input
-                name="password"
-                id="password"
-                type="password"
-                placeholder="Password"
-                required
-                className="w-full border-b-2 border-black p-2 focus:outline-none"
-                onInput={(e) => {
-                  e.target.value = e.target.value.replace(/^[ .]+/, '');
-                }}
-              />
-            </div>
+            <input
+              name="password"
+              type="password"
+              placeholder="Password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              className="w-full border-b-2 border-black p-2 mb-6 focus:outline-none"
+            />
 
             <button
               type="submit"
@@ -88,7 +83,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => router.push('/auth/reset-password')}
+              onClick={() => window.location.href = '/auth/reset-password'}
               className="w-full py-2 font-semibold text-sm rounded-lg mt-2 border"
               style={{
                 backgroundColor: '#FFFFFF',

@@ -13,16 +13,15 @@ export const signup = async (req, res) => {
       return res.status(400).json({ error: 'Required fields are missing' });
     }
 
-    // Set default passwords
     const defaultPassword = role === 'admin' ? 'admin123' : '123456';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    // Check if user exists
     const checkQuery = role === 'admin'
       ? 'SELECT * FROM users WHERE email = ?'
       : 'SELECT * FROM users WHERE student_id = ?';
 
-    const [existing] = await pool.query(checkQuery, [role === 'admin' ? email : student_id]);
+    const checkValue = role === 'admin' ? email.trim() : student_id.trim();
+    const [existing] = await pool.query(checkQuery, [checkValue]);
 
     if (existing.length > 0) {
       return res.status(409).json({ error: `${role} already exists` });
@@ -30,7 +29,13 @@ export const signup = async (req, res) => {
 
     await pool.query(
       'INSERT INTO users (student_id, email, name, password, role) VALUES (?, ?, ?, ?, ?)',
-      [student_id || null, email || null, name, hashedPassword, role]
+      [
+        student_id?.trim() || null,
+        email?.trim() || null,
+        name.trim(),
+        hashedPassword,
+        role,
+      ]
     );
 
     res.status(201).json({ message: `${role} registered successfully` });
@@ -49,11 +54,10 @@ export const signin = async (req, res) => {
       return res.status(400).json({ error: 'Missing credentials' });
     }
 
+    const identifier = student_id?.trim() || email.trim();
     const [users] = await pool.query(
-      student_id
-        ? 'SELECT * FROM users WHERE student_id = ?'
-        : 'SELECT * FROM users WHERE email = ?',
-      [student_id || email]
+      'SELECT * FROM users WHERE ' + (student_id ? 'student_id = ?' : 'email = ?'),
+      [identifier]
     );
 
     if (users.length === 0) {
@@ -61,14 +65,20 @@ export const signin = async (req, res) => {
     }
 
     const user = users[0];
-    const isMatch = await bcrypt.compare(password, user.password);
 
+    const isMatch = await bcrypt.compare(password.trim(), user.password);
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const token = jwt.sign(
-      { id: user.id, role: user.role, student_id: user.student_id, email: user.email },
+      {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        student_id: user.student_id,
+        email: user.email,
+      },
       JWT_SECRET,
       { expiresIn: '1d' }
     );
@@ -80,10 +90,37 @@ export const signin = async (req, res) => {
   }
 };
 
-// ✅ LOGOUT (client-side)
+// ✅ RESET PASSWORD
+export const resetPassword = async (req, res) => {
+  try {
+    const { student_id, newPassword } = req.body;
+
+    if (!student_id || !newPassword) {
+      return res.status(400).json({ error: 'Missing fields' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
+
+    const [result] = await pool.query(
+      'UPDATE users SET password = ? WHERE student_id = ?',
+      [hashedPassword, student_id.trim()]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    res.status(200).json({ message: 'Password reset successful' });
+  } catch (err) {
+    console.error('Reset password error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ✅ LOGOUT — client handles token removal
 export const logout = async (req, res) => {
   try {
-    res.status(200).json({ message: 'Logout successful (client-side handled)' });
+    res.status(200).json({ message: 'Logout successful (handled on client)' });
   } catch (error) {
     console.error('Logout error:', error.message);
     res.status(500).json({ error: 'Internal Server Error' });

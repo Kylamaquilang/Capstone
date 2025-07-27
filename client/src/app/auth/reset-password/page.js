@@ -1,48 +1,45 @@
 'use client';
-import Image from 'next/image';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation'; // ✅ Don't forget this!
+import useResetPassword from '@/hooks/useResetPassword';
 
 export default function ResetPasswordPage() {
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const router = useRouter(); // ✅ now this won't throw
+  const { resetPassword, error, success } = useResetPassword();
+  const [student_id, setStudentId] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await resetPassword({ student_id, newPassword });
+  };
 
   return (
-    <div className="flex justify-center items-center min-h-screen text-black" style={{ backgroundColor: '#000C50' }}>
-      <div className="bg-white w-full max-w-4xl h-[520px] rounded-xl shadow-lg flex overflow-hidden">
-        {/* Left Section */}
-        <div className="w-1/2 p-10 border-r-4" style={{ borderColor: '#000C50' }}>
-          <h2 className="text-2xl font-bold mb-6">Reset Password</h2>
-          <form className="space-y-6">
-            <input type="text" placeholder="Student ID" className="w-full border-b border-black p-2" />
-            <input type="text" placeholder="Last Name" className="w-full border-b border-black p-2" />
-            <input type="text" placeholder="First Name" className="w-full border-b border-black p-2" />
-            <input type="email" placeholder="Email" className="w-full border-b border-black p-2" />
-            <button
-              type="button"
-              onClick={() => router.push('/auth/login')}
-              className="w-full bg-[#000C50] text-white py-2 rounded"
-            >
-              Save Password
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push('/auth/login')}
-              className="w-full border border-[#000C50] text-[#000C50] py-2 rounded"
-            >
-              Cancel
-            </button>
-          </form>
-        </div>
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <form onSubmit={handleSubmit} className="max-w-md w-full bg-white p-6 rounded shadow">
+        <h2 className="text-xl font-bold mb-4">Reset Password</h2>
 
-        {/* Right Section */}
-        <div className="w-1/2 flex flex-col items-end text-right p-10 border-l">
-          <Image src="/images/cpc.png" alt="Logo" width={90} height={90} className="mb-6" />
-          <h2 className="text-3xl font-bold mt-14">Welcome to<br />CPC Essen!</h2>
-          <p className="text-xs font-semibold text-gray-600 absolute bottom-4 right-8">ESSEN © 2024</p>
-        </div>
-      </div>
+        <label className="block mb-2">Student ID</label>
+        <input
+          type="text"
+          value={student_id}
+          onChange={(e) => setStudentId(e.target.value)}
+          className="w-full mb-4 p-2 border rounded"
+        />
+
+        <label className="block mb-2">New Password</label>
+        <input
+          type="password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          className="w-full mb-4 p-2 border rounded"
+        />
+
+        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded">
+          Reset Password
+        </button>
+
+        {error && <p className="text-red-500 mt-4">{error}</p>}
+        {success && <p className="text-green-600 mt-4">{success}</p>}
+      </form>
     </div>
   );
 }
