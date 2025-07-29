@@ -90,29 +90,40 @@ export const signin = async (req, res) => {
   }
 };
 
-// ✅ RESET PASSWORD
-export const resetPassword = async (req, res) => {
+// ✅ CHANGE PASSWORD
+export const changePassword = async (req, res) => {
+  const { email, oldPassword, newPassword } = req.body;
+
+  if (!email || !oldPassword || !newPassword) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
   try {
-    const { student_id, newPassword } = req.body;
+    // Find user by email
+    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email.trim()]);
 
-    if (!student_id || !newPassword) {
-      return res.status(400).json({ error: 'Missing fields' });
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
+    const user = users[0];
+
+    // Compare old password
+    const isMatch = await bcrypt.compare(oldPassword.trim(), user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Old password is incorrect' });
+    }
+
+    // Hash and update new password
     const hashedPassword = await bcrypt.hash(newPassword.trim(), 10);
+    await pool.query('UPDATE users SET password = ? WHERE email = ?', [
+      hashedPassword,
+      email.trim(),
+    ]);
 
-    const [result] = await pool.query(
-      'UPDATE users SET password = ? WHERE student_id = ?',
-      [hashedPassword, student_id.trim()]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Student not found' });
-    }
-
-    res.status(200).json({ message: 'Password reset successful' });
-  } catch (err) {
-    console.error('Reset password error:', err.message);
+    res.status(200).json({ message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Change password error:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
