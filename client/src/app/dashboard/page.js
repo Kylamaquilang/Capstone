@@ -1,28 +1,9 @@
 'use client';
+import Footer from '@/components/common/footer';
+import Navbar from '@/components/common/nav-bar';
+import { products } from '@/data/products'; // ✅ Make sure this path is correct
 import Image from 'next/image';
-import Navbar from '@/components/common/nav-bar'; // ✅ Import Navbar
-import Footer from '@/components/common/footer'; // ✅ Import Footer
-
-const products = {
-  "POLOS": [
-    { name: "BSIT POLO", src: "/images/polo.png", label: "POLO", price: "₱450.00" },
-    { name: "BSIT PEACH POLO", src: "/images/polo.png", label: "POLO", price: "₱450.00" },
-    { name: "BSHM PEACH POLO", src: "/images/polo.png", label: "POLO", price: "₱450.00" },
-    { name: "BSED PEACH POLO", src: "/images/polo.png", label: "POLO", price: "₱450.00" },
-    { name: "BEED PEACH POLO", src: "/images/polo.png", label: "POLO", price: "₱450.00" },
-  ],
-  "LANYARDS & TELA": [
-    { name: "BSHM LANYARD", src: "/images/id.jpg", label: "LANYARD", price: "₱120.00" },
-    { name: "BSIT LANYARD", src: "/images/id.jpg", label: "LANYARD", price: "₱120.00" },
-    { name: "BSED LANYARD", src: "/images/id.jpg", label: "LANYARD", price: "₱120.00" },
-    { name: "BEED LANYARD", src: "/images/id.jpg", label: "LANYARD", price: "₱120.00" },
-  ],
-  "NSTP & PE": [
-    { name: "NSTP Shirt", src: "/images/nstp.png", label: "NSTP", price: "₱380.00" },
-    { name: "PE Pants", src: "/images/pe-pants.png", label: "PE", price: "₱400.00" },
-    { name: "PE Shirt", src: "/images/pe-shirt.png", label: "PE", price: "₱350.00" },
-  ]
-};
+import Link from 'next/link';
 
 export default function UserDashboard() {
   return (
@@ -59,23 +40,25 @@ export default function UserDashboard() {
             <div className="px-6 sm:px-12 md:px-20">
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-6">
                 {items.map((item, index) => (
-                  <button
+                  <Link
                     key={index}
-                    className="w-[250px] h-[350px] border rounded-md p-4 shadow hover:shadow-lg transition duration-200 text-left bg-white"
+                    href={`/products/${encodeURIComponent(item.name)}`} // ✅ Navigates to product detail page
                   >
-                    <Image
-                      src={item.src}
-                      alt={item.name}
-                      width={200}
-                      height={150}
-                      className="mx-auto mb-4"
-                    />
-                    <p className="text-sm font-bold mb-1 ml-5">{item.name}</p>
-                    <span className="inline-block text-white bg-[#000C50] text-xs font-semibold px-3 py-1 rounded-full mb-1 ml-5">
-                      {item.label}
-                    </span>
-                    <p className="text-sm font-semibold mt-1 ml-5">{item.price}</p>
-                  </button>
+                    <div className="w-[250px] h-[350px] border rounded-md p-4 shadow hover:shadow-lg transition duration-200 text-left bg-white cursor-pointer">
+                      <Image
+                        src={item.src}
+                        alt={item.name}
+                        width={200}
+                        height={150}
+                        className="mx-auto mb-4"
+                      />
+                      <p className="text-sm font-bold mb-1 ml-5 text-black">{item.name}</p>
+                      <span className="inline-block text-white bg-[#000C50] text-xs font-semibold px-3 py-1 rounded-full mb-1 ml-5">
+                        {item.label}
+                      </span>
+                      <p className="text-sm font-semibold mt-1 ml-5 text-black">{item.price}</p>
+                    </div>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -83,7 +66,7 @@ export default function UserDashboard() {
         ))}
       </div>
 
-      <Footer /> 
+      <Footer />
     </div>
   );
 }
