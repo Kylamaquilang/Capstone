@@ -24,8 +24,8 @@ export const getUserDashboard = async (req, res) => {
     const student_id = req.user.student_id;
 
     const [orders] = await pool.query(
-      'SELECT * FROM orders WHERE student_id = ? ORDER BY created_at DESC',
-      [student_id]
+      'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC',
+      [req.user.id]
     );
 
     res.json({ orders });
@@ -34,3 +34,4 @@ export const getUserDashboard = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+

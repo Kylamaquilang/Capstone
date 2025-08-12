@@ -1,22 +1,16 @@
 import express from 'express';
 import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
+import {
+  getAdminDashboard,
+  getUserDashboard,
+} from '../controllers/dashboard.controller.js';
 
 const router = express.Router();
 
-// ✅ Route for admin access only
-router.get('/admin', verifyToken, isAdmin, (req, res) => {
-  res.status(200).json({
-    message: 'Welcome to the Admin Dashboard',
-    user: req.user,
-  });
-});
+// Admin dashboard (requires token + admin role)
+router.get('/admin', verifyToken, isAdmin, getAdminDashboard);
 
-// ✅ Route for any logged-in user
-router.get('/user', verifyToken, (req, res) => {
-  res.status(200).json({
-    message: 'Welcome to the User Dashboard',
-    user: req.user,
-  });
-});
+// Student/user dashboard (requires token)
+router.get('/student', verifyToken, getUserDashboard);
 
 export default router;
