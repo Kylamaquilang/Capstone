@@ -1,7 +1,7 @@
 'use client';
 import Footer from '@/components/common/footer';
 import Navbar from '@/components/common/nav-bar';
-import { products } from '@/data/products'; // ✅ Make sure this path is correct
+import { products } from '@/data/products';
 import Image from 'next/image';
 import Link from 'next/link';
 
