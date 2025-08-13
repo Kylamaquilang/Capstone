@@ -2,7 +2,7 @@
 import { BellIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 
-export default function Navbar() {
+export default function AdminNavbar() {
   return (
     <nav className="bg-[#000C50] text-white p-4 flex items-center justify-between">
       <div className="flex items-center gap-4">
