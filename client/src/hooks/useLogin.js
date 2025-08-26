@@ -1,22 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
 import { useRouter } from 'next/navigation';
-
-// ✅ Axios instance using environment variable
-const API = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
-  withCredentials: true,
-});
+import { useAuth } from '@/context/auth-context';
+import API from '@/lib/axios';
 
 export default function useLogin() {
   const router = useRouter();
+  const { login } = useAuth();
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const login = async ({ student_id, password }) => {
+  const handleLogin = async ({ student_id, password }) => {
+    setLoading(true);
+    setError('');
+    
     try {
-      // 📌 Attempt login
       const { data } = await API.post('/auth/signin', { student_id, password });
 
       if (!data.token) {
@@ -24,27 +23,22 @@ export default function useLogin() {
         return;
       }
 
-      // ✅ Store token
-      localStorage.setItem('token', data.token);
+      // Store token and user data in context
+      login(data.user, data.token);
 
-      // ✅ Decode token (safe base64 decode)
-      const payload = JSON.parse(atob(data.token.split('.')[1]));
-      const { role } = payload;
-
-      // 🔎 Debug info (remove in production)
-      console.log('Logged in as:', payload);
-
-      // 🔁 Redirect based on role
-      if (role === 'admin') {
-        router.push('/app/dashboard/admin');
+      // Redirect based on role
+      if (data.user.role === 'admin') {
+        router.push('/admin');
       } else {
         router.push('/dashboard');
       }
     } catch (err) {
       console.error('Login error:', err);
       setError(err?.response?.data?.error || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
-  return { login, error };
+  return { login: handleLogin, error, loading };
 }

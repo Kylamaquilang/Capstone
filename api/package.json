@@ -4,7 +4,12 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:hash-passwords": "node ./src/scripts/hash_passwords.js",
+    "db:seed": "node ./src/scripts/seed_database.js",
+    "db:add-sizes": "node ./src/scripts/add_product_sizes.js"
   },
   "keywords": [],
   "author": "",
@@ -13,10 +18,14 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.1",
     "mysql2": "^3.14.1",
     "nodemon": "^3.1.10"
   }

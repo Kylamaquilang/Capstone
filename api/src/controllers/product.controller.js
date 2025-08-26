@@ -1,110 +1,539 @@
-import { pool } from '../database/db.js'
+import { pool } from '../database/db.js';
+import { 
+  validateName, 
+  validatePrice, 
+  validateStock, 
+  validateSize, 
+  validateCategory, 
+  validateImageUrl,
+  validateId,
+  validatePagination
+} from '../utils/validation.js';
 
 // Low stock threshold
-const LOW_STOCK_THRESHOLD = 5
+const LOW_STOCK_THRESHOLD = 5;
+
+// ✅ Get All Products - Simple version for frontend
+export const getAllProductsSimple = async (req, res) => {
+  try {
+    const [products] = await pool.query(`
+      SELECT 
+        p.id,
+        p.name,
+        p.description,
+        p.price,
+        p.stock,
+        p.image,
+        c.name as category
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      ORDER BY p.created_at DESC
+    `);
+
+    // Transform products to match frontend expectations
+    const transformedProducts = products.map(product => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: parseFloat(product.price),
+      stock: parseInt(product.stock),
+      image_url: product.image || '/images/polo.png',
+      category: product.category || 'Other'
+    }));
+
+    res.json(transformedProducts);
+  } catch (err) {
+    console.error('Get Products Simple Error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
 
 // ✅ Create Product
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, stock, sizes, category, image } = req.body
+    const { name, description, price, stock, sizes, category_id, image } = req.body;
 
-    if (!name || !price || stock == null) {
-      return res.status(400).json({ error: 'Name, price, and stock are required' })
+    // Enhanced validation
+    if (!validateName(name)) {
+      return res.status(400).json({ 
+        error: 'Name is required and must be 2-50 characters long' 
+      });
     }
 
-    const [result] = await pool.query(
-      `INSERT INTO products (name, description, price, stock, sizes, category, image)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, description, price, stock, sizes, category, image]
-    )
+    if (!validatePrice(price)) {
+      return res.status(400).json({ 
+        error: 'Valid price is required' 
+      });
+    }
 
-    res.status(201).json({ message: 'Product created successfully', productId: result.insertId })
+    if (!validateStock(stock)) {
+      return res.status(400).json({ 
+        error: 'Valid stock quantity is required' 
+      });
+    }
+
+    if (image && !validateImageUrl(image)) {
+      return res.status(400).json({ 
+        error: 'Invalid image URL format' 
+      });
+    }
+
+    // Check if category exists if provided
+    if (category_id) {
+      const [categories] = await pool.query('SELECT id FROM categories WHERE id = ?', [category_id]);
+      if (categories.length === 0) {
+        return res.status(400).json({ error: 'Category not found' });
+      }
+    }
+
+    // Check if product with same name already exists
+    const [existing] = await pool.query(
+      'SELECT id FROM products WHERE name = ?',
+      [name.trim()]
+    );
+
+    if (existing.length > 0) {
+      return res.status(409).json({ error: 'Product with this name already exists' });
+    }
+
+    // Start transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Insert product
+      const [productResult] = await connection.query(
+        `INSERT INTO products (name, description, price, stock, category_id, image, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          name.trim(),
+          description?.trim() || null,
+          parseFloat(price),
+          parseInt(stock),
+          category_id || null,
+          image?.trim() || null
+        ]
+      );
+
+      const productId = productResult.insertId;
+
+      // Insert product sizes if provided
+      if (sizes && Array.isArray(sizes) && sizes.length > 0) {
+        for (const sizeData of sizes) {
+          if (!validateSize(sizeData.size)) {
+            throw new Error(`Invalid size: ${sizeData.size}. Valid sizes are: XS, S, M, L, XL, XXL`);
+          }
+
+          if (!validateStock(sizeData.stock)) {
+            throw new Error(`Invalid stock quantity for size ${sizeData.size}`);
+          }
+
+          const sizePrice = sizeData.price || price; // Use product price if size price not specified
+
+          await connection.query(
+            `INSERT INTO product_sizes (product_id, size, stock, price) VALUES (?, ?, ?, ?)`,
+            [productId, sizeData.size.toUpperCase(), parseInt(sizeData.stock), parseFloat(sizePrice)]
+          );
+        }
+      }
+
+      await connection.commit();
+      connection.release();
+
+      res.status(201).json({ 
+        message: 'Product created successfully', 
+        productId: productId 
+      });
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
   } catch (error) {
-    console.error('Create Product Error:', error.message)
-    res.status(500).json({ error: 'Internal Server Error' })
+    console.error('Create Product Error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
-// ✅ Get All Products
+// ✅ Get All Products with pagination and filtering
 export const getAllProducts = async (req, res) => {
   try {
-    const [products] = await pool.query(`
-      SELECT p.*, c.name AS category_name
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-    `)
+    const { page = 1, limit = 10, category, search, minPrice, maxPrice, inStock } = req.query;
+    
+    // Validate pagination
+    const { page: validPage, limit: validLimit } = validatePagination(page, limit);
+    const offset = (validPage - 1) * validLimit;
 
-    res.json(products)
+    // Build query conditions
+    let whereConditions = [];
+    let queryParams = [];
+
+    if (category) {
+      whereConditions.push('c.name = ?');
+      queryParams.push(category);
+    }
+
+    if (search) {
+      whereConditions.push('(p.name LIKE ? OR p.description LIKE ?)');
+      queryParams.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (minPrice) {
+      whereConditions.push('p.price >= ?');
+      queryParams.push(parseFloat(minPrice));
+    }
+
+    if (maxPrice) {
+      whereConditions.push('p.price <= ?');
+      queryParams.push(parseFloat(maxPrice));
+    }
+
+    if (inStock === 'true') {
+      whereConditions.push('p.stock > 0');
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Get total count for pagination
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total FROM products p LEFT JOIN categories c ON p.category_id = c.id ${whereClause}`,
+      queryParams
+    );
+    const totalProducts = countResult[0].total;
+
+    // Get products with pagination
+    const [products] = await pool.query(
+      `SELECT p.*, c.name AS category_name
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       ${whereClause}
+       ORDER BY p.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...queryParams, validLimit, offset]
+    );
+
+    // Get product sizes for each product
+    const productsWithSizes = await Promise.all(
+      products.map(async (product) => {
+        const [sizes] = await pool.query(
+          'SELECT * FROM product_sizes WHERE product_id = ?',
+          [product.id]
+        );
+        return {
+          ...product,
+          sizes: sizes
+        };
+      })
+    );
+
+    res.json({
+      products: productsWithSizes,
+      pagination: {
+        currentPage: validPage,
+        totalPages: Math.ceil(totalProducts / validLimit),
+        totalProducts,
+        hasNextPage: validPage < Math.ceil(totalProducts / validLimit),
+        hasPrevPage: validPage > 1
+      }
+    });
   } catch (err) {
-    console.error('Get Products Error:', err)
-    res.status(500).json({ error: 'Internal Server Error' })
+    console.error('Get Products Error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 // ✅ Get Product by ID
 export const getProductById = async (req, res) => {
   try {
-    const [rows] = await pool.query(`SELECT * FROM products WHERE id = ?`, [req.params.id])
-
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' })
+    const { id } = req.params;
+    
+    if (!validateId(id)) {
+      return res.status(400).json({ error: 'Invalid product ID' });
     }
 
-    res.json(rows[0])
+    const [rows] = await pool.query(`
+      SELECT p.*, c.name AS category_name 
+      FROM products p 
+      LEFT JOIN categories c ON p.category_id = c.id 
+      WHERE p.id = ?
+    `, [id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const product = rows[0];
+    
+    // Get product sizes
+    const [sizes] = await pool.query(
+      'SELECT * FROM product_sizes WHERE product_id = ?',
+      [id]
+    );
+
+    product.sizes = sizes;
+
+    res.json(product);
   } catch (error) {
-    console.error('Get Product Error:', error.message)
-    res.status(500).json({ error: 'Internal Server Error' })
+    console.error('Get Product Error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 // ✅ Update product (admin only)
 export const updateProduct = async (req, res) => {
-  const { id } = req.params
-  const { name, description, price, stock, sizes, category_id, image } = req.body
-
   try {
-    const [result] = await pool.query(
-      `UPDATE products SET name = ?, description = ?, price = ?, stock = ?, sizes = ?, category_id = ?, image = ?
-       WHERE id = ?`,
-      [name, description, price, stock, sizes, category_id, image, id]
-    )
+    const { id } = req.params;
+    const { name, description, price, stock, sizes, category_id, image } = req.body;
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Product not found' })
+    if (!validateId(id)) {
+      return res.status(400).json({ error: 'Invalid product ID' });
     }
 
-    res.json({ message: 'Product updated successfully' })
+    // Check if product exists
+    const [existing] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Validate input fields
+    if (name && !validateName(name)) {
+      return res.status(400).json({ 
+        error: 'Name must be 2-50 characters long' 
+      });
+    }
+
+    if (price !== undefined && !validatePrice(price)) {
+      return res.status(400).json({ 
+        error: 'Valid price is required' 
+      });
+    }
+
+    if (stock !== undefined && !validateStock(stock)) {
+      return res.status(400).json({ 
+        error: 'Valid stock quantity is required' 
+      });
+    }
+
+    if (image && !validateImageUrl(image)) {
+      return res.status(400).json({ 
+        error: 'Invalid image URL format' 
+      });
+    }
+
+    // Check if category exists if provided
+    if (category_id) {
+      const [categories] = await pool.query('SELECT id FROM categories WHERE id = ?', [category_id]);
+      if (categories.length === 0) {
+        return res.status(400).json({ error: 'Category not found' });
+      }
+    }
+
+    // Check if name is being changed and if it conflicts with existing product
+    if (name && name !== existing[0].name) {
+      const [nameConflict] = await pool.query(
+        'SELECT id FROM products WHERE name = ? AND id != ?',
+        [name.trim(), id]
+      );
+      if (nameConflict.length > 0) {
+        return res.status(409).json({ error: 'Product with this name already exists' });
+      }
+    }
+
+    // Start transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Build update query dynamically
+      const updateFields = [];
+      const updateValues = [];
+
+      if (name !== undefined) {
+        updateFields.push('name = ?');
+        updateValues.push(name.trim());
+      }
+
+      if (description !== undefined) {
+        updateFields.push('description = ?');
+        updateValues.push(description?.trim() || null);
+      }
+
+      if (price !== undefined) {
+        updateFields.push('price = ?');
+        updateValues.push(parseFloat(price));
+      }
+
+      if (stock !== undefined) {
+        updateFields.push('stock = ?');
+        updateValues.push(parseInt(stock));
+      }
+
+      if (category_id !== undefined) {
+        updateFields.push('category_id = ?');
+        updateValues.push(category_id || null);
+      }
+
+      if (image !== undefined) {
+        updateFields.push('image = ?');
+        updateValues.push(image?.trim() || null);
+      }
+
+      updateValues.push(id);
+
+      // Update product
+      if (updateFields.length > 0) {
+        await connection.query(
+          `UPDATE products SET ${updateFields.join(', ')} WHERE id = ?`,
+          updateValues
+        );
+      }
+
+      // Update product sizes if provided
+      if (sizes && Array.isArray(sizes)) {
+        // Delete existing sizes
+        await connection.query('DELETE FROM product_sizes WHERE product_id = ?', [id]);
+
+        // Insert new sizes
+        for (const sizeData of sizes) {
+          if (!validateSize(sizeData.size)) {
+            throw new Error(`Invalid size: ${sizeData.size}. Valid sizes are: XS, S, M, L, XL, XXL`);
+          }
+
+          if (!validateStock(sizeData.stock)) {
+            throw new Error(`Invalid stock quantity for size ${sizeData.size}`);
+          }
+
+          const sizePrice = sizeData.price || price || existing[0].price;
+
+          await connection.query(
+            `INSERT INTO product_sizes (product_id, size, stock, price) VALUES (?, ?, ?, ?)`,
+            [id, sizeData.size.toUpperCase(), parseInt(sizeData.stock), parseFloat(sizePrice)]
+          );
+        }
+      }
+
+      await connection.commit();
+      connection.release();
+
+      res.json({ message: 'Product updated successfully' });
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
   } catch (err) {
-    console.error('Update product error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('Update product error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
 
 // ✅ Delete Product
 export const deleteProduct = async (req, res) => {
   try {
-    const { id } = req.params
+    const { id } = req.params;
 
-    const [result] = await pool.query(`DELETE FROM products WHERE id = ?`, [id])
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Product not found' })
+    if (!validateId(id)) {
+      return res.status(400).json({ error: 'Invalid product ID' });
     }
 
-    res.json({ message: 'Product deleted successfully' })
+    // Check if product exists
+    const [existing] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Check if product is in any active cart or order
+    const [cartItems] = await pool.query('SELECT id FROM cart_items WHERE product_id = ?', [id]);
+    if (cartItems.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete product that is in active carts' 
+      });
+    }
+
+    // Start transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Delete product sizes first
+      await connection.query('DELETE FROM product_sizes WHERE product_id = ?', [id]);
+      
+      // Delete product
+      const [result] = await connection.query('DELETE FROM products WHERE id = ?', [id]);
+
+      if (result.affectedRows === 0) {
+        throw new Error('Product not found');
+      }
+
+      await connection.commit();
+      connection.release();
+
+      res.json({ message: 'Product deleted successfully' });
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
   } catch (error) {
-    console.error('Delete Product Error:', error.message)
-    res.status(500).json({ error: 'Internal Server Error' })
+    console.error('Delete Product Error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
 
 // ✅ Get Low Stock Products (for Admin Alerts)
 export const getLowStockProducts = async (req, res) => {
   try {
-    const [products] = await pool.query(`SELECT * FROM products WHERE stock <= ?`, [LOW_STOCK_THRESHOLD])
-    res.json(products)
+    const [products] = await pool.query(`
+      SELECT p.*, c.name AS category_name 
+      FROM products p 
+      LEFT JOIN categories c ON p.category_id = c.id 
+      WHERE p.stock <= ? 
+      ORDER BY p.stock ASC
+    `, [LOW_STOCK_THRESHOLD]);
+
+    // Get product sizes for each product
+    const productsWithSizes = await Promise.all(
+      products.map(async (product) => {
+        const [sizes] = await pool.query(
+          'SELECT * FROM product_sizes WHERE product_id = ?',
+          [product.id]
+        );
+        return {
+          ...product,
+          sizes: sizes
+        };
+      })
+    );
+
+    res.json({
+      products: productsWithSizes,
+      threshold: LOW_STOCK_THRESHOLD,
+      count: products.length
+    });
   } catch (error) {
-    console.error('Low Stock Check Error:', error.message)
-    res.status(500).json({ error: 'Internal Server Error' })
+    console.error('Low Stock Check Error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
+
+// ✅ Get Product Statistics
+export const getProductStats = async (req, res) => {
+  try {
+    const [stats] = await pool.query(`
+      SELECT 
+        COUNT(*) as totalProducts,
+        COUNT(CASE WHEN stock = 0 THEN 1 END) as outOfStock,
+        COUNT(CASE WHEN stock <= ? THEN 1 END) as lowStock,
+        SUM(stock) as totalStock,
+        AVG(price) as averagePrice,
+        MIN(price) as minPrice,
+        MAX(price) as maxPrice
+      FROM products
+    `, [LOW_STOCK_THRESHOLD]);
+
+    res.json(stats[0]);
+  } catch (error) {
+    console.error('Get Product Stats Error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};

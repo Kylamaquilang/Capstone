@@ -1,114 +1,199 @@
 'use client';
 
-import Footer from '@/components/common/footer';
-import Navbar from '@/components/common/nav-bar';
-import { products } from '@/data/products';
-import Image from 'next/image';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useAuth } from '@/context/auth-context';
+import ProtectedRoute from '@/components/common/ProtectedRoute';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/common/footer';
+import API from '@/lib/axios';
+import Image from 'next/image';
 
 export default function ProductDetailPage() {
-  const params = useParams();
+  const { name } = useParams();
+  const { user, isAuthenticated } = useAuth();
   const router = useRouter();
-  const decodedName = decodeURIComponent(params.name);
-
-  const product = Object.values(products)
-    .flat()
-    .find((p) => p.name === decodedName);
-
+  const [product, setProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [addingToCart, setAddingToCart] = useState(false);
 
-  const sizes = ['S', 'M', 'L', 'XL'];
-  const stockAvailable = 15;
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchProduct();
+    }
+  }, [isAuthenticated, name]);
 
-  const noSizeOption =
-    product?.label?.toLowerCase() === 'lanyard' ||
-    product?.label?.toLowerCase() === 'tela';
+  const fetchProduct = async () => {
+    try {
+      setLoading(true);
+      // First try to find by name
+      const { data: products } = await API.get('/products');
+      const foundProduct = products.find(p => 
+        p.name.toLowerCase() === decodeURIComponent(name).toLowerCase()
+      );
+      
+      if (foundProduct) {
+        // Get detailed product info including sizes
+        const { data: detailedProduct } = await API.get(`/products/${foundProduct.id}`);
+        setProduct(detailedProduct);
+      } else {
+        setError('Product not found');
+      }
+    } catch (err) {
+      console.error('Error fetching product:', err);
+      setError('Failed to load product');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  if (!product) {
+  const handleAddToCart = async () => {
+    if (!selectedSize) {
+      alert('Please select a size');
+      return;
+    }
+
+    if (quantity < 1) {
+      alert('Please select a valid quantity');
+      return;
+    }
+
+    try {
+      setAddingToCart(true);
+      
+      // Find the selected size info
+      const sizeInfo = product.sizes.find(s => s.size === selectedSize);
+      if (!sizeInfo || sizeInfo.stock < quantity) {
+        alert('Selected size is out of stock or insufficient quantity');
+        return;
+      }
+
+      // Add to cart
+      await API.post('/cart/add', {
+        product_id: product.id,
+        size_id: sizeInfo.id,
+        quantity: quantity
+      });
+
+      alert('Product added to cart successfully!');
+      router.push('/cart');
+    } catch (err) {
+      console.error('Error adding to cart:', err);
+      alert(err?.response?.data?.error || 'Failed to add to cart');
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex justify-center items-center text-red-500 text-xl">
-        Product not found
-      </div>
+      <ProtectedRoute>
+        <div className="min-h-screen bg-white">
+          <Navbar />
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#000C50] mx-auto"></div>
+              <p className="mt-4 text-lg text-gray-600">Loading product...</p>
+            </div>
+          </div>
+        </div>
+      </ProtectedRoute>
     );
   }
 
-  const handleQuantityChange = (type) => {
-    if (type === 'increase' && quantity < stockAvailable) {
-      setQuantity(quantity + 1);
-    }
-    if (type === 'decrease' && quantity > 1) {
-      setQuantity(quantity - 1);
-    }
-  };
+  if (error) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-white">
+          <Navbar />
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <p className="text-red-600 text-lg mb-4">{error}</p>
+              <button 
+                onClick={() => router.push('/dashboard')}
+                className="px-6 py-2 bg-[#000C50] text-white rounded hover:bg-[#1a237e] transition-colors"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
 
-  const handleAddToCart = () => {
-    const existingCart = JSON.parse(localStorage.getItem('cart') || '[]');
-
-    const newItem = {
-      id: Date.now(), // unique id
-      name: product.name,
-      size: noSizeOption ? 'N/A' : selectedSize,
-      quantity,
-      price: parseFloat(product.price.replace('₱', '')), // Remove ₱ sign
-      image: product.src,
-    };
-
-    localStorage.setItem('cart', JSON.stringify([...existingCart, newItem]));
-
-    router.push('/cart'); // Redirect to cart page
-  };
+  if (!product) {
+    return null;
+  }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
-      <Navbar />
-
-      <main className="flex-grow">
-        <div className="max-w-6xl mx-auto py-12 px-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+    <ProtectedRoute>
+      <div className="min-h-screen bg-white">
+        <Navbar />
+        
+        <div className="container mx-auto px-6 py-8 mt-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Product Image */}
-            <div className="flex justify-center">
-              <Image
-                src={product.src}
-                alt={product.name}
-                width={450}
-                height={450}
-                className="rounded-md shadow-lg object-cover"
-              />
+            <div className="space-y-4">
+              <div className="relative h-96 lg:h-[500px] rounded-lg overflow-hidden shadow-lg">
+                <Image
+                  src={product.image || '/images/polo.png'}
+                  alt={product.name}
+                  fill
+                  className="object-cover"
+                />
+              </div>
             </div>
 
             {/* Product Details */}
-            <div className="flex flex-col justify-center">
-              <h1 className="text-4xl font-bold text-gray-800 mb-4">
-                {product.name}
-              </h1>
-              <span className="inline-block bg-[#000C50] text-white px-3 py-1 rounded-full text-sm mb-4">
-                {product.label}
-              </span>
-              <p className="text-2xl font-semibold text-gray-900 mb-6">
-                {product.price}
-              </p>
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-4xl font-bold text-gray-900 mb-2">{product.name}</h1>
+                <p className="text-lg text-gray-600">{product.description}</p>
+              </div>
 
-              <p className="text-green-600 mb-4">
-                Stock Available: {stockAvailable}
-              </p>
+              {/* Price */}
+              <div className="text-3xl font-bold text-[#000C50]">
+                ₱{parseFloat(product.price).toFixed(2)}
+              </div>
 
-              {!noSizeOption && (
-                <div className="mb-6">
-                  <p className="font-bold mb-2">Select Size:</p>
-                  <div className="flex gap-3">
-                    {sizes.map((size) => (
+              {/* Category */}
+              {product.category_name && (
+                <div>
+                  <span className="inline-block bg-[#000C50] text-white text-sm font-semibold px-3 py-1 rounded-full">
+                    {product.category_name}
+                  </span>
+                </div>
+              )}
+
+              {/* Size Selection */}
+              {product.sizes && product.sizes.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-gray-900">Select Size</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {product.sizes.map((size) => (
                       <button
-                        key={size}
-                        onClick={() => setSelectedSize(size)}
-                        className={`px-4 py-2 border rounded-md ${
-                          selectedSize === size
-                            ? 'bg-[#000C50] text-white'
-                            : 'bg-white text-gray-800 border-gray-500'
+                        key={size.id}
+                        onClick={() => setSelectedSize(size.size)}
+                        disabled={size.stock === 0}
+                        className={`p-3 border-2 rounded-lg text-center transition-colors ${
+                          selectedSize === size.size
+                            ? 'border-[#000C50] bg-[#000C50] text-white'
+                            : size.stock === 0
+                            ? 'border-gray-300 text-gray-400 cursor-not-allowed'
+                            : 'border-gray-300 hover:border-[#000C50] cursor-pointer'
                         }`}
                       >
-                        {size}
+                        <div className="font-semibold">{size.size}</div>
+                        <div className="text-sm">
+                          {size.stock > 0 ? `${size.stock} in stock` : 'Out of stock'}
+                        </div>
+                        {size.price && size.price !== product.price && (
+                          <div className="text-xs">₱{parseFloat(size.price).toFixed(2)}</div>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -116,43 +201,68 @@ export default function ProductDetailPage() {
               )}
 
               {/* Quantity */}
-              <div className="mb-6">
-                <p className="font-semibold mb-2">Quantity:</p>
-                <div className="flex items-center gap-3">
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-gray-900">Quantity</h3>
+                <div className="flex items-center space-x-3">
                   <button
-                    onClick={() => handleQuantityChange('decrease')}
-                    className="px-3 py-1 border rounded-md bg-gray-200"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-10 h-10 border-2 border-gray-300 rounded-lg flex items-center justify-center hover:border-[#000C50] transition-colors"
                   >
                     -
                   </button>
-                  <span className="text-lg">{quantity}</span>
+                  <span className="text-lg font-semibold w-16 text-center">{quantity}</span>
                   <button
-                    onClick={() => handleQuantityChange('increase')}
-                    className="px-3 py-1 border rounded-md bg-gray-200"
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="w-10 h-10 border-2 border-gray-300 rounded-lg flex items-center justify-center hover:border-[#000C50] transition-colors"
                   >
                     +
                   </button>
                 </div>
               </div>
 
-              {/* Add to Cart */}
+              {/* Add to Cart Button */}
               <button
                 onClick={handleAddToCart}
-                disabled={!selectedSize && !noSizeOption}
-                className={`px-8 py-3 rounded-lg transition ${
-                  selectedSize || noSizeOption
-                    ? 'bg-[#000C50] text-white hover:bg-blue-900'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                disabled={!selectedSize || addingToCart}
+                className={`w-full py-4 px-6 rounded-lg font-semibold text-lg transition-colors ${
+                  !selectedSize || addingToCart
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-[#000C50] text-white hover:bg-[#1a237e]'
                 }`}
               >
-                Add to Cart
+                {addingToCart ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Adding to Cart...
+                  </div>
+                ) : (
+                  'Add to Cart'
+                )}
               </button>
+
+              {/* Stock Info */}
+              <div className="text-sm text-gray-600">
+                <p>Total Stock: {product.stock}</p>
+                {product.sizes && product.sizes.length > 0 && (
+                  <p>Available in multiple sizes</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </main>
 
-      <Footer />
-    </div>
+          {/* Back Button */}
+          <div className="mt-8">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="px-6 py-2 border-2 border-[#000C50] text-[#000C50] rounded-lg hover:bg-[#000C50] hover:text-white transition-colors"
+            >
+              ← Back to Products
+            </button>
+          </div>
+        </div>
+
+        <Footer />
+      </div>
+    </ProtectedRoute>
   );
 }

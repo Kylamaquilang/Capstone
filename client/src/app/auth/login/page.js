@@ -5,7 +5,7 @@ import { useState } from 'react';
 import useLogin from '@/hooks/useLogin';
 
 export default function LoginPage() {
-  const { login, error } = useLogin();
+  const { login, error, loading } = useLogin();
   const [formData, setFormData] = useState({
     student_id: '',
     password: '',
@@ -51,7 +51,11 @@ export default function LoginPage() {
           />
           <h4 className="mt-32 text-xl font-bold mb-8">Sign in</h4>
 
-          {error && <div className="bg-red-100 text-red-700 p-2 rounded mb-4">{error}</div>}
+          {error && (
+            <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">
+              {error}
+            </div>
+          )}
 
           <form className="max-w-sm mx-auto" onSubmit={handleSubmit}>
             <input
@@ -60,7 +64,8 @@ export default function LoginPage() {
               value={formData.student_id}
               onChange={handleChange}
               required
-              className="w-full border-b-2 border-black p-2 mb-6 focus:outline-none"
+              disabled={loading}
+              className="w-full border-b-2 border-black p-2 mb-6 focus:outline-none disabled:opacity-50"
             />
 
             <input
@@ -70,21 +75,31 @@ export default function LoginPage() {
               value={formData.password}
               onChange={handleChange}
               required
-              className="w-full border-b-2 border-black p-2 mb-6 focus:outline-none"
+              disabled={loading}
+              className="w-full border-b-2 border-black p-2 mb-6 focus:outline-none disabled:opacity-50"
             />
 
             <button
               type="submit"
-              className="w-full text-white py-2 font-semibold text-sm rounded-lg"
+              disabled={loading}
+              className="w-full text-white py-3 font-semibold text-sm rounded-lg transition-colors disabled:opacity-50"
               style={{ backgroundColor: '#000C50' }}
             >
-              CONTINUE
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Signing in...
+                </div>
+              ) : (
+                'CONTINUE'
+              )}
             </button>
 
             <button
               type="button"
+              disabled={loading}
               onClick={() => window.location.href = '/auth/reset-password'}
-              className="w-full py-2 font-semibold text-sm rounded-lg mt-2 border"
+              className="w-full py-3 font-semibold text-sm rounded-lg mt-2 border transition-colors disabled:opacity-50"
               style={{
                 backgroundColor: '#FFFFFF',
                 borderColor: '#000C50',
@@ -94,6 +109,13 @@ export default function LoginPage() {
               RESET PASSWORD
             </button>
           </form>
+
+          {/* Help Text */}
+          <div className="mt-6 text-center text-sm text-gray-600">
+            <p>Students: Use your Student ID</p>
+            <p>Admins: Use your email address</p>
+            <p className="mt-2 text-xs">Default password: cpc123</p>
+          </div>
         </div>
       </div>
     </div>
