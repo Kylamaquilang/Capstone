@@ -81,8 +81,8 @@ export const addToCart = async (req, res) => {
     }
 
     await pool.query(
-      `INSERT INTO cart_items (user_id, product_id, size_id, quantity, price) VALUES (?, ?, ?, ?, ?)`,
-      [user_id, product_id, size_id || null, quantity, productInfo.price]
+      `INSERT INTO cart_items (user_id, product_id, size_id, quantity) VALUES (?, ?, ?, ?)`,
+      [user_id, product_id, size_id || null, quantity]
     );
 
     res.status(201).json({ message: 'Product added to cart' });

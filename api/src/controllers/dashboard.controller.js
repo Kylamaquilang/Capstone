@@ -35,3 +35,16 @@ export const getUserDashboard = async (req, res) => {
   }
 };
 
+// ✅ Admin: Get all users list
+export const getAllUsers = async (req, res) => {
+  try {
+    const [users] = await pool.query(
+      'SELECT id, name, student_id, role, created_at FROM users ORDER BY created_at DESC'
+    );
+    res.json({ users });
+  } catch (error) {
+    console.error('Admin Users Error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+

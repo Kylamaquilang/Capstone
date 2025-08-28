@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import Footer from '@/components/common/footer';
-import Navbar from '@/components/Navbar';
+import Navbar from '@/components/common/nav-bar';
 import API from '@/lib/axios';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -69,20 +69,10 @@ export default function UserDashboard() {
       <div className="min-h-screen bg-white">
         <Navbar />
 
-        {/* Welcome Banner */}
-        <section className="bg-gradient-to-r from-[#000C50] to-[#1a237e] text-white py-8 mt-20">
-          <div className="container mx-auto px-6">
-            <h1 className="text-3xl font-bold mb-2">
-              Welcome back, {user?.name}!
-            </h1>
-            <p className="text-lg opacity-90">
-              Student ID: {user?.student_id} • Role: {user?.role}
-            </p>
-          </div>
-        </section>
+  
 
         {/* Banner Section */}
-        <section className="flex w-300 h-[400px] mt-8 mb-15 rounded-sm overflow-hidden shadow-md">
+        <section className="flex w-300 h-[400px] mt-8 mb-10 mt-15 rounded-sm overflow-hidden shadow-md">
           <div className="relative w-3/4">
             <Image
               src="/images/school.png"

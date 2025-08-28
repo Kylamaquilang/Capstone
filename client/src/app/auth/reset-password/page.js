@@ -1,45 +1,79 @@
 'use client';
+import Image from 'next/image';
 import { useState } from 'react';
-import useResetPassword from '@/hooks/useResetPassword';
+import { useRouter } from 'next/navigation'; // ✅ Add this
 
 export default function ResetPasswordPage() {
-  const { resetPassword, error, success } = useResetPassword();
-  const [student_id, setStudentId] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    await resetPassword({ student_id, newPassword });
-  };
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const router = useRouter(); // ✅ Initialize router
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <form onSubmit={handleSubmit} className="max-w-md w-full bg-white p-6 rounded shadow">
-        <h2 className="text-xl font-bold mb-4">Reset Password</h2>
+    <div
+      className="flex justify-center items-center min-h-screen text-black"
+      style={{ backgroundColor: '#000C50' }}
+    >
+      <div className="bg-white w-full max-w-4xl h-[520px] rounded-xl shadow-lg flex overflow-hidden">
+        {/* Left Side - Form */}
+        <div
+          className="w-1/2 p-10 border-r-4 flex flex-col justify-between"
+          style={{ borderColor: '#000C50' }}
+        >
+          <h2 className="text-2xl font-bold text-black ml-19 mb-8">Reset Password</h2>
+          <form className="space-y-6">
+            <input
+              type="number"
+              placeholder="Student ID"
+              className="w-full border-b border-black focus:outline-none text-sm placeholder-black"
+              inputMode="numeric"
+            />
+            <input
+              type="text"
+              placeholder="Last Name"
+              className="w-full border-b border-[#000C50] focus:outline-none text-sm placeholder-black"
+            />
+            <input
+              type="text"
+              placeholder="First Name"
+              className="w-full border-b border-black focus:outline-none text-sm placeholder-black"
+            />
+            <input
+              type="text"
+              placeholder="Email"
+              className="w-full border-b border-black focus:outline-none text-sm placeholder-black"
+            />
 
-        <label className="block mb-2">Student ID</label>
-        <input
-          type="text"
-          value={student_id}
-          onChange={(e) => setStudentId(e.target.value)}
-          className="w-full mb-4 p-2 border rounded"
-        />
+            <button
+              type="button" // ✅ important
+              onClick={() => router.push('/login')} // ✅ redirect
+              className="w-full bg-[#000C50] text-white py-2 rounded-md font-semibold"
+            >
+              Save Password
+            </button>
 
-        <label className="block mb-2">New Password</label>
-        <input
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          className="w-full mb-4 p-2 border rounded"
-        />
+            <button
+              type="button"
+              onClick={() => router.push('/login')} // Optional: cancel goes back too
+              className="w-full border border-[#000C50] text-[#000C50] py-2 rounded-md font-semibold mb-10"
+            >
+              Cancel
+            </button>
+          </form>
+        </div>
 
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded">
-          Reset Password
-        </button>
-
-        {error && <p className="text-red-500 mt-4">{error}</p>}
-        {success && <p className="text-green-600 mt-4">{success}</p>}
-      </form>
+        {/* Right Side - Welcome */}
+        <div className="w-1/2 bg-white relative flex flex-col items-end text-right mb-10 p-10 border-l mt-1">
+          <Image
+            src="/images/cpc.png"
+            alt="Logo"
+            width={90}
+            height={90}
+            className="mb-6"
+          />
+          <h2 className="text-3xl font-bold text-black mt-14 mr-6">Welcome to<br />CPC Essen!</h2>
+          <p className="text-xs font-semibold text-gray-600 absolute bottom-4 right-8">ESSEN © 2024</p>
+        </div>
+      </div>
     </div>
   );
 }

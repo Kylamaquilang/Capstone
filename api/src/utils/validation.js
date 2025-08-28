@@ -55,6 +55,8 @@ export const validateCategory = (category) => {
 // Image URL validation
 export const validateImageUrl = (imageUrl) => {
   if (!imageUrl) return true; // Image is optional
+  // Allow server-hosted relative paths like /uploads/...
+  if (typeof imageUrl === 'string' && imageUrl.startsWith('/')) return true;
   try {
     const url = new URL(imageUrl);
     return url.protocol === 'http:' || url.protocol === 'https:';

@@ -3,12 +3,16 @@ import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
 import {
   getAdminDashboard,
   getUserDashboard,
+  getAllUsers,
 } from '../controllers/dashboard.controller.js';
 
 const router = express.Router();
 
 // Admin dashboard (requires token + admin role)
 router.get('/admin', verifyToken, isAdmin, getAdminDashboard);
+
+// Admin users list
+router.get('/users', verifyToken, isAdmin, getAllUsers);
 
 // Student/user dashboard (requires token)
 router.get('/student', verifyToken, getUserDashboard);

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
-import Navbar from '@/components/Navbar';
+import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
 import API from '@/lib/axios';
 import Image from 'next/image';
@@ -71,8 +71,8 @@ export default function ProductDetailPage() {
         return;
       }
 
-      // Add to cart
-      await API.post('/cart/add', {
+      // Add to cart (backend expects POST /api/cart with body)
+      await API.post('/cart', {
         product_id: product.id,
         size_id: sizeInfo.id,
         quantity: quantity
@@ -132,19 +132,19 @@ export default function ProductDetailPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-white">
-        <Navbar />
-        
+      <Navbar />
+
         <div className="container mx-auto px-6 py-8 mt-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Product Image */}
             <div className="space-y-4">
               <div className="relative h-96 lg:h-[500px] rounded-lg overflow-hidden shadow-lg">
-                <Image
+              <Image
                   src={product.image || '/images/polo.png'}
-                  alt={product.name}
+                alt={product.name}
                   fill
                   className="object-cover"
-                />
+              />
               </div>
             </div>
 
@@ -165,7 +165,7 @@ export default function ProductDetailPage() {
                 <div>
                   <span className="inline-block bg-[#000C50] text-white text-sm font-semibold px-3 py-1 rounded-full">
                     {product.category_name}
-                  </span>
+              </span>
                 </div>
               )}
 
@@ -246,9 +246,9 @@ export default function ProductDetailPage() {
                 {product.sizes && product.sizes.length > 0 && (
                   <p>Available in multiple sizes</p>
                 )}
-              </div>
             </div>
           </div>
+        </div>
 
           {/* Back Button */}
           <div className="mt-8">
@@ -261,8 +261,10 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        <Footer />
-      </div>
+      <Footer />
+    </div>
     </ProtectedRoute>
   );
 }
+
+

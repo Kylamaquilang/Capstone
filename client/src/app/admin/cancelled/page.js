@@ -4,25 +4,26 @@ import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
 
-export default function AdminOrdersPage() {
+export default function AdminCancelledPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchOrders = async () => {
+  const fetchCancelled = async () => {
     try {
       setLoading(true);
       const { data } = await API.get('/orders/admin');
-      setOrders(data || []);
+      const cancelled = (data || []).filter(o => o.status?.toLowerCase() === 'cancelled');
+      setOrders(cancelled);
     } catch (err) {
-      setError('Failed to load orders');
+      setError('Failed to load cancelled orders');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchCancelled();
   }, []);
 
   return (
@@ -35,10 +36,10 @@ export default function AdminOrdersPage() {
         <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">ORDERS</h2>
+              <h2 className="text-2xl font-bold">CANCELLED ORDERS</h2>
             </div>
             {loading ? (
-              <div className="text-gray-600">Loading orders...</div>
+              <div className="text-gray-600">Loading cancelled orders...</div>
             ) : error ? (
               <div className="text-red-600">{error}</div>
             ) : (
@@ -49,8 +50,6 @@ export default function AdminOrdersPage() {
                       <th className="px-4 py-2">Order ID</th>
                       <th className="px-4 py-2">User</th>
                       <th className="px-4 py-2">Amount</th>
-                      <th className="px-4 py-2">Payment</th>
-                      <th className="px-4 py-2">Status</th>
                       <th className="px-4 py-2">Created</th>
                     </tr>
                   </thead>
@@ -60,15 +59,13 @@ export default function AdminOrdersPage() {
                         <td className="px-4 py-2">{o.id}</td>
                         <td className="px-4 py-2">{o.user_name}</td>
                         <td className="px-4 py-2">₱{Number(o.total_amount).toFixed(2)}</td>
-                        <td className="px-4 py-2">{o.payment_method}{o.pay_at_counter ? ' (Counter)' : ''}</td>
-                        <td className="px-4 py-2 capitalize">{o.status}</td>
                         <td className="px-4 py-2">{new Date(o.created_at).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 {orders.length === 0 && (
-                  <div className="text-gray-600 mt-4">No orders yet.</div>
+                  <div className="text-gray-600 mt-4">No cancelled orders.</div>
                 )}
               </div>
             )}

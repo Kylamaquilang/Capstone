@@ -1,10 +1,27 @@
 'use client';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import ProductTable from './product-table';
 import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
+import API from '@/lib/axios';
 
 export default function AdminProductPage() {
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data } = await API.get('/categories');
+        setCategories(Array.isArray(data) ? data : []);
+      } catch (e) {
+        setCategories([]);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   return (
     <div className="flex flex-col h-screen text-black">
       {/* ✅ Top Navbar */}
@@ -34,19 +51,26 @@ export default function AdminProductPage() {
             </div>
 
             {/* Category Buttons */}
-            <div className="flex space-x-2 mb-4">
-              {['TELA', 'POLO', 'PE', 'NSTP', 'LANYARD'].map((cat) => (
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setSelectedCategory('')}
+                className={`${selectedCategory === '' ? 'bg-[#000C50] text-white' : 'bg-gray-200 text-black'} px-3 py-1 rounded font-semibold text-sm`}
+              >
+                All
+              </button>
+              {categories.map((cat) => (
                 <button
-                  key={cat}
-                  className="bg-gray-200 px-3 py-1 rounded font-semibold text-sm"
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.name)}
+                  className={`${selectedCategory === cat.name ? 'bg-[#000C50] text-white' : 'bg-gray-200 text-black'} px-3 py-1 rounded font-semibold text-sm`}
                 >
-                  {cat}
+                  {String(cat.name).toUpperCase()}
                 </button>
               ))}
             </div>
 
             {/* Product Table */}
-            <ProductTable />
+            <ProductTable category={selectedCategory} />
           </div>
         </div>
       </div>

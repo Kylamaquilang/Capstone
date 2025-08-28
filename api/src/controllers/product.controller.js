@@ -169,8 +169,8 @@ export const getAllProducts = async (req, res) => {
     let queryParams = [];
 
     if (category) {
-      whereConditions.push('c.name = ?');
-      queryParams.push(category);
+      whereConditions.push('UPPER(c.name) = UPPER(?)');
+      queryParams.push(category.trim());
     }
 
     if (search) {

@@ -4,25 +4,25 @@ import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
 
-export default function AdminOrdersPage() {
-  const [orders, setOrders] = useState([]);
+export default function AdminNotificationPage() {
+  const [lowStock, setLowStock] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchOrders = async () => {
+  const fetchLowStock = async () => {
     try {
       setLoading(true);
-      const { data } = await API.get('/orders/admin');
-      setOrders(data || []);
+      const { data } = await API.get('/products/low-stock');
+      setLowStock(data.products || []);
     } catch (err) {
-      setError('Failed to load orders');
+      setError('Failed to load notifications');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchLowStock();
   }, []);
 
   return (
@@ -35,10 +35,10 @@ export default function AdminOrdersPage() {
         <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">ORDERS</h2>
+              <h2 className="text-2xl font-bold">NOTIFICATIONS</h2>
             </div>
             {loading ? (
-              <div className="text-gray-600">Loading orders...</div>
+              <div className="text-gray-600">Loading notifications...</div>
             ) : error ? (
               <div className="text-red-600">{error}</div>
             ) : (
@@ -46,29 +46,23 @@ export default function AdminOrdersPage() {
                 <table className="w-full text-left">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-4 py-2">Order ID</th>
-                      <th className="px-4 py-2">User</th>
-                      <th className="px-4 py-2">Amount</th>
-                      <th className="px-4 py-2">Payment</th>
-                      <th className="px-4 py-2">Status</th>
-                      <th className="px-4 py-2">Created</th>
+                      <th className="px-4 py-2">Product</th>
+                      <th className="px-4 py-2">Category</th>
+                      <th className="px-4 py-2">Stock</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((o) => (
-                      <tr key={o.id} className="border-b">
-                        <td className="px-4 py-2">{o.id}</td>
-                        <td className="px-4 py-2">{o.user_name}</td>
-                        <td className="px-4 py-2">₱{Number(o.total_amount).toFixed(2)}</td>
-                        <td className="px-4 py-2">{o.payment_method}{o.pay_at_counter ? ' (Counter)' : ''}</td>
-                        <td className="px-4 py-2 capitalize">{o.status}</td>
-                        <td className="px-4 py-2">{new Date(o.created_at).toLocaleString()}</td>
+                    {lowStock.map((p) => (
+                      <tr key={p.id} className="border-b">
+                        <td className="px-4 py-2">{p.name}</td>
+                        <td className="px-4 py-2">{p.category_name || '—'}</td>
+                        <td className="px-4 py-2">{p.stock}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {orders.length === 0 && (
-                  <div className="text-gray-600 mt-4">No orders yet.</div>
+                {lowStock.length === 0 && (
+                  <div className="text-gray-600 mt-4">No low-stock notifications.</div>
                 )}
               </div>
             )}
