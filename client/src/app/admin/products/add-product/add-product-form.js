@@ -142,47 +142,91 @@ export default function AddProductForm() {
           </div>
         </div>
 
-        {/* Right Column - Drag & Drop Upload */}
-        <div
-          className={`flex flex-col items-center justify-center rounded p-4 text-sm w-full h-full min-h-[220px] cursor-pointer transition border-2 ${dragActive ? 'border-[#000C50] bg-blue-50' : 'border-dashed border-gray-400'}`}
-          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragActive(false);
-            const f = e.dataTransfer.files?.[0];
-            if (f) {
-              setFile(f);
-              setPreviewUrl(URL.createObjectURL(f));
-            }
-          }}
-          onClick={() => document.getElementById('product-file-input')?.click()}
-        >
-          <input
-            id="product-file-input"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0] || null;
-              setFile(f);
-              setPreviewUrl(f ? URL.createObjectURL(f) : '');
-            }}
-          />
+        {/* Right Column - Enhanced Image Upload */}
+        <div className="space-y-4">
+          <div>
+            <label className="block font-semibold mb-3">PRODUCT IMAGE:</label>
+            
+            {/* File Input Button */}
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => document.getElementById('product-file-input')?.click()}
+                className="w-full bg-[#000C50] text-white py-3 px-4 rounded-md hover:bg-blue-900 transition-colors font-medium flex items-center justify-center space-x-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span>Browse Files</span>
+              </button>
+              <input
+                id="product-file-input"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] || null;
+                  setFile(f);
+                  setPreviewUrl(f ? URL.createObjectURL(f) : '');
+                }}
+              />
+            </div>
 
-          {previewUrl ? (
-            <div className="flex flex-col items-center">
-              <img src={previewUrl} alt="Preview" className="w-40 h-40 object-cover rounded mb-2 border" />
-              <span className="text-xs text-gray-600 max-w-[220px] truncate">{file?.name}</span>
-              <span className="mt-2 text-xs text-gray-500">Click to choose another file</span>
+            {/* Drag & Drop Area */}
+            <div
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
+                dragActive 
+                  ? 'border-[#000C50] bg-blue-50 border-solid' 
+                  : 'border-gray-300 hover:border-gray-400'
+              }`}
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                const f = e.dataTransfer.files?.[0];
+                if (f) {
+                  setFile(f);
+                  setPreviewUrl(URL.createObjectURL(f));
+                }
+              }}
+              onClick={() => document.getElementById('product-file-input')?.click()}
+            >
+              {previewUrl ? (
+                <div className="space-y-3">
+                  <img src={previewUrl} alt="Preview" className="w-32 h-32 object-cover rounded-lg mx-auto border-2 border-gray-200" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{file?.name}</p>
+                    <p className="text-xs text-gray-500">Click to change image</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Upload an image</p>
+                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="text-center text-gray-600">
-              <div className="font-semibold mb-1">PRODUCT IMAGE</div>
-              <div>Drag & drop image here</div>
-              <div className="text-xs mt-1">or click to browse</div>
-            </div>
-          )}
+
+            {/* File Info */}
+            {file && (
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">File size:</span>
+                  <span className="font-medium">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <span className="text-gray-600">File type:</span>
+                  <span className="font-medium">{file.type}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

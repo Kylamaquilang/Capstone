@@ -2,7 +2,8 @@
 import Link from 'next/link';
 import { 
   CubeIcon, ClipboardDocumentListIcon, XCircleIcon, BanknotesIcon, 
-  BellIcon, UserCircleIcon, ArrowLeftOnRectangleIcon 
+  BellIcon, UserCircleIcon, ArrowLeftOnRectangleIcon, 
+  ArchiveBoxIcon, ChartBarIcon
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
@@ -10,7 +11,9 @@ export default function Sidebar() {
     <div className="w-64 bg-white text-black-900 flex flex-col justify-between border-r shadow-md" style={{ height: 'calc(100vh - 64px)' }}>
       {/* Top - Navigation Items */}
       <div className="flex flex-col space-y-6 px-6 py-8 ml-3">
+        <SidebarItem href="/admin/dashboard" icon={ChartBarIcon} label="Dashboard" />
         <SidebarItem href="/admin/products" icon={CubeIcon} label="Products" />
+        <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" />
         <SidebarItem href="/admin/orders" icon={ClipboardDocumentListIcon} label="Orders" />
         <SidebarItem href="/admin/cancelled" icon={XCircleIcon} label="Cancelled" />
         <SidebarItem href="/admin/sales" icon={BanknotesIcon} label="Sales" />

@@ -60,7 +60,7 @@ export default function LoginPage() {
           <form className="max-w-sm mx-auto" onSubmit={handleSubmit}>
             <input
               name="student_id"
-              placeholder="Student ID / Admin Email"
+              placeholder="Student ID (e.g., 2021-0001) or Admin Email"
               value={formData.student_id}
               onChange={handleChange}
               required
@@ -112,8 +112,8 @@ export default function LoginPage() {
 
           {/* Help Text */}
           <div className="mt-6 text-center text-sm text-gray-600">
-            <p>Students: Use your Student ID</p>
-            <p>Admins: Use your email address</p>
+            <p>Students: Use your Student ID (e.g., 2021-0001)</p>
+            <p>Admins: Use your email address (e.g., admin@cpc.edu)</p>
             <p className="mt-2 text-xs">Default password: cpc123</p>
           </div>
         </div>

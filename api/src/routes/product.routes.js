@@ -11,7 +11,10 @@ import {
   updateProduct,
   deleteProduct,
   getLowStockProducts,
-  getProductStats
+  getProductStats,
+  getInventorySummary,
+  updateProductStock,
+  getStockMovementHistory
 } from '../controllers/product.controller.js'
 
 import { verifyToken, isAdmin } from '../middleware/auth.middleware.js'
@@ -58,5 +61,10 @@ router.post('/upload-image', verifyToken, isAdmin, upload.single('image'), (req,
 })
 router.put('/:id', verifyToken, isAdmin, updateProduct)
 router.delete('/:id', verifyToken, isAdmin, deleteProduct)
+
+// Inventory management routes
+router.get('/inventory/summary', verifyToken, isAdmin, getInventorySummary)
+router.put('/:id/stock', verifyToken, isAdmin, updateProductStock)
+router.get('/inventory/movements', verifyToken, isAdmin, getStockMovementHistory)
 
 export default router

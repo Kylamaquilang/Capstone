@@ -3,7 +3,9 @@ import {
   getUserOrders,
   getAllOrders,
   getOrderItems,
-  updateOrderStatus
+  updateOrderStatus,
+  getOrderStats,
+  getSalesPerformance
 } from '../controllers/order.controller.js'
 import { verifyToken, isAdmin } from '../middleware/verifyToken.js'
 
@@ -13,5 +15,9 @@ router.get('/admin', verifyToken, isAdmin, getAllOrders)
 
 router.get('/:id/items', verifyToken, getOrderItems)
 router.patch('/:id/status', verifyToken, isAdmin, updateOrderStatus)
+
+// Analytics and reporting routes
+router.get('/stats', verifyToken, isAdmin, getOrderStats)
+router.get('/sales-performance', verifyToken, isAdmin, getSalesPerformance)
 
 export default router

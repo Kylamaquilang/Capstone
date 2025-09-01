@@ -16,7 +16,27 @@ export default function useLogin() {
     setError('');
     
     try {
-      const { data } = await API.post('/auth/signin', { student_id, password });
+      // Clean and validate input
+      const cleanStudentId = student_id.trim();
+      const cleanPassword = password.trim();
+      
+      if (!cleanStudentId || !cleanPassword) {
+        setError('Please fill in all fields');
+        setLoading(false);
+        return;
+      }
+      
+      // Determine if this is an email (admin) or student ID (student)
+      const isEmail = cleanStudentId.includes('@');
+      
+      // Send the appropriate field based on the input type
+      const loginData = isEmail 
+        ? { email: cleanStudentId, password: cleanPassword }
+        : { student_id: cleanStudentId, password: cleanPassword };
+      
+      console.log('Sending login data:', loginData);
+      
+      const { data } = await API.post('/auth/signin', loginData);
 
       if (!data.token) {
         setError('No token received from server');

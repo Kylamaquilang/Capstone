@@ -13,6 +13,14 @@ import {
 // Low stock threshold
 const LOW_STOCK_THRESHOLD = 5;
 
+// Stock movement types
+const STOCK_MOVEMENT_TYPES = {
+  PURCHASE: 'purchase',
+  SALE: 'sale',
+  ADJUSTMENT: 'adjustment',
+  RETURN: 'return'
+};
+
 // ✅ Get All Products - Simple version for frontend
 export const getAllProductsSimple = async (req, res) => {
   try {
@@ -534,6 +542,164 @@ export const getProductStats = async (req, res) => {
     res.json(stats[0]);
   } catch (error) {
     console.error('Get Product Stats Error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ Get inventory summary
+export const getInventorySummary = async (req, res) => {
+  try {
+    const [summary] = await pool.query(`
+      SELECT 
+        COUNT(*) as total_products,
+        SUM(stock) as total_stock,
+        SUM(CASE WHEN stock <= ? THEN 1 ELSE 0 END) as low_stock_count,
+        SUM(CASE WHEN stock = 0 THEN 1 ELSE 0 END) as out_of_stock_count,
+        SUM(stock * price) as total_inventory_value
+      FROM products
+    `, [LOW_STOCK_THRESHOLD]);
+
+    const [categoryStats] = await pool.query(`
+      SELECT 
+        c.name as category,
+        COUNT(p.id) as product_count,
+        SUM(p.stock) as total_stock,
+        AVG(p.price) as avg_price
+      FROM categories c
+      LEFT JOIN products p ON c.id = p.category_id
+      GROUP BY c.id, c.name
+      ORDER BY product_count DESC
+    `);
+
+    res.json({
+      summary: summary[0],
+      categoryStats,
+      lowStockThreshold: LOW_STOCK_THRESHOLD
+    });
+  } catch (err) {
+    console.error('Get inventory summary error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ Update product stock
+export const updateProductStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { stock, reason, movement_type } = req.body;
+
+    if (!stock || !reason || !movement_type) {
+      return res.status(400).json({ 
+        error: 'Stock, reason, and movement type are required' 
+      });
+    }
+
+    if (!Object.values(STOCK_MOVEMENT_TYPES).includes(movement_type)) {
+      return res.status(400).json({ error: 'Invalid movement type' });
+    }
+
+    // Get current stock
+    const [currentProduct] = await pool.query(
+      'SELECT stock FROM products WHERE id = ?',
+      [id]
+    );
+
+    if (currentProduct.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const currentStock = currentProduct[0].stock;
+    const newStock = Math.max(0, currentStock + stock); // Prevent negative stock
+
+    // Update product stock
+    await pool.query(
+      'UPDATE products SET stock = ?, updated_at = NOW() WHERE id = ?',
+      [newStock, id]
+    );
+
+    // Log stock movement
+    await pool.query(`
+      INSERT INTO stock_movements (product_id, movement_type, quantity, previous_stock, new_stock, reason, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, NOW())
+    `, [id, movement_type, stock, currentStock, newStock, reason]);
+
+    res.json({ 
+      message: 'Stock updated successfully',
+      previousStock: currentStock,
+      newStock: newStock,
+      change: stock
+    });
+  } catch (err) {
+    console.error('Update product stock error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ Get stock movement history
+export const getStockMovementHistory = async (req, res) => {
+  try {
+    const { product_id, movement_type, start_date, end_date, page = 1, limit = 20 } = req.query;
+    
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    
+    if (product_id) {
+      whereClause += ' AND sm.product_id = ?';
+      params.push(product_id);
+    }
+    
+    if (movement_type) {
+      whereClause += ' AND sm.movement_type = ?';
+      params.push(movement_type);
+    }
+    
+    if (start_date) {
+      whereClause += ' AND DATE(sm.created_at) >= ?';
+      params.push(start_date);
+    }
+    
+    if (end_date) {
+      whereClause += ' AND DATE(sm.created_at) <= ?';
+      params.push(end_date);
+    }
+
+    const offset = (page - 1) * limit;
+    
+    const [movements] = await pool.query(`
+      SELECT 
+        sm.id,
+        sm.movement_type,
+        sm.quantity,
+        sm.previous_stock,
+        sm.new_stock,
+        sm.reason,
+        sm.created_at,
+        p.name as product_name,
+        p.image as product_image
+      FROM stock_movements sm
+      JOIN products p ON sm.product_id = p.id
+      ${whereClause}
+      ORDER BY sm.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [...params, limit, offset]);
+
+    const [total] = await pool.query(`
+      SELECT COUNT(*) as total
+      FROM stock_movements sm
+      ${whereClause}
+    `, params);
+
+    res.json({
+      movements,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: total[0].total,
+        totalPages: Math.ceil(total[0].total / limit)
+      }
+    });
+  } catch (err) {
+    console.error('Get stock movement history error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };

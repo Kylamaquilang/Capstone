@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { pool } from '../database/db.js';
 import { validateEmail, validateStudentId, validatePassword } from '../utils/validation.js';
+import { sendPasswordResetEmail, generateVerificationCode, sendWelcomeEmail } from '../utils/emailService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 const SALT_ROUNDS = 12;
@@ -92,6 +93,16 @@ export const signup = async (req, res) => {
         contact_number?.trim() || null
       ]
     );
+
+    // Send welcome email if user has email and is a student
+    if (email && role === 'student') {
+      try {
+        await sendWelcomeEmail(email.trim(), name.trim(), student_id?.trim(), DEFAULT_STUDENT_PASSWORD);
+      } catch (emailError) {
+        console.warn('Failed to send welcome email:', emailError.message);
+        // Don't fail registration if email fails
+      }
+    }
 
     res.status(201).json({ 
       message: `${role} registered successfully`,
@@ -314,6 +325,169 @@ export const refreshToken = async (req, res) => {
   } catch (error) {
     console.error('Refresh token error:', error.message);
     res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ REQUEST PASSWORD RESET
+export const requestPasswordReset = async (req, res) => {
+  try {
+    const { email, student_id } = req.body;
+
+    if (!email && !student_id) {
+      return res.status(400).json({ 
+        error: 'Email or Student ID is required' 
+      });
+    }
+
+    // Find user by email or student_id
+    const lookupField = email ? 'email' : 'student_id';
+    const lookupValue = email ? email.trim() : student_id.trim();
+    
+    const [users] = await pool.query(
+      `SELECT id, name, email, student_id FROM users WHERE ${lookupField} = ?`,
+      [lookupValue]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = users[0];
+
+    // Check if user has an email address
+    if (!user.email) {
+      return res.status(400).json({ 
+        error: 'No email address found for this account. Please contact an administrator.' 
+      });
+    }
+
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Store verification code in database
+    await pool.query(
+      `INSERT INTO password_reset_codes (user_id, code, expires_at, created_at) 
+       VALUES (?, ?, ?, NOW())`,
+      [user.id, verificationCode, expiresAt]
+    );
+
+    // Send email with verification code
+    await sendPasswordResetEmail(user.email, verificationCode, user.name);
+
+    res.status(200).json({ 
+      message: 'Password reset verification code sent to your email',
+      email: user.email // Return masked email for confirmation
+    });
+  } catch (error) {
+    console.error('Request password reset error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ✅ VERIFY PASSWORD RESET CODE
+export const verifyPasswordResetCode = async (req, res) => {
+  try {
+    const { email, student_id, verificationCode } = req.body;
+
+    if (!email && !student_id || !verificationCode) {
+      return res.status(400).json({ 
+        error: 'Email/Student ID and verification code are required' 
+      });
+    }
+
+    // Find user by email or student_id
+    const lookupField = email ? 'email' : 'student_id';
+    const lookupValue = email ? email.trim() : student_id.trim();
+    
+    const [users] = await pool.query(
+      `SELECT id FROM users WHERE ${lookupField} = ?`,
+      [lookupValue]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userId = users[0].id;
+
+    // Check if verification code is valid and not expired
+    const [codes] = await pool.query(
+      `SELECT * FROM password_reset_codes 
+       WHERE user_id = ? AND code = ? AND expires_at > NOW() 
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId, verificationCode]
+    );
+
+    if (codes.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired verification code' });
+    }
+
+    // Generate a temporary reset token (valid for 15 minutes)
+    const resetToken = jwt.sign(
+      { userId, type: 'password_reset' },
+      JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    // Delete the used verification code
+    await pool.query(
+      `DELETE FROM password_reset_codes WHERE id = ?`,
+      [codes[0].id]
+    );
+
+    res.status(200).json({ 
+      message: 'Verification code verified successfully',
+      resetToken,
+      expiresIn: '15 minutes'
+    });
+  } catch (error) {
+    console.error('Verify password reset code error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// ✅ RESET PASSWORD WITH TOKEN
+export const resetPasswordWithToken = async (req, res) => {
+  try {
+    const { resetToken, newPassword } = req.body;
+
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({ 
+        error: 'Reset token and new password are required' 
+      });
+    }
+
+    if (!validatePassword(newPassword)) {
+      return res.status(400).json({ 
+        error: 'New password must be at least 6 characters long' 
+      });
+    }
+
+    // Verify reset token
+    let decoded;
+    try {
+      decoded = jwt.verify(resetToken, JWT_SECRET);
+      if (decoded.type !== 'password_reset') {
+        return res.status(400).json({ error: 'Invalid token type' });
+      }
+    } catch (jwtError) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword.trim(), SALT_ROUNDS);
+
+    // Update password
+    await pool.query(
+      `UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?`,
+      [hashedPassword, decoded.userId]
+    );
+
+    res.status(200).json({ message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Reset password with token error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };
 
