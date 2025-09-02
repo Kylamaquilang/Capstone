@@ -1,8 +1,8 @@
 'use client';
 
+import useLogin from '@/hooks/useLogin';
 import Image from 'next/image';
 import { useState } from 'react';
-import useLogin from '@/hooks/useLogin';
 
 export default function LoginPage() {
   const { login, error, loading } = useLogin();
