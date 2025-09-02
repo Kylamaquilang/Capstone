@@ -1,5 +1,5 @@
 import { pool } from '../database/db.js';
-import { validateQuantity, validateId } from '../utils/validation.js';
+import { validateId, validateQuantity } from '../utils/validation.js';
 
 // ✅ Add to Cart
 export const addToCart = async (req, res) => {
@@ -59,7 +59,7 @@ export const addToCart = async (req, res) => {
 
     // Check if same product & size is already in cart
     const [existing] = await pool.query(
-      `SELECT * FROM cart_items WHERE user_id = ? AND product_id = ? AND size_id = ?`,
+      `SELECT * FROM cart WHERE user_id = ? AND product_id = ? AND size_id = ?`,
       [user_id, product_id, size_id || null]
     );
 
@@ -74,14 +74,14 @@ export const addToCart = async (req, res) => {
 
     if (existing.length > 0) {
       await pool.query(
-        `UPDATE cart_items SET quantity = ? WHERE id = ?`,
+        `UPDATE cart SET quantity = ? WHERE id = ?`,
         [newQty, existing[0].id]
       );
       return res.json({ message: 'Cart item quantity updated' });
     }
 
     await pool.query(
-      `INSERT INTO cart_items (user_id, product_id, size_id, quantity) VALUES (?, ?, ?, ?)`,
+      `INSERT INTO cart (user_id, product_id, size_id, quantity) VALUES (?, ?, ?, ?)`,
       [user_id, product_id, size_id || null, quantity]
     );
 
@@ -106,7 +106,7 @@ export const getCart = async (req, res) => {
         p.image,
         ps.size,
         ps.id as size_id
-      FROM cart_items c
+      FROM cart c
       JOIN products p ON c.product_id = p.id
       LEFT JOIN product_sizes ps ON c.size_id = ps.id
       WHERE c.user_id = ?
@@ -129,7 +129,7 @@ export const updateCart = async (req, res) => {
   }
 
   try {
-    const [cartRows] = await pool.query(`SELECT * FROM cart_items WHERE id = ?`, [id]);
+    const [cartRows] = await pool.query(`SELECT * FROM cart WHERE id = ?`, [id]);
     if (cartRows.length === 0) {
       return res.status(404).json({ error: 'Cart item not found' });
     }
@@ -160,7 +160,7 @@ export const updateCart = async (req, res) => {
     }
 
     await pool.query(
-      `UPDATE cart_items SET quantity = ?, size_id = ? WHERE id = ?`,
+      `UPDATE cart SET quantity = ?, size_id = ? WHERE id = ?`,
       [quantity, size_id || null, id]
     );
 
@@ -176,7 +176,7 @@ export const deleteCartItem = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [result] = await pool.query(`DELETE FROM cart_items WHERE id = ?`, [id]);
+    const [result] = await pool.query(`DELETE FROM cart WHERE id = ?`, [id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Cart item not found' });
@@ -194,7 +194,7 @@ export const clearCart = async (req, res) => {
   const user_id = req.user.id;
 
   try {
-    await pool.query(`DELETE FROM cart_items WHERE user_id = ?`, [user_id]);
+    await pool.query(`DELETE FROM cart WHERE user_id = ?`, [user_id]);
     res.json({ message: 'Cart cleared successfully' });
   } catch (err) {
     console.error('Clear cart error:', err);

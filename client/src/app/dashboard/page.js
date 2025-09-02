@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/auth-context';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import Footer from '@/components/common/footer';
 import Navbar from '@/components/common/nav-bar';
+import { useAuth } from '@/context/auth-context';
 import API from '@/lib/axios';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function UserDashboard() {
   const { user, isAuthenticated, loading } = useAuth();

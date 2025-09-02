@@ -1,13 +1,12 @@
 import { pool } from '../database/db.js';
-import { 
-  validateName, 
-  validatePrice, 
-  validateStock, 
-  validateSize, 
-  validateCategory, 
-  validateImageUrl,
-  validateId,
-  validatePagination
+import {
+    validateId,
+    validateImageUrl,
+    validateName,
+    validatePagination,
+    validatePrice,
+    validateSize,
+    validateStock
 } from '../utils/validation.js';
 
 // Low stock threshold
@@ -272,13 +271,18 @@ export const getProductById = async (req, res) => {
 
     const product = rows[0];
     
-    // Get product sizes
-    const [sizes] = await pool.query(
-      'SELECT * FROM product_sizes WHERE product_id = ?',
-      [id]
-    );
-
-    product.sizes = sizes;
+    // Try to get product sizes if the table exists, otherwise set empty array
+    try {
+      const [sizes] = await pool.query(
+        'SELECT * FROM product_sizes WHERE product_id = ?',
+        [id]
+      );
+      product.sizes = sizes;
+    } catch (sizeError) {
+      // If product_sizes table doesn't exist, just set empty array
+      console.log('Product sizes table not available, setting empty array');
+      product.sizes = [];
+    }
 
     res.json(product);
   } catch (error) {

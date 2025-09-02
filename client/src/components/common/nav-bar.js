@@ -1,12 +1,12 @@
 'use client';
+import {
+    BellIcon,
+    MagnifyingGlassIcon,
+    ShoppingCartIcon,
+    UserCircleIcon,
+} from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
-import {
-  MagnifyingGlassIcon,
-  BellIcon,
-  ShoppingCartIcon,
-  UserCircleIcon,
-} from '@heroicons/react/24/outline';
 
 export default function Navbar() {
   return (
