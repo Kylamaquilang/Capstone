@@ -331,6 +331,7 @@ export default function UserProfilePage() {
                   width={100}
                   height={100}
                   className="rounded-full object-cover border-4 border-white shadow-lg"
+                  style={{ width: 'auto', height: 'auto' }}
                   onError={(e) => {
                     e.target.style.display = 'none';
                     e.target.nextSibling.style.display = 'flex';
@@ -626,13 +627,14 @@ export default function UserProfilePage() {
                 <div key={order.id} className="flex gap-6 items-start border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
                   {/* Image with alt fallback */}
                   <div className="flex-shrink-0">
-                    <Image
-                      src="/images/polo.png"
-                      alt={order.name || 'Order Image'}
-                      width={120}
-                      height={120}
-                      className="rounded-lg object-cover"
-                    />
+                                          <Image
+                        src="/images/polo.png"
+                        alt={order.name || 'Order Image'}
+                        width={120}
+                        height={120}
+                        className="rounded-lg object-cover"
+                        style={{ width: 'auto', height: 'auto' }}
+                      />
                   </div>
 
                   {/* Order Info */}

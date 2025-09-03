@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../database/db.js';
 import { validateEmail, validateStudentId, validatePassword } from '../utils/validation.js';
 import { sendPasswordResetEmail, generateVerificationCode, sendWelcomeEmail } from '../utils/emailService.js';
+import { transporter } from '../utils/emailService.js'; // Added for new email functions
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
 const SALT_ROUNDS = 12;
@@ -219,61 +220,103 @@ export const signin = async (req, res) => {
 
 // ✅ CHANGE PASSWORD
 export const changePassword = async (req, res) => {
+  const { email, verificationCode, newPassword } = req.body;
+
+  if (!email || !verificationCode || !newPassword) {
+    return res.status(400).json({ error: 'Email, verification code, and new password are required' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  }
+
   try {
-    const { email, student_id, oldPassword, newPassword } = req.body;
-
-    // Enhanced validation
-    if ((!email && !student_id) || !oldPassword || !newPassword) {
-      return res.status(400).json({ 
-        error: 'All fields are required',
-        required: ['email or student_id', 'oldPassword', 'newPassword']
-      });
-    }
-
-    if (email && !validateEmail(email)) {
-      return res.status(400).json({ error: 'Invalid email format' });
-    }
-
-    if (!validatePassword(newPassword)) {
-      return res.status(400).json({ 
-        error: 'New password must be at least 6 characters long' 
-      });
-    }
-
-    if (oldPassword === newPassword) {
-      return res.status(400).json({ 
-        error: 'New password must be different from old password' 
-      });
-    }
-
-    // Find user by email or student_id
-    const lookupField = email ? 'email' : 'student_id';
-    const lookupValue = email ? email.trim() : student_id.trim();
-    const [users] = await pool.query(`SELECT * FROM users WHERE ${lookupField} = ?`, [lookupValue]);
-
+    // Get user
+    const [users] = await pool.query('SELECT id, name FROM users WHERE email = ?', [email]);
+    
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     const user = users[0];
 
-    // Compare old password
-    const isMatch = await bcrypt.compare(oldPassword.trim(), user.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Old password is incorrect' });
+    // Verify the code
+    const [codes] = await pool.query(`
+      SELECT * FROM password_reset_codes 
+      WHERE user_id = ? AND code = ? AND expires_at > NOW() 
+      ORDER BY created_at DESC LIMIT 1
+    `, [user.id, verificationCode]);
+
+    if (codes.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired verification code' });
     }
 
-    // Hash and update new password
-    const hashedPassword = await bcrypt.hash(newPassword.trim(), SALT_ROUNDS);
-    await pool.query(
-      `UPDATE users SET password = ?, must_change_password = 0 WHERE ${lookupField} = ?`, 
-      [hashedPassword, lookupValue]
-    );
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
-    res.status(200).json({ message: 'Password changed successfully' });
+    // Update password
+    await pool.query('UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?', [hashedPassword, user.id]);
+
+    // Delete the used verification code
+    await pool.query('DELETE FROM password_reset_codes WHERE user_id = ? AND code = ?', [user.id, verificationCode]);
+
+    // Send confirmation email
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Password Changed Successfully - ESSEN Store',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #000C50 0%, #1e40af 100%); color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0;">ESSEN Store</h1>
+            <p style="margin: 10px 0 0 0;">Password Update Confirmation</p>
+          </div>
+          
+          <div style="padding: 30px 20px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${user.name},</h2>
+            
+            <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0; color: #155724;">
+                ✅ Your password has been successfully changed.
+              </p>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              Your account password was updated on ${new Date().toLocaleString()}. If you did not make this change, please contact our support team immediately.
+            </p>
+            
+            <div style="background: #e8f4fd; border-left: 4px solid #000C50; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0; color: #333;">
+                <strong>Security Reminder:</strong> Keep your password secure and never share it with anyone. Consider using a strong, unique password for your account.
+              </p>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/login" 
+                 style="background: #000C50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                Login to Your Account
+              </a>
+            </div>
+          </div>
+          
+          <div style="background: #333; color: white; padding: 20px; text-align: center; font-size: 14px;">
+            <p style="margin: 0;">© 2024 ESSEN Store. All rights reserved.</p>
+            <p style="margin: 5px 0 0 0;">"Equip yourself for success, find everything you need to thrive in school"</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ 
+      message: 'Password changed successfully',
+      user: { id: user.id, name: user.name, email }
+    });
+
   } catch (error) {
-    console.error('Change password error:', error.message);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
   }
 };
 
@@ -549,5 +592,93 @@ export const updateProfile = async (req, res) => {
   } catch (error) {
     console.error('Update profile error:', error.message);
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Send verification code for password change
+export const sendVerificationCode = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    // Check if user exists
+    const [users] = await pool.query('SELECT id, name FROM users WHERE email = ?', [email]);
+    
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found with this email' });
+    }
+
+    const user = users[0];
+    
+    // Generate 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store verification code with expiration (15 minutes)
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+    
+    await pool.query(`
+      INSERT INTO password_reset_codes (user_id, code, expires_at) 
+      VALUES (?, ?, ?)
+      ON DUPLICATE KEY UPDATE code = VALUES(code), expires_at = VALUES(expires_at)
+    `, [user.id, verificationCode, expiresAt]);
+
+    // Send email with verification code
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Password Change Verification Code - ESSEN Store',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #000C50 0%, #1e40af 100%); color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0;">ESSEN Store</h1>
+            <p style="margin: 10px 0 0 0;">Password Change Verification</p>
+          </div>
+          
+          <div style="padding: 30px 20px; background: #f8f9fa;">
+            <h2 style="color: #333; margin-bottom: 20px;">Hello ${user.name},</h2>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              You have requested to change your password. Please use the verification code below to complete the process.
+            </p>
+            
+            <div style="background: white; border: 2px solid #000C50; border-radius: 10px; padding: 20px; text-align: center; margin: 20px 0;">
+              <h3 style="color: #000C50; margin: 0 0 10px 0;">Your Verification Code</h3>
+              <div style="font-size: 32px; font-weight: bold; color: #000C50; letter-spacing: 5px; font-family: monospace;">
+                ${verificationCode}
+              </div>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
+              This code will expire in <strong>15 minutes</strong>. If you didn't request this password change, please ignore this email.
+            </p>
+            
+            <div style="background: #e8f4fd; border-left: 4px solid #000C50; padding: 15px; margin: 20px 0;">
+              <p style="margin: 0; color: #333;">
+                <strong>Security Tip:</strong> Never share this verification code with anyone. ESSEN Store staff will never ask for this code.
+              </p>
+            </div>
+          </div>
+          
+          <div style="background: #333; color: white; padding: 20px; text-align: center; font-size: 14px;">
+            <p style="margin: 0;">© 2024 ESSEN Store. All rights reserved.</p>
+            <p style="margin: 5px 0 0 0;">"Equip yourself for success, find everything you need to thrive in school"</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.status(200).json({ 
+      message: 'Verification code sent successfully',
+      email: email // Return email for confirmation
+    });
+
+  } catch (error) {
+    console.error('Send verification code error:', error);
+    res.status(500).json({ error: 'Failed to send verification code' });
   }
 };

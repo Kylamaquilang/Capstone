@@ -8,7 +8,8 @@ import {
   updateProfile,
   requestPasswordReset,
   verifyPasswordResetCode,
-  resetPasswordWithToken
+  resetPasswordWithToken,
+  sendVerificationCode
 } from '../controllers/auth.controller.js';
 import { verifyToken } from '../middleware/auth.middleware.js';
 import { pool } from '../database/db.js';
@@ -40,6 +41,9 @@ router.post('/refresh-token', refreshToken);
 router.post('/request-reset', requestPasswordReset);
 router.post('/verify-code', verifyPasswordResetCode);
 router.post('/reset-password', resetPasswordWithToken);
+
+// Email verification routes for password change
+router.post('/send-verification-code', sendVerificationCode);
 
 // Protected routes
 router.put('/profile', verifyToken, updateProfile);

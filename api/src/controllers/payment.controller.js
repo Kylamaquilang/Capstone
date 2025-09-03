@@ -96,8 +96,8 @@ export const createGCashPayment = async (req, res) => {
       data: {
         attributes: {
           payment_method: paymentMethod.id,
-          return_url: `${process.env.CLIENT_URL}/payment/success?order_id=${orderId}`,
-          cancel_url: `${process.env.CLIENT_URL}/payment/cancel?order_id=${orderId}`
+          return_url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/payment/success?order_id=${orderId}`,
+          cancel_url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/payment/cancel?order_id=${orderId}`
         }
       }
     };
@@ -252,7 +252,7 @@ export const cancelPayment = async (req, res) => {
 
   try {
     const [orders] = await pool.query(
-      'SELECT payment_intent_id, payment_status FROM orders WHERE id = ? AND user_id = ?',
+      'SELECT payment_intent_id FROM orders WHERE id = ? AND user_id = ?',
       [orderId, userId]
     );
 
@@ -261,10 +261,6 @@ export const cancelPayment = async (req, res) => {
     }
 
     const order = orders[0];
-
-    if (order.payment_status === 'paid') {
-      return res.status(400).json({ error: 'Payment cannot be cancelled' });
-    }
 
     if (order.payment_intent_id) {
       // Cancel payment intent in PayMongo
@@ -278,18 +274,21 @@ export const cancelPayment = async (req, res) => {
           }
         }
       );
+
+      // Update order status
+      await pool.query(
+        'UPDATE orders SET payment_status = ?, status = ? WHERE id = ?',
+        ['cancelled', 'cancelled', orderId]
+      );
+
+      // Update payment transaction
+      await pool.query(
+        'UPDATE payment_transactions SET status = ? WHERE transaction_id = ?',
+        ['cancelled', order.payment_intent_id]
+      );
     }
 
-    // Update order status
-    await pool.query(
-      'UPDATE orders SET payment_status = ?, status = ? WHERE id = ?',
-      ['cancelled', 'cancelled', orderId]
-    );
-
-    res.json({ 
-      success: true, 
-      message: 'Payment cancelled successfully' 
-    });
+    res.json({ message: 'Payment cancelled successfully' });
 
   } catch (error) {
     console.error('Cancel payment error:', error);

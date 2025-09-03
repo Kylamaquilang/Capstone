@@ -1,5 +1,7 @@
 'use client';
 import Link from 'next/link';
+import { useAuth } from '@/context/auth-context';
+import { useRouter } from 'next/navigation';
 import { 
   CubeIcon, ClipboardDocumentListIcon, XCircleIcon, BanknotesIcon, 
   BellIcon, UserCircleIcon, ArrowLeftOnRectangleIcon, 
@@ -7,6 +9,14 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
+  const { logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    router.push('/auth/login');
+  };
+
   return (
     <div className="w-64 bg-white text-black-900 flex flex-col justify-between border-r shadow-md" style={{ height: 'calc(100vh - 64px)' }}>
       {/* Top - Navigation Items */}
@@ -23,10 +33,13 @@ export default function Sidebar() {
 
       {/* Bottom - Logout */}
       <div className="p-6">
-        <Link href="/logout" className="flex items-center text-black-900 hover:text-black transition ml-3">
+        <button 
+          onClick={handleLogout}
+          className="flex items-center text-black-900 hover:text-red-600 transition ml-3 w-full"
+        >
           <ArrowLeftOnRectangleIcon className="h-7 w-7 mr-3" />
           <span className="text-base font-medium">Logout</span>
-        </Link>
+        </button>
       </div>
     </div>
   );
