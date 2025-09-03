@@ -48,7 +48,7 @@ export default function useLogin() {
 
       // Redirect based on role
       if (data.user.role === 'admin') {
-        router.push('/admin');
+        router.push('/admin/orders');
       } else {
         router.push('/dashboard');
       }

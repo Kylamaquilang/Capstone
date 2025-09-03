@@ -9,24 +9,25 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [updatingStatus, setUpdatingStatus] = useState(null);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      // Try to get students from the new endpoint first
-      const { data } = await API.get('/students/all');
-      setUsers(data.students || []);
+      // Try to get users from the new user management endpoint
+      const { data } = await API.get('/users/all');
+      setUsers(data.users || []);
       setError('');
     } catch (err) {
-      // Fallback to dashboard users if student endpoint is unavailable
+      // Fallback to students endpoint if user management is unavailable
       try {
-        const { data } = await API.get('/dashboard/users');
-        setUsers(data.users || []);
+        const { data } = await API.get('/students/all');
+        setUsers(data.students || []);
         setError('');
       } catch (e2) {
-        // Fallback to test endpoint if admin users is unavailable
+        // Fallback to dashboard users if students endpoint is unavailable
         try {
-          const { data } = await API.get('/auth/test-db');
+          const { data } = await API.get('/dashboard/users');
           setUsers(data.users || []);
           setError('');
         } catch (e3) {
@@ -42,6 +43,53 @@ export default function AdminUsersPage() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handleStatusToggle = async (userId, currentStatus) => {
+    try {
+      setUpdatingStatus(userId);
+      await API.patch(`/users/${userId}/status`, {
+        is_active: !currentStatus
+      });
+      
+      // Update local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId 
+            ? { ...user, is_active: !currentStatus }
+            : user
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update user status:', err);
+      alert(err?.response?.data?.error || 'Failed to update user status');
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId, userName) => {
+    if (!confirm(`Are you sure you want to delete user "${userName}"?`)) {
+      return;
+    }
+
+    try {
+      await API.delete(`/users/${userId}`);
+      
+      // Update local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId 
+            ? { ...user, is_active: false }
+            : user
+        )
+      );
+      
+      alert('User deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      alert(err?.response?.data?.error || 'Failed to delete user');
+    }
+  };
 
   const getDegreeDisplayName = (degree) => {
     const degreeNames = {
@@ -65,6 +113,30 @@ export default function AdminUsersPage() {
     );
   };
 
+  const getActiveStatusBadge = (isActive) => {
+    const statusClasses = isActive 
+      ? 'bg-green-100 text-green-800' 
+      : 'bg-red-100 text-red-800';
+    
+    return (
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusClasses}`}>
+        {isActive ? 'Active' : 'Inactive'}
+      </span>
+    );
+  };
+
+  const getRoleBadge = (role) => {
+    const roleClasses = role === 'admin' 
+      ? 'bg-purple-100 text-purple-800' 
+      : 'bg-blue-100 text-blue-800';
+    
+    return (
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleClasses}`}>
+        {role?.charAt(0).toUpperCase() + role?.slice(1)}
+      </span>
+    );
+  };
+
   return (
     <div className="flex flex-col h-screen text-black">
       <Navbar />
@@ -75,7 +147,7 @@ export default function AdminUsersPage() {
         <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">STUDENTS</h2>
+              <h2 className="text-2xl font-bold">USER MANAGEMENT</h2>
               <div className="flex items-center gap-2">
                 <Link href="/admin/users/add-student">
                   <button className="bg-[#000C50] text-white px-4 py-2 rounded hover:bg-blue-900 transition">
@@ -90,7 +162,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
             {loading ? (
-              <div className="text-gray-600">Loading students...</div>
+              <div className="text-gray-600">Loading users...</div>
             ) : error ? (
               <div className="text-red-600">{error}</div>
             ) : (
@@ -102,9 +174,12 @@ export default function AdminUsersPage() {
                       <th className="px-4 py-2">Student ID</th>
                       <th className="px-4 py-2">Name</th>
                       <th className="px-4 py-2">Email</th>
+                      <th className="px-4 py-2">Role</th>
                       <th className="px-4 py-2">Degree</th>
                       <th className="px-4 py-2">Status</th>
+                      <th className="px-4 py-2">Active</th>
                       <th className="px-4 py-2">Created</th>
+                      <th className="px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -123,6 +198,7 @@ export default function AdminUsersPage() {
                           </div>
                         </td>
                         <td className="px-4 py-2 text-sm">{user.email}</td>
+                        <td className="px-4 py-2">{getRoleBadge(user.role)}</td>
                         <td className="px-4 py-2">
                           <div className="text-sm">
                             <div className="font-medium">{user.degree}</div>
@@ -130,8 +206,30 @@ export default function AdminUsersPage() {
                           </div>
                         </td>
                         <td className="px-4 py-2">{getStatusBadge(user.status)}</td>
+                        <td className="px-4 py-2">{getActiveStatusBadge(user.is_active)}</td>
                         <td className="px-4 py-2 text-sm text-gray-500">
                           {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleStatusToggle(user.id, user.is_active)}
+                              disabled={updatingStatus === user.id}
+                              className={`px-3 py-1 text-xs rounded ${
+                                user.is_active
+                                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                              } ${updatingStatus === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {updatingStatus === user.id ? 'Updating...' : (user.is_active ? 'Deactivate' : 'Activate')}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id, user.name)}
+                              className="px-3 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -139,7 +237,7 @@ export default function AdminUsersPage() {
                 </table>
                 {users.length === 0 && (
                   <div className="text-gray-600 mt-4 text-center py-8">
-                    No students found.
+                    No users found.
                   </div>
                 )}
               </div>

@@ -7,8 +7,25 @@ import {
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useNotifications } from '@/context/NotificationContext';
 
 export default function Navbar() {
+  const { cartCount, notificationCount } = useNotifications();
+
+  // Badge component
+  const Badge = ({ count, children }) => {
+    if (count === 0) return children;
+    
+    return (
+      <div className="relative">
+        {children}
+        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+          {count > 99 ? '99+' : count}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <nav className="bg-[#000C50] text-white p-4 flex items-center justify-between">
       <div className="flex items-center gap-4">
@@ -21,8 +38,19 @@ export default function Navbar() {
       </div>
       <div className="flex gap-4 items-center">
         <button><MagnifyingGlassIcon className="h-6 w-6 text-white" /></button>
-        <Link href="/notification"><BellIcon className="h-6 w-6 text-white" /></Link>
-        <Link href="/cart"><ShoppingCartIcon className="h-6 w-6 text-white" /></Link>
+        
+        <Link href="/notification">
+          <Badge count={notificationCount}>
+            <BellIcon className="h-6 w-6 text-white" />
+          </Badge>
+        </Link>
+        
+        <Link href="/cart">
+          <Badge count={cartCount}>
+            <ShoppingCartIcon className="h-6 w-6 text-white" />
+          </Badge>
+        </Link>
+        
         <Link href="/user-profile"><UserCircleIcon className="h-6 w-6 text-white" /></Link>
       </div>
     </nav>

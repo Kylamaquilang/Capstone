@@ -1,5 +1,6 @@
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/auth-context';
+import { NotificationProvider } from '@/context/NotificationContext';
 import { Montserrat } from 'next/font/google';
 import './globals.css';
 
@@ -19,7 +20,9 @@ export default function RootLayout({ children }) {
       <body className={montserrat.className}>
         <AuthProvider>
           <CartProvider>
-            {children}
+            <NotificationProvider>
+              {children}
+            </NotificationProvider>
           </CartProvider>
         </AuthProvider>
       </body>

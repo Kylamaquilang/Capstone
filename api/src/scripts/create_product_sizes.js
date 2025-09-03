@@ -1,15 +1,14 @@
-import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Database configuration
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  port: process.env.DB_PORT || 3306,
   database: 'capstone_db',
+  port: process.env.DB_PORT || 3306,
   charset: 'utf8mb4',
 };
 
@@ -19,7 +18,6 @@ async function createProductSizes() {
   try {
     console.log('🔧 Creating product_sizes table...');
     
-    // Connect to database
     connection = await mysql.createConnection(dbConfig);
     console.log('✅ Connected to capstone_db database');
     
@@ -28,59 +26,57 @@ async function createProductSizes() {
       CREATE TABLE IF NOT EXISTS product_sizes (
         id INT PRIMARY KEY AUTO_INCREMENT,
         product_id INT NOT NULL,
-        size VARCHAR(20) NOT NULL,
+        size VARCHAR(10) NOT NULL,
         stock INT DEFAULT 0,
         price DECIMAL(10,2),
-        is_active BOOLEAN DEFAULT TRUE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
         UNIQUE KEY unique_product_size (product_id, size)
       )
     `);
     console.log('✅ product_sizes table created');
     
-    // Get existing products
-    const [products] = await connection.execute('SELECT id, name, size, stock, price FROM products');
-    console.log(`📦 Found ${products.length} products to process`);
+    // Add sample product sizes for existing products
+    const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+    const products = [1, 2, 3]; // PE Shirt, PE Pants, School Polo
     
-    // Insert size data for each product
-    for (const product of products) {
-      if (product.size) {
-        // Product already has a size, create a size record
-        await connection.execute(`
-          INSERT INTO product_sizes (product_id, size, stock, price) 
-          VALUES (?, ?, ?, ?)
-          ON DUPLICATE KEY UPDATE 
-          stock = VALUES(stock), 
-          price = VALUES(price)
-        `, [product.id, product.size, product.stock, product.price]);
+    console.log('🔧 Adding sample product sizes...');
+    
+    for (const productId of products) {
+      for (const size of sizes) {
+        const stock = Math.floor(Math.random() * 20) + 5; // Random stock between 5-25
+        const price = 450.00; // Default price
         
-        console.log(`✅ Added size ${product.size} for ${product.name}`);
-      } else {
-        // Product doesn't have a size, add default sizes
-        const defaultSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-        for (const size of defaultSizes) {
+        try {
           await connection.execute(`
-            INSERT INTO product_sizes (product_id, size, stock, price) 
+            INSERT INTO product_sizes (product_id, size, stock, price)
             VALUES (?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE 
-            stock = VALUES(stock), 
-            price = VALUES(price)
-          `, [product.id, size, Math.floor(product.stock / defaultSizes.length), product.price]);
+            ON DUPLICATE KEY UPDATE stock = ?, price = ?
+          `, [productId, size, stock, price, stock, price]);
+        } catch (error) {
+          // Ignore duplicate key errors
+          console.log(`   - Size ${size} for product ${productId} already exists`);
         }
-        console.log(`✅ Added default sizes for ${product.name}`);
       }
     }
     
-    // Verify the data
-    const [sizeCount] = await connection.execute('SELECT COUNT(*) as count FROM product_sizes');
-    console.log(`📊 Total size records created: ${sizeCount[0].count}`);
+    console.log('✅ Sample product sizes added');
+    
+    // Show sample data
+    console.log('\n📋 Sample product sizes:');
+    const [sampleSizes] = await connection.execute(`
+      SELECT ps.*, p.name as product_name 
+      FROM product_sizes ps 
+      JOIN products p ON ps.product_id = p.id 
+      LIMIT 10
+    `);
+    
+    sampleSizes.forEach(size => {
+      console.log(`   - Product: ${size.product_name}, Size: ${size.size}, Stock: ${size.stock}, Price: ₱${size.price}`);
+    });
     
     await connection.end();
-    
     console.log('\n🎉 Product sizes setup completed successfully!');
-    console.log('📝 Products now have proper size information');
     
   } catch (error) {
     console.error('❌ Error creating product sizes:', error.message);

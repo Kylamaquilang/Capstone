@@ -57,8 +57,8 @@ export default function UserDashboard() {
       
       setProducts(groupedProducts);
     } catch (err) {
-      console.error('Error fetching products:', err);
-      setError('Failed to load products');
+      console.log('Error fetching products (server might be starting):', err.message);
+      setError('Failed to load products. Please try again in a moment.');
     } finally {
       setProductsLoading(false);
     }
@@ -72,7 +72,7 @@ export default function UserDashboard() {
   
 
         {/* Banner Section */}
-        <section className="flex w-300 h-[400px] mt-8 mb-10 mt-15 rounded-sm overflow-hidden shadow-md">
+        <section className="flex w-300 h-[400px] mt-15 mb-10 mt-15 rounded-sm overflow-hidden shadow-md">
           <div className="relative w-3/4">
             <Image
               src="/images/school.png"
@@ -124,49 +124,50 @@ export default function UserDashboard() {
                       <Link
                         key={item.id}
                         href={`/products/${encodeURIComponent(item.name)}`}
-                        className="block group"
+                                                 className="block"
                       >
-                        <div className="w-full max-w-[280px] h-[380px] border rounded-lg p-4 shadow-lg hover:shadow-xl transition duration-300 text-left bg-white cursor-pointer transform hover:-translate-y-1 group-hover:border-[#000C50]">
-                          <div className="relative h-48 mb-4 overflow-hidden rounded-md">
-                            <Image
-                              src={item.src}
-                              alt={item.name}
-                              fill
-                              className="object-cover group-hover:scale-105 transition-transform duration-300"
-                              onError={(e) => {
-                                // Fallback to default image if the main image fails
-                                e.target.src = '/images/polo.png';
-                              }}
-                            />
-                            {item.stock <= 0 && (
-                              <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                                Out of Stock
-                              </div>
-                            )}
-                            {item.stock > 0 && item.stock <= 5 && (
-                              <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
-                                Low Stock
-                              </div>
-                            )}
-                          </div>
-                          <p className="text-lg font-bold mb-2 text-black line-clamp-2 group-hover:text-[#000C50] transition-colors">
-                            {item.name}
-                          </p>
-                          <span className="inline-block text-white bg-[#000C50] text-xs font-semibold px-3 py-1 rounded-full mb-2">
-                            {item.label}
-                          </span>
-                          <p className="text-lg font-semibold text-[#000C50] mb-2">{item.price}</p>
-                          {item.description && (
-                            <p className="text-sm text-gray-600 line-clamp-2 mb-2">{item.description}</p>
-                          )}
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm text-gray-500">
-                              Stock: {item.stock > 0 ? item.stock : 'Out of stock'}
-                            </p>
-                            <div className="text-xs text-[#000C50] font-medium group-hover:underline">
-                              View Details →
-                            </div>
-                          </div>
+                                                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+                           {/* Product Image */}
+                           <div className="relative h-55 bg-gray-100">
+                             <Image
+                               src={item.src}
+                               alt={item.name}
+                               fill
+                               className="object-cover"
+                               onError={(e) => {
+                                 e.target.src = '/images/polo.png';
+                               }}
+                             />
+                             {/* Stock Badge */}
+                             {item.stock <= 0 && (
+                               <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
+                                 Out of Stock
+                               </div>
+                             )}
+                             {item.stock > 0 && item.stock <= 5 && (
+                               <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded">
+                                 Low Stock
+                               </div>
+                             )}
+                           </div>
+                           
+                           {/* Product Info */}
+                           <div className="p-4">
+                             <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-2">
+                               {item.name}
+                             </h3>
+                             <p className="text-lg font-bold text-[#000C50] mb-2">
+                               {item.price}
+                             </p>
+                             <div className="flex items-center justify-between">
+                               <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                 {item.label}
+                               </span>
+                               <span className="text-xs text-gray-500">
+                                 Stock: {item.stock}
+                               </span>
+                             </div>
+                           </div>
                         </div>
                       </Link>
                     ))}

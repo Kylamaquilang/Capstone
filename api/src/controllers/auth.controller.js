@@ -169,7 +169,7 @@ export const signin = async (req, res) => {
 
     // Check if user is active
     if (!user.is_active) {
-      return res.status(403).json({ error: 'Account is deactivated' });
+      return res.status(403).json({ error: 'Account is deactivated. Please contact an administrator.' });
     }
 
     // Verify password

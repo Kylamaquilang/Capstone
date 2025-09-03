@@ -1,177 +1,257 @@
 'use client';
-import Image from 'next/image';
-import { useState } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
-import Swal from 'sweetalert2';
-
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/auth-context';
+import { useNotifications } from '@/context/NotificationContext';
+import ProtectedRoute from '@/components/common/ProtectedRoute';
 import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
-
-const notifications = [
-  {
-    id: 1,
-    message: 'Your order #1234 has been confirmed.',
-    date: 'June 25, 2025',
-    name: 'BSIT POLO',
-    image: '/images/polo.png',
-    size: 'M',
-    quantity: 2,
-    price: 450,
-    status: 'confirmed',
-  },
-  {
-    id: 2,
-    message: 'Your IT Polo is out for delivery.',
-    date: 'June 24, 2025',
-    name: 'IT POLO',
-    image: '/images/polo.png',
-    size: 'L',
-    quantity: 1,
-    price: 450,
-    status: 'out-for-delivery',
-  },
-  {
-    id: 3,
-    message: 'Order #1233 has been delivered successfully.',
-    date: 'June 23, 2025',
-    name: 'PE Pants',
-    image: '/images/pe-pants.png',
-    size: 'L',
-    quantity: 1,
-    price: 400,
-    status: 'delivered',
-  },
-];
+import API from '@/lib/axios';
+import Swal from 'sweetalert2';
 
 export default function NotificationPage() {
-  const [selectedNotification, setSelectedNotification] = useState(null);
+  const { user, isAuthenticated } = useAuth();
+  const { decrementNotificationCount, updateNotificationCount } = useNotifications();
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const getActionLabel = (status) => {
-    switch (status) {
-      case 'confirmed':
-        return 'Cancel Order';
-      case 'out-for-delivery':
-        return 'Mark as Received';
-      case 'delivered':
-        return 'Claim Order';
-      default:
-        return 'Action';
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchNotifications();
+    }
+  }, [isAuthenticated]);
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const response = await API.get('/notifications');
+      if (response.data.success) {
+        setNotifications(response.data.notifications);
+      } else {
+        setError('Failed to load notifications');
+      }
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setError('Failed to load notifications');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const openModal = (notif) => setSelectedNotification(notif);
-  const closeModal = () => setSelectedNotification(null);
-
-  const handleAction = () => {
-    const { name, status } = selectedNotification;
-
-    let title = '';
-    let text = '';
-
-    if (status === 'confirmed') {
-      title = 'Order Cancelled';
-      text = `Your order for ${name} has been cancelled.`;
-    } else if (status === 'out-for-delivery') {
-      title = 'Item Received';
-      text = `You have successfully marked ${name} as received.`;
-    } else if (status === 'delivered') {
-      title = 'Claim Successful';
-      text = `You have successfully claimed ${name}.`;
+  const markAsRead = async (id) => {
+    try {
+      const response = await API.put(`/notifications/${id}/read`);
+      if (response.data.success) {
+        setNotifications(prev => 
+          prev.map(notification => 
+            notification.id === id 
+              ? { ...notification, is_read: 1 }
+              : notification
+          )
+        );
+        
+        // Decrement notification count
+        decrementNotificationCount();
+        
+        Swal.fire({
+          icon: 'success',
+          title: 'Marked as Read',
+          text: 'Notification marked as read',
+          confirmButtonColor: '#000C50',
+        });
+      }
+    } catch (err) {
+      console.error('Error marking as read:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to mark notification as read',
+        confirmButtonColor: '#000C50',
+      });
     }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const result = await Swal.fire({
+        title: 'Mark All as Read',
+        text: 'Are you sure you want to mark all notifications as read?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#000C50',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, mark all!',
+        cancelButtonText: 'Cancel'
+      });
+
+      if (result.isConfirmed) {
+        const response = await API.put('/notifications/mark-all-read');
+        if (response.data.success) {
+          setNotifications(prev => 
+            prev.map(notification => ({ ...notification, is_read: 1 }))
+          );
+          
+          // Update notification count to 0
+          updateNotificationCount(0);
+          
+          Swal.fire({
+            icon: 'success',
+            title: 'All Marked as Read',
+            text: 'All notifications marked as read',
+            confirmButtonColor: '#000C50',
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error marking all as read:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to mark all notifications as read',
+        confirmButtonColor: '#000C50',
+      });
+    }
+  };
+
+  const deleteNotification = async (id) => {
+    try {
+      const result = await Swal.fire({
+        title: 'Delete Notification',
+        text: 'Are you sure you want to delete this notification?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#000C50',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+      });
+
+      if (result.isConfirmed) {
+        const response = await API.delete(`/notifications/${id}`);
+        if (response.data.success) {
+          setNotifications(prev => prev.filter(notification => notification.id !== id));
 
     Swal.fire({
       icon: 'success',
-      title,
-      text,
+            title: 'Deleted',
+            text: 'Notification deleted successfully',
+            confirmButtonColor: '#000C50',
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to delete notification',
       confirmButtonColor: '#000C50',
-      confirmButtonText: 'OK',
-    }).then(() => {
-      closeModal();
     });
+    }
   };
 
+  if (loading) {
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+      <ProtectedRoute>
+        <div className="min-h-screen bg-white">
       <Navbar />
-
-      <main className="flex-grow px-6 py-10">
-        <h2 className="text-3xl font-bold mb-6 text-[#000C50] ml-140">Notifications</h2>
-        <div className="space-y-4">
-          {notifications.map((note) => (
-            <div
-              key={note.id}
-              className="flex justify-between items-start p-6 rounded-lg shadow-lg w-200 h-45 mx-auto"
-            >
-              <div className="flex gap-4">
-                <Image src={note.image} alt={note.name} width={130} height={70} className="rounded" />
-                <div>
-                  <p className="text-s font-semibold mt-5">{note.message}</p>
-                  <p className="text-sm text-gray-600">
-                    {note.name} - Size: {note.size}, Qty: {note.quantity}
-                  </p>
-                  <p className="text-sm font-semibold text-[#000C50]">₱{note.price * note.quantity}.00</p>
-                  <span className="text-xs text-gray-500">{note.date}</span>
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#000C50] mx-auto"></div>
+              <p className="mt-4 text-lg text-gray-600">Loading notifications...</p>
+            </div>
                 </div>
               </div>
-              <div className="mt-2">
+      </ProtectedRoute>
+    );
+  }
+
+  if (error) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-white">
+          <Navbar />
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <p className="text-red-600 text-lg mb-4">{error}</p>
                 <button
-                  onClick={() => openModal(note)}
-                  className="bg-[#000C50] text-white px-3 py-1 text-xs rounded hover:bg-blue-900 mt-11 mr-5 h-8"
+                onClick={fetchNotifications}
+                className="px-6 py-2 bg-[#000C50] text-white rounded hover:bg-[#1a237e] transition-colors"
                 >
-                  {getActionLabel(note.status)}
+                Try Again
                 </button>
               </div>
             </div>
-          ))}
         </div>
-      </main>
+      </ProtectedRoute>
+    );
+  }
 
-      {/* Modal */}
-      {selectedNotification && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-[350px] md:w-[400px] h-[400px] shadow-xl relative">
-            <button className="absolute top-2 right-2" onClick={closeModal}>
-              <XMarkIcon className="h-5 w-5 text-gray-500 hover:text-red-500" />
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-white flex flex-col">
+        <Navbar />
+
+        <main className="flex-grow px-6 py-10 max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-[#000C50]">Notifications</h1>
+            {notifications.length > 0 && (
+              <button
+                onClick={markAllAsRead}
+                className="px-4 py-2 bg-[#000C50] text-white rounded hover:bg-[#1a237e] transition-colors"
+              >
+                Mark All as Read
             </button>
-            <h3 className="text-xl font-bold mb-4 text-[#000C50]">
-              {getActionLabel(selectedNotification.status)}
-            </h3>
-            <div className="flex gap-2">
-              <Image
-                src={selectedNotification.image}
-                alt="Product"
-                width={200}
-                height={180}
-                className="rounded"
-              />
-              <div>
-                <p className="font-bold mt-10">{selectedNotification.name}</p>
-                <p className="text-sm">Size: {selectedNotification.size}</p>
-                <p className="text-sm">Quantity: {selectedNotification.quantity}</p>
-                <p className="text-sm font-semibold text-[#000C50]">
-                  ₱{selectedNotification.price * selectedNotification.quantity}.00
+            )}
+          </div>
+
+          {notifications.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-6xl mb-4">🔔</div>
+              <p className="text-gray-600 text-lg mb-4">No notifications yet</p>
+              <p className="text-gray-500">You'll see notifications here when you receive them.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`bg-white rounded-lg shadow-md p-6 border-l-4 ${
+                    notification.is_read ? 'border-gray-300' : 'border-[#000C50]'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <p className="text-gray-800 mb-2">{notification.message}</p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(notification.created_at).toLocaleString()}
                 </p>
               </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-9">
+                    <div className="flex gap-2 ml-4">
+                      {!notification.is_read && (
               <button
-                className="bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400 w-30"
-                onClick={closeModal}
+                          onClick={() => markAsRead(notification.id)}
+                          className="px-3 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
               >
-                Cancel
+                          Mark Read
               </button>
+                      )}
               <button
-                className="bg-[#000C50] text-white px-4 py-2 rounded hover:bg-blue-900 mr-4 w-40"
-                onClick={handleAction}
+                        onClick={() => deleteNotification(notification.id)}
+                        className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
               >
-                {getActionLabel(selectedNotification.status)}
+                        Delete
               </button>
             </div>
           </div>
+                </div>
+              ))}
         </div>
       )}
+        </main>
 
       <Footer />
     </div>
+    </ProtectedRoute>
   );
 }
