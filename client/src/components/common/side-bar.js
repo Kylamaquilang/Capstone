@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { 
   CubeIcon, ClipboardDocumentListIcon, XCircleIcon, BanknotesIcon, 
   BellIcon, UserCircleIcon, ArrowLeftOnRectangleIcon, 
-  ArchiveBoxIcon, ChartBarIcon
+  ArchiveBoxIcon, ChartBarIcon, TagIcon
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
@@ -23,6 +23,7 @@ export default function Sidebar() {
       <div className="flex flex-col space-y-6 px-6 py-8 ml-3">
         <SidebarItem href="/admin/dashboard" icon={ChartBarIcon} label="Dashboard" />
         <SidebarItem href="/admin/products" icon={CubeIcon} label="Products" />
+        <SidebarItem href="/admin/categories" icon={TagIcon} label="Categories" />
         <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" />
         <SidebarItem href="/admin/orders" icon={ClipboardDocumentListIcon} label="Orders" />
         <SidebarItem href="/admin/cancelled" icon={XCircleIcon} label="Cancelled" />

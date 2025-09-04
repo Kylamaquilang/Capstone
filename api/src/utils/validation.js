@@ -4,11 +4,14 @@ export const validateEmail = (email) => {
   return emailRegex.test(email);
 };
 
-// Student ID validation (adjust pattern as needed)
+// Student ID validation (numeric format)
 export const validateStudentId = (studentId) => {
-  // Basic validation - adjust regex pattern based on your student ID format
-  const studentIdRegex = /^[A-Z0-9]{8,12}$/;
-  return studentIdRegex.test(studentId);
+  if (!studentId || typeof studentId !== 'string') return false;
+  
+  // Pattern: Numeric student ID (4-8 digits)
+  // Allow student IDs from 1000 to 99999999
+  const studentIdRegex = /^[1-9]\d{3,7}$/;
+  return studentIdRegex.test(studentId.trim());
 };
 
 // Password validation

@@ -3,6 +3,7 @@ import {
   getUserOrders,
   getAllOrders,
   getOrderItems,
+  getOrderById,
   updateOrderStatus,
   getOrderStats,
   getSalesPerformance
@@ -12,6 +13,7 @@ import { verifyToken, isAdmin } from '../middleware/verifyToken.js'
 const router = express.Router()
 router.get('/student', verifyToken, getUserOrders)
 router.get('/admin', verifyToken, isAdmin, getAllOrders)
+router.get('/:id', verifyToken, isAdmin, getOrderById)
 
 router.get('/:id/items', verifyToken, getOrderItems)
 router.patch('/:id/status', verifyToken, isAdmin, updateOrderStatus)

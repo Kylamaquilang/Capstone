@@ -20,9 +20,7 @@ export default function AddProductForm() {
     const loadCategories = async () => {
       try {
         const { data } = await API.get('/categories');
-        const allowed = new Set(['POLO', 'PE', 'NSTP', 'TELA', 'LANYARD']);
-        const filtered = (data || []).filter((c) => c?.name && allowed.has(String(c.name).toUpperCase()));
-        setCategories(filtered);
+        setCategories(data || []);
       } catch {
         setCategories([]);
       }

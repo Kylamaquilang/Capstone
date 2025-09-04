@@ -12,6 +12,7 @@ const DEFAULT_STUDENT_PASSWORD = process.env.DEFAULT_STUDENT_PASSWORD || 'cpc123
 export const addStudent = async (req, res) => {
   try {
     const { 
+      student_id,
       first_name, 
       last_name, 
       middle_name, 
@@ -22,10 +23,17 @@ export const addStudent = async (req, res) => {
     } = req.body;
 
     // Validation
-    if (!first_name || !last_name || !email || !degree || !status) {
+    if (!student_id || !first_name || !last_name || !email || !degree || !status) {
       return res.status(400).json({ 
         error: 'Required fields missing',
-        required: ['first_name', 'last_name', 'email', 'degree', 'status']
+        required: ['student_id', 'first_name', 'last_name', 'email', 'degree', 'status']
+      });
+    }
+
+    // Validate student ID format
+    if (!validateStudentId(student_id)) {
+      return res.status(400).json({ 
+        error: 'Invalid student ID format. Expected numeric format (4-8 digits)' 
       });
     }
 
@@ -52,34 +60,19 @@ export const addStudent = async (req, res) => {
       });
     }
 
-    // Check if student already exists
-    const [existing] = await pool.query('SELECT * FROM users WHERE email = ?', [email.trim()]);
-    if (existing.length > 0) {
+    // Check if student already exists with this email
+    const [existingEmail] = await pool.query('SELECT * FROM users WHERE email = ?', [email.trim()]);
+    if (existingEmail.length > 0) {
       return res.status(409).json({ 
         error: 'Student already exists with this email' 
       });
     }
 
-    // Generate student ID (format: YYYY-DEGREE-XXXX)
-    const currentYear = new Date().getFullYear();
-    const [lastStudent] = await pool.query(
-      'SELECT student_id FROM users WHERE student_id LIKE ? ORDER BY student_id DESC LIMIT 1',
-      [`${currentYear}-${degree}-%`]
-    );
-
-    let studentNumber = 1;
-    if (lastStudent.length > 0) {
-      const lastNumber = parseInt(lastStudent[0].student_id.split('-')[2]);
-      studentNumber = lastNumber + 1;
-    }
-
-    const student_id = `${currentYear}-${degree}-${studentNumber.toString().padStart(4, '0')}`;
-
-    // Check if generated student_id already exists
-    const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ?', [student_id]);
+    // Check if student already exists with this student_id
+    const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ?', [student_id.trim()]);
     if (existingStudentId.length > 0) {
       return res.status(409).json({ 
-        error: 'Generated student ID already exists. Please try again.' 
+        error: 'Student ID already exists' 
       });
     }
 
@@ -108,7 +101,7 @@ export const addStudent = async (req, res) => {
         must_change_password
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, 1)`,
       [
-        student_id,
+        student_id.trim(),
         email.trim(),
         fullName,
         hashedPassword,
@@ -124,7 +117,7 @@ export const addStudent = async (req, res) => {
 
     // Send welcome email
     try {
-      await sendWelcomeEmail(email.trim(), fullName, student_id, DEFAULT_STUDENT_PASSWORD);
+      await sendWelcomeEmail(email.trim(), fullName, student_id.trim(), DEFAULT_STUDENT_PASSWORD);
     } catch (emailError) {
       console.warn('Failed to send welcome email:', emailError.message);
     }
@@ -133,7 +126,7 @@ export const addStudent = async (req, res) => {
       message: 'Student added successfully',
       student: {
         id: result.insertId,
-        student_id,
+        student_id: student_id.trim(),
         name: fullName,
         email: email.trim(),
         degree,
@@ -173,10 +166,21 @@ export const addStudentsBulk = async (req, res) => {
 
             try {
               // Validate required fields
-              if (!row.first_name || !row.last_name || !row.email || !row.degree || !row.status) {
+              if (!row.student_id || !row.first_name || !row.last_name || !row.email || !row.degree || !row.status) {
                 errors.push({
                   row: rowNumber,
                   error: 'Missing required fields',
+                  data: row
+                });
+                errorCount++;
+                continue;
+              }
+
+              // Validate student ID format
+              if (!validateStudentId(row.student_id)) {
+                errors.push({
+                  row: rowNumber,
+                  error: 'Invalid student ID format. Expected numeric format (4-8 digits)',
                   data: row
                 });
                 errorCount++;
@@ -218,9 +222,9 @@ export const addStudentsBulk = async (req, res) => {
                 continue;
               }
 
-              // Check if student already exists
-              const [existing] = await pool.query('SELECT * FROM users WHERE email = ?', [row.email.trim()]);
-              if (existing.length > 0) {
+              // Check if student already exists with this email
+              const [existingEmail] = await pool.query('SELECT * FROM users WHERE email = ?', [row.email.trim()]);
+              if (existingEmail.length > 0) {
                 errors.push({
                   row: rowNumber,
                   error: 'Student already exists with this email',
@@ -230,27 +234,12 @@ export const addStudentsBulk = async (req, res) => {
                 continue;
               }
 
-              // Generate student ID
-              const currentYear = new Date().getFullYear();
-              const [lastStudent] = await pool.query(
-                'SELECT student_id FROM users WHERE student_id LIKE ? ORDER BY student_id DESC LIMIT 1',
-                [`${currentYear}-${row.degree}-%`]
-              );
-
-              let studentNumber = 1;
-              if (lastStudent.length > 0) {
-                const lastNumber = parseInt(lastStudent[0].student_id.split('-')[2]);
-                studentNumber = lastNumber + 1;
-              }
-
-              const student_id = `${currentYear}-${row.degree}-${studentNumber.toString().padStart(4, '0')}`;
-
-              // Check if generated student_id already exists
-              const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ?', [student_id]);
+              // Check if student already exists with this student_id
+              const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ?', [row.student_id.trim()]);
               if (existingStudentId.length > 0) {
                 errors.push({
                   row: rowNumber,
-                  error: 'Generated student ID already exists',
+                  error: 'Student ID already exists',
                   data: row
                 });
                 errorCount++;
@@ -282,7 +271,7 @@ export const addStudentsBulk = async (req, res) => {
                   must_change_password
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, 1)`,
                 [
-                  student_id,
+                  row.student_id.trim(),
                   row.email.trim(),
                   fullName,
                   hashedPassword,
@@ -298,7 +287,7 @@ export const addStudentsBulk = async (req, res) => {
 
               // Send welcome email
               try {
-                await sendWelcomeEmail(row.email.trim(), fullName, student_id, DEFAULT_STUDENT_PASSWORD);
+                await sendWelcomeEmail(row.email.trim(), fullName, row.student_id.trim(), DEFAULT_STUDENT_PASSWORD);
               } catch (emailError) {
                 console.warn('Failed to send welcome email:', emailError.message);
               }

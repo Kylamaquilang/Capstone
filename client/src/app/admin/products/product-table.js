@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/solid';
 import API from '@/lib/axios';
@@ -9,6 +10,7 @@ export default function ProductTable({ category = '' }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const CATEGORY_SHOW_SIZES = new Set(['PE', 'NSTP', 'POLO']);
+  const router = useRouter();
 
   const fetchProducts = async () => {
     try {
@@ -149,7 +151,7 @@ export default function ProductTable({ category = '' }) {
                   </td>
                   <td className="px-4 py-2 flex items-center gap-2">
                     <button
-                      onClick={() => alert(`Edit ${prod.name}`)}
+                      onClick={() => router.push(`/admin/products/edit/${prod.id}`)}
                       className="text-blue-600 hover:text-blue-800"
                     >
                       <PencilSquareIcon className="w-5 h-5" />

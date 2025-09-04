@@ -23,9 +23,19 @@ export const getUserOrders = async (req, res) => {
 export const getAllOrders = async (req, res) => {
   try {
     const [orders] = await pool.query(`
-      SELECT o.id, o.user_id, u.name AS user_name,
-             o.total_amount, o.payment_method, o.pay_at_counter,
-             o.status, o.created_at
+      SELECT 
+        o.id, 
+        o.user_id, 
+        u.name AS user_name,
+        u.student_id,
+        u.email,
+        o.total_amount, 
+        o.payment_method, 
+        o.pay_at_counter,
+        o.status, 
+        o.created_at,
+        o.updated_at,
+        (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) as item_count
       FROM orders o
       JOIN users u ON o.user_id = u.id
       ORDER BY o.created_at DESC
@@ -44,7 +54,7 @@ export const getOrderItems = async (req, res) => {
 
   try {
     const [items] = await pool.query(`
-      SELECT oi.quantity, oi.size, oi.price, p.name, p.image
+      SELECT oi.quantity, oi.size, oi.price, p.name, p.image, p.id as product_id
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = ?
@@ -53,6 +63,63 @@ export const getOrderItems = async (req, res) => {
     res.json(items)
   } catch (err) {
     console.error('Get order items error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// 📋 Get single order with details
+export const getOrderById = async (req, res) => {
+  const { id } = req.params
+
+  try {
+    // Get order details
+    const [orders] = await pool.query(`
+      SELECT 
+        o.id, 
+        o.user_id, 
+        u.name AS user_name,
+        u.student_id,
+        u.email,
+        o.total_amount, 
+        o.payment_method, 
+        o.pay_at_counter,
+        o.status, 
+        o.created_at,
+        o.updated_at
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      WHERE o.id = ?
+    `, [id])
+
+    if (orders.length === 0) {
+      return res.status(404).json({ error: 'Order not found' })
+    }
+
+    const order = orders[0]
+
+    // Get order items
+    const [items] = await pool.query(`
+      SELECT oi.quantity, oi.size, oi.price, p.name, p.image, p.id as product_id
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id = ?
+    `, [id])
+
+    // Get order status history
+    const [statusHistory] = await pool.query(`
+      SELECT old_status, new_status, notes, created_at
+      FROM order_status_logs
+      WHERE order_id = ?
+      ORDER BY created_at DESC
+    `, [id])
+
+    res.json({
+      ...order,
+      items,
+      status_history: statusHistory
+    })
+  } catch (err) {
+    console.error('Get order by ID error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }

@@ -92,6 +92,11 @@ export default function AdminUsersPage() {
   };
 
   const getDegreeDisplayName = (degree) => {
+    // Handle null, undefined, or empty degree
+    if (!degree) {
+      return 'N/A';
+    }
+
     const degreeNames = {
       'BEED': 'Bachelor of Elementary Education',
       'BSED': 'Bachelor of Secondary Education',
@@ -102,13 +107,22 @@ export default function AdminUsersPage() {
   };
 
   const getStatusBadge = (status) => {
+    // Handle null, undefined, or empty status
+    if (!status) {
+      return (
+        <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+          N/A
+        </span>
+      );
+    }
+
     const statusClasses = status === 'regular' 
       ? 'bg-green-100 text-green-800' 
       : 'bg-yellow-100 text-yellow-800';
     
     return (
       <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusClasses}`}>
-        {status?.charAt(0).toUpperCase() + status?.slice(1)}
+        {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
   };
@@ -126,13 +140,22 @@ export default function AdminUsersPage() {
   };
 
   const getRoleBadge = (role) => {
+    // Handle null, undefined, or empty role
+    if (!role) {
+      return (
+        <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+          N/A
+        </span>
+      );
+    }
+
     const roleClasses = role === 'admin' 
       ? 'bg-purple-100 text-purple-800' 
       : 'bg-blue-100 text-blue-800';
     
     return (
       <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleClasses}`}>
-        {role?.charAt(0).toUpperCase() + role?.slice(1)}
+        {role.charAt(0).toUpperCase() + role.slice(1)}
       </span>
     );
   };
@@ -186,10 +209,10 @@ export default function AdminUsersPage() {
                     {users.map((user) => (
                       <tr key={user.id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-2">{user.id}</td>
-                        <td className="px-4 py-2 font-mono text-sm">{user.student_id}</td>
+                        <td className="px-4 py-2 font-mono text-sm">{user.student_id || 'N/A'}</td>
                         <td className="px-4 py-2">
                           <div>
-                            <div className="font-medium">{user.name}</div>
+                            <div className="font-medium">{user.name || 'N/A'}</div>
                             {user.first_name && user.last_name && (
                               <div className="text-xs text-gray-500">
                                 {user.first_name} {user.middle_name ? user.middle_name + ' ' : ''}{user.last_name}{user.suffix ? ' ' + user.suffix : ''}
@@ -197,11 +220,11 @@ export default function AdminUsersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-sm">{user.email}</td>
+                        <td className="px-4 py-2 text-sm">{user.email || 'N/A'}</td>
                         <td className="px-4 py-2">{getRoleBadge(user.role)}</td>
                         <td className="px-4 py-2">
                           <div className="text-sm">
-                            <div className="font-medium">{user.degree}</div>
+                            <div className="font-medium">{user.degree || 'N/A'}</div>
                             <div className="text-xs text-gray-500">{getDegreeDisplayName(user.degree)}</div>
                           </div>
                         </td>

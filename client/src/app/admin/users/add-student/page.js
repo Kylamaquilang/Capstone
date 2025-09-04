@@ -6,6 +6,7 @@ import API from '@/lib/axios';
 
 export default function AddStudentPage() {
   const [form, setForm] = useState({ 
+    student_id: '',
     first_name: '', 
     last_name: '', 
     middle_name: '', 
@@ -32,6 +33,7 @@ export default function AddStudentPage() {
       await API.post('/students/add', form);
       setSuccess('Student added successfully');
       setForm({ 
+        student_id: '',
         first_name: '', 
         last_name: '', 
         middle_name: '', 
@@ -66,6 +68,21 @@ export default function AddStudentPage() {
             
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    Student ID <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    name="student_id" 
+                    value={form.student_id} 
+                    onChange={handleChange} 
+                    placeholder="e.g., 20240001"
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    required 
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Format: Numeric ID (4-8 digits, e.g., 20240001)</p>
+                </div>
+                
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">
                     First Name <span className="text-red-500">*</span>
@@ -169,7 +186,7 @@ export default function AddStudentPage() {
               <div className="bg-blue-50 p-4 rounded-lg">
                 <h3 className="font-medium text-blue-800 mb-2">Student Information</h3>
                 <p className="text-sm text-blue-700">
-                  • A student ID will be automatically generated in the format: YYYY-DEGREE-XXXX<br/>
+                  • Student ID must be manually entered by the admin (numeric format)<br/>
                   • Default password will be: <strong>cpc123</strong><br/>
                   • Welcome email will be sent to the student with login credentials
                 </p>
@@ -192,6 +209,7 @@ export default function AddStudentPage() {
                   type="button"
                   onClick={() => {
                     setForm({ 
+                      student_id: '',
                       first_name: '', 
                       last_name: '', 
                       middle_name: '', 

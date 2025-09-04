@@ -6,24 +6,50 @@ import API from '@/lib/axios';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusUpdate, setStatusUpdate] = useState({ status: '', notes: '' });
   const [updating, setUpdating] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
       const { data } = await API.get('/orders/admin');
       setOrders(data || []);
+      setFilteredOrders(data || []);
     } catch (err) {
       setError('Failed to load orders');
     } finally {
       setLoading(false);
     }
   };
+
+  // Filter orders based on search term and status filter
+  useEffect(() => {
+    let filtered = orders;
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(order => 
+        order.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.student_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.id.toString().includes(searchTerm)
+      );
+    }
+
+    // Filter by status
+    if (statusFilter) {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    setFilteredOrders(filtered);
+  }, [orders, searchTerm, statusFilter]);
 
   const updateOrderStatus = async () => {
     if (!selectedOrder || !statusUpdate.status) return;
@@ -89,7 +115,35 @@ export default function AdminOrdersPage() {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">ORDER MANAGEMENT</h2>
               <div className="text-sm text-gray-600">
-                Total Orders: {orders.length}
+                Total Orders: {orders.length} | Showing: {filteredOrders.length}
+              </div>
+            </div>
+
+            {/* Search and Filter Controls */}
+            <div className="mb-6 flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search by name, student ID, email, or order ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="sm:w-48">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                  <option value="ready_for_pickup">Ready for Pickup</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="refunded">Refunded</option>
+                </select>
               </div>
             </div>
 
@@ -104,6 +158,7 @@ export default function AdminOrdersPage() {
                     <tr>
                       <th className="px-4 py-2">Order ID</th>
                       <th className="px-4 py-2">Customer</th>
+                      <th className="px-4 py-2">Items</th>
                       <th className="px-4 py-2">Amount</th>
                       <th className="px-4 py-2">Payment</th>
                       <th className="px-4 py-2">Status</th>
@@ -112,13 +167,25 @@ export default function AdminOrdersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((order) => (
+                    {filteredOrders.map((order) => (
                       <tr key={order.id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-2 font-mono text-sm">#{order.id}</td>
                         <td className="px-4 py-2">
                           <div>
                             <div className="font-medium">{order.user_name}</div>
-                            <div className="text-xs text-gray-500">ID: {order.user_id}</div>
+                            <div className="text-xs text-gray-500">
+                              Student ID: {order.student_id || 'N/A'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Email: {order.email}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="text-center">
+                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                              {order.item_count || 0} items
+                            </span>
                           </div>
                         </td>
                         <td className="px-4 py-2">
@@ -172,12 +239,14 @@ export default function AdminOrdersPage() {
                     ))}
                   </tbody>
                 </table>
-                {orders.length === 0 && (
+                {filteredOrders.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
-                    <p>No orders found</p>
+                    <p>
+                      {orders.length === 0 ? 'No orders found' : 'No orders match your search criteria'}
+                    </p>
                   </div>
                 )}
               </div>

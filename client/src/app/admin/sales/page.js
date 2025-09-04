@@ -3,6 +3,27 @@ import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 export default function AdminSalesPage() {
   const [salesData, setSalesData] = useState({
@@ -55,6 +76,70 @@ export default function AdminSalesPage() {
       return dateStr;
     }
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Prepare chart data
+  const chartData = {
+    labels: salesData.salesData?.map(item => formatDate(item.period)) || [],
+    datasets: [
+      {
+        label: 'Revenue',
+        data: salesData.salesData?.map(item => item.revenue) || [],
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4,
+        fill: true,
+      },
+      {
+        label: 'Orders',
+        data: salesData.salesData?.map(item => item.orders) || [],
+        borderColor: 'rgb(34, 197, 94)',
+        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        tension: 0.4,
+        fill: false,
+        yAxisID: 'y1',
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: 'Sales Performance Trend',
+      },
+    },
+    scales: {
+      y: {
+        type: 'linear',
+        display: true,
+        position: 'left',
+        title: {
+          display: true,
+          text: 'Revenue (PHP)',
+        },
+      },
+      y1: {
+        type: 'linear',
+        display: true,
+        position: 'right',
+        title: {
+          display: true,
+          text: 'Number of Orders',
+        },
+        grid: {
+          drawOnChartArea: false,
+        },
+      },
+    },
   };
 
   return (
@@ -122,7 +207,7 @@ export default function AdminSalesPage() {
             </div>
           </div>
 
-            {loading ? (
+          {loading ? (
             <div className="text-center py-8">
               <div className="text-xl text-gray-600">Loading sales data...</div>
             </div>
@@ -205,6 +290,20 @@ export default function AdminSalesPage() {
               <div className="bg-white p-6 rounded-lg shadow-md mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Trend</h3>
                 {salesData.salesData && salesData.salesData.length > 0 ? (
+                  <div className="h-96">
+                    <Line data={chartData} options={chartOptions} />
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No sales data available for the selected period</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Sales Data Table */}
+              <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Detailed Sales Data</h3>
+                {salesData.salesData && salesData.salesData.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
@@ -272,9 +371,9 @@ export default function AdminSalesPage() {
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     <p>No product performance data available</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
             </>
           )}
         </div>
