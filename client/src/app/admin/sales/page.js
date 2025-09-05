@@ -27,9 +27,12 @@ ChartJS.register(
 
 export default function AdminSalesPage() {
   const [salesData, setSalesData] = useState({
-    summary: {},
-    dailyStats: [],
-    topProducts: []
+    salesData: [],
+    topProducts: [],
+    paymentBreakdown: [],
+    inventorySummary: [],
+    salesLogsSummary: {},
+    summary: {}
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -42,17 +45,46 @@ export default function AdminSalesPage() {
   const fetchSalesData = async () => {
     try {
       setLoading(true);
+      setError('');
+      
       const params = new URLSearchParams({
         start_date: dateRange.start_date,
         end_date: dateRange.end_date,
         group_by: groupBy
       });
       
-      const { data } = await API.get(`/orders/sales-performance?${params}`);
-      setSalesData(data);
+      const { data } = await API.get(`/orders/sales-performance/public?${params}`);
+      
+      // Ensure data structure is properly set
+      setSalesData({
+        salesData: data.salesData || [],
+        topProducts: data.topProducts || [],
+        paymentBreakdown: data.paymentBreakdown || [],
+        inventorySummary: data.inventorySummary || [],
+        salesLogsSummary: data.salesLogsSummary || {},
+        summary: data.summary || {}
+      });
     } catch (err) {
-      setError('Failed to load sales data');
       console.error('Sales data error:', err);
+      
+      // Handle different types of errors
+      if (err.response?.status === 404) {
+        setError('Sales performance endpoint not found. Please check if the API server is running.');
+      } else if (err.response?.status === 401 || err.response?.status === 403) {
+        setError('Authentication required. Please log in as admin to view sales data.');
+      } else if (err.response?.status >= 500) {
+        setError('Server error. Please try again later.');
+      } else {
+        setError('Failed to load sales data. Please check your connection.');
+      }
+      
+      // Set empty data structure to prevent crashes
+      setSalesData({
+        salesData: [],
+        topProducts: [],
+        paymentBreakdown: [],
+        inventorySummary: []
+      });
     } finally {
       setLoading(false);
     }
@@ -143,13 +175,11 @@ export default function AdminSalesPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black">
       <Navbar />
       <div className="flex flex-1">
-        <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
-          <Sidebar />
-        </div>
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+        <Sidebar />
+        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">Sales Analytics</h1>
@@ -225,7 +255,7 @@ export default function AdminSalesPage() {
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Total Orders</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {salesData.salesData?.reduce((sum, item) => sum + item.orders, 0) || 0}
+                        {salesData.summary?.total_orders || 0}
                       </p>
                     </div>
                   </div>
@@ -241,7 +271,7 @@ export default function AdminSalesPage() {
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {formatCurrency(salesData.salesData?.reduce((sum, item) => sum + item.revenue, 0) || 0)}
+                        {formatCurrency(salesData.summary?.total_revenue || 0)}
                       </p>
                     </div>
                   </div>
@@ -257,10 +287,7 @@ export default function AdminSalesPage() {
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
                       <p className="text-2xl font-bold text-purple-600">
-                        {formatCurrency(
-                          salesData.salesData?.reduce((sum, item) => sum + item.avg_order_value, 0) / 
-                          (salesData.salesData?.length || 1)
-                        )}
+                        {formatCurrency(salesData.summary?.avg_order_value || 0)}
                       </p>
                     </div>
                   </div>
@@ -276,11 +303,81 @@ export default function AdminSalesPage() {
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Growth</p>
                       <p className="text-2xl font-bold text-yellow-600">
-                        {salesData.salesData && salesData.salesData.length > 1 ? 
+                        {salesData.salesData && salesData.salesData.length > 1 && salesData.salesData[1].revenue > 0 ? 
                           `${Math.round(((salesData.salesData[0].revenue - salesData.salesData[1].revenue) / salesData.salesData[1].revenue) * 100)}%` : 
                           'N/A'
                         }
                       </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sales Tracking Section */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Sales Tracking</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="bg-white p-6 rounded-lg shadow-md">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-600">Completed Sales</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {salesData.salesLogsSummary?.completed_sales || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-lg shadow-md">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-600">Sales Revenue</p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {formatCurrency(salesData.salesLogsSummary?.completed_revenue || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-lg shadow-md">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-600">Reversed Sales</p>
+                        <p className="text-2xl font-bold text-red-600">
+                          {salesData.salesLogsSummary?.reversed_sales || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-lg shadow-md">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-600">Total Sales Logs</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {salesData.salesLogsSummary?.total_sales_logs || 0}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -331,6 +428,86 @@ export default function AdminSalesPage() {
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     <p>No sales data available for the selected period</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Payment Method Breakdown */}
+              <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Method Breakdown</h3>
+                {salesData.paymentBreakdown && salesData.paymentBreakdown.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {salesData.paymentBreakdown.map((payment, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium text-gray-900 capitalize">
+                            {payment.payment_method === 'gcash' ? 'GCash' : 'Cash Payment'}
+                          </h4>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            payment.payment_method === 'gcash' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-green-100 text-green-800'
+                          }`}>
+                            {payment.payment_method === 'gcash' ? 'Online' : 'Counter'}
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Orders:</span>
+                            <span className="font-semibold">{payment.order_count}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Revenue:</span>
+                            <span className="font-semibold text-green-600">
+                              {formatCurrency(payment.total_revenue)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Avg Order:</span>
+                            <span className="font-semibold">
+                              {formatCurrency(payment.avg_order_value)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No payment data available</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Inventory Movement Summary */}
+              <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Inventory Movement Summary</h3>
+                {salesData.inventorySummary && salesData.inventorySummary.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-gray-600">Movement Type</th>
+                          <th className="px-4 py-2 text-left text-gray-600">Count</th>
+                          <th className="px-4 py-2 text-left text-gray-600">Total Quantity</th>
+                          <th className="px-4 py-2 text-left text-gray-600">Products Affected</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {salesData.inventorySummary.map((movement, index) => (
+                          <tr key={index} className="border-b hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium capitalize">{movement.movement_type}</td>
+                            <td className="px-4 py-2">{movement.movement_count}</td>
+                            <td className="px-4 py-2">{movement.total_quantity}</td>
+                            <td className="px-4 py-2">{movement.products_affected}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No inventory movement data available</p>
                   </div>
                 )}
               </div>

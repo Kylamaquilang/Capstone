@@ -27,13 +27,11 @@ export default function AdminCancelledPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black">
       <Navbar />
       <div className="flex flex-1">
-        <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
-          <Sidebar />
-        </div>
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+        <Sidebar />
+        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">CANCELLED ORDERS</h2>
@@ -58,7 +56,7 @@ export default function AdminCancelledPage() {
                       <tr key={o.id} className="border-b">
                         <td className="px-4 py-2">{o.id}</td>
                         <td className="px-4 py-2">{o.user_name}</td>
-                        <td className="px-4 py-2">₱{Number(o.total_amount).toFixed(2)}</td>
+                        <td className="px-4 py-2">{Number(o.total_amount).toFixed(2)}</td>
                         <td className="px-4 py-2">{new Date(o.created_at).toLocaleString()}</td>
                       </tr>
                     ))}

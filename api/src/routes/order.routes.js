@@ -22,4 +22,7 @@ router.patch('/:id/status', verifyToken, isAdmin, updateOrderStatus)
 router.get('/stats', verifyToken, isAdmin, getOrderStats)
 router.get('/sales-performance', verifyToken, isAdmin, getSalesPerformance)
 
+// Public sales data endpoint for testing (remove in production)
+router.get('/sales-performance/public', getSalesPerformance)
+
 export default router

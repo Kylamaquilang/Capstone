@@ -3,6 +3,17 @@ import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
+import { 
+  ClockIcon, 
+  CogIcon, 
+  CubeIcon, 
+  CheckCircleIcon, 
+  XCircleIcon, 
+  ArrowPathIcon,
+  EyeIcon,
+  PencilSquareIcon
+} from '@heroicons/react/24/outline';
+import ActionMenu from '@/components/common/ActionMenu';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -15,6 +26,7 @@ export default function AdminOrdersPage() {
   const [updating, setUpdating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
 
   const fetchOrders = async () => {
     try {
@@ -48,22 +60,48 @@ export default function AdminOrdersPage() {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
+    // Filter by payment status
+    if (paymentStatusFilter) {
+      filtered = filtered.filter(order => order.payment_status === paymentStatusFilter);
+    }
+
     setFilteredOrders(filtered);
-  }, [orders, searchTerm, statusFilter]);
+  }, [orders, searchTerm, statusFilter, paymentStatusFilter]);
 
   const updateOrderStatus = async () => {
     if (!selectedOrder || !statusUpdate.status) return;
     
     try {
       setUpdating(true);
-      await API.patch(`/orders/${selectedOrder.id}/status`, statusUpdate);
+      const response = await API.patch(`/orders/${selectedOrder.id}/status`, statusUpdate);
       
       // Update local state
       setOrders(orders.map(order => 
         order.id === selectedOrder.id 
-          ? { ...order, status: statusUpdate.status }
+          ? { 
+              ...order, 
+              status: statusUpdate.status,
+              payment_status: response.data.paymentStatus || order.payment_status
+            }
           : order
       ));
+      
+      // Show success message with additional info
+      let successMessage = `Order #${selectedOrder.id} status updated to ${statusUpdate.status}`;
+      
+      if (response.data.paymentStatusUpdated) {
+        successMessage += '\n\n✅ Payment status automatically updated to PAID';
+      }
+      
+      if (response.data.inventoryUpdated) {
+        successMessage += '\n\n📦 Stock restored for cancelled order';
+      }
+      
+      if (response.data.salesLogged) {
+        successMessage += '\n\n💰 Sale logged in system';
+      }
+      
+      alert(successMessage);
       
       setShowStatusModal(false);
       setSelectedOrder(null);
@@ -88,15 +126,16 @@ export default function AdminOrdersPage() {
   };
 
   const getStatusIcon = (status) => {
+    const iconProps = { className: "h-5 w-5" };
     const icons = {
-      pending: '⏳',
-      processing: '⚙️',
-      ready_for_pickup: '📦',
-      delivered: '✅',
-      cancelled: '❌',
-      refunded: '↩️'
+      pending: <ClockIcon {...iconProps} className="h-5 w-5 text-yellow-500" />,
+      processing: <CogIcon {...iconProps} className="h-5 w-5 text-blue-500" />,
+      ready_for_pickup: <CubeIcon {...iconProps} className="h-5 w-5 text-purple-500" />,
+      delivered: <CheckCircleIcon {...iconProps} className="h-5 w-5 text-green-500" />,
+      cancelled: <XCircleIcon {...iconProps} className="h-5 w-5 text-red-500" />,
+      refunded: <ArrowPathIcon {...iconProps} className="h-5 w-5 text-gray-500" />
     };
-    return icons[status] || '❓';
+    return icons[status] || <ClockIcon {...iconProps} className="h-5 w-5 text-gray-500" />;
   };
 
   useEffect(() => {
@@ -104,13 +143,11 @@ export default function AdminOrdersPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black">
       <Navbar />
       <div className="flex flex-1">
-        <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
-          <Sidebar />
-        </div>
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+        <Sidebar />
+        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">ORDER MANAGEMENT</h2>
@@ -136,13 +173,27 @@ export default function AdminOrdersPage() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">All Statuses</option>
+                  <option value="">All Order Statuses</option>
                   <option value="pending">Pending</option>
                   <option value="processing">Processing</option>
                   <option value="ready_for_pickup">Ready for Pickup</option>
                   <option value="delivered">Delivered</option>
                   <option value="cancelled">Cancelled</option>
                   <option value="refunded">Refunded</option>
+                </select>
+              </div>
+              <div className="sm:w-48">
+                <select
+                  value={paymentStatusFilter}
+                  onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Payment Statuses</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                  <option value="failed">Failed</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
             </div>
@@ -160,8 +211,9 @@ export default function AdminOrdersPage() {
                       <th className="px-4 py-2">Customer</th>
                       <th className="px-4 py-2">Items</th>
                       <th className="px-4 py-2">Amount</th>
-                      <th className="px-4 py-2">Payment</th>
-                      <th className="px-4 py-2">Status</th>
+                      <th className="px-4 py-2">Payment Method</th>
+                      <th className="px-4 py-2">Payment Status</th>
+                      <th className="px-4 py-2">Order Status</th>
                       <th className="px-4 py-2">Created</th>
                       <th className="px-4 py-2">Actions</th>
                     </tr>
@@ -189,23 +241,68 @@ export default function AdminOrdersPage() {
                           </div>
                         </td>
                         <td className="px-4 py-2">
-                          <span className="font-semibold text-green-600">
-                            ₱{Number(order.total_amount).toFixed(2)}
+                          <span className="font-semibold text-green-600 text-lg">
+                            {Number(order.total_amount || 0).toFixed(2)}
                           </span>
                         </td>
                         <td className="px-4 py-2">
-                          <div className="text-sm">
-                            <div>{order.payment_method}</div>
-                            {order.pay_at_counter && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                Counter Payment
-                              </span>
+                          <div className="flex flex-col space-y-1">
+                            <div className="flex items-center space-x-2">
+                              {order.payment_method === 'gcash' ? (
+                                <span className="font-medium text-blue-600">GCash</span>
+                              ) : (
+                                <span className="font-medium text-green-600">Cash</span>
+                              )}
+                            </div>
+                            <div className="text-xs">
+                              {order.pay_at_counter ? (
+                                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full font-medium">
+                                  Pay at Counter
+                                </span>
+                              ) : (
+                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+                                  Online Payment
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center space-x-2">
+                            {order.payment_status === 'paid' ? (
+                              <>
+                                <CheckCircleIcon className="h-5 w-5 text-green-600" />
+                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                                  Paid
+                                </span>
+                              </>
+                            ) : order.payment_status === 'pending' ? (
+                              <>
+                                <ClockIcon className="h-5 w-5 text-yellow-600" />
+                                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
+                                  Pending
+                                </span>
+                              </>
+                            ) : order.payment_status === 'failed' ? (
+                              <>
+                                <XCircleIcon className="h-5 w-5 text-red-600" />
+                                <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium">
+                                  Failed
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <ClockIcon className="h-5 w-5 text-gray-600" />
+                                <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs font-medium">
+                                  Unpaid
+                                </span>
+                              </>
                             )}
                           </div>
                         </td>
                         <td className="px-4 py-2">
                           <div className="flex items-center space-x-2">
-                            <span className="text-lg">{getStatusIcon(order.status)}</span>
+                            {getStatusIcon(order.status)}
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                               {order.status.replace('_', ' ')}
                             </span>
@@ -216,24 +313,24 @@ export default function AdminOrdersPage() {
                           <div className="text-gray-500">{new Date(order.created_at).toLocaleTimeString()}</div>
                         </td>
                         <td className="px-4 py-2">
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => {
-                                setSelectedOrder(order);
-                                setStatusUpdate({ status: order.status, notes: '' });
-                                setShowStatusModal(true);
-                              }}
-                              className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                            >
-                              Update Status
-                            </button>
-                            <button
-                              onClick={() => window.location.href = `/admin/orders/${order.id}`}
-                              className="px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
-                            >
-                              View Details
-                            </button>
-                          </div>
+                          <ActionMenu
+                            actions={[
+                              {
+                                label: 'Update Status',
+                                icon: PencilSquareIcon,
+                                onClick: () => {
+                                  setSelectedOrder(order);
+                                  setStatusUpdate({ status: order.status, notes: '' });
+                                  setShowStatusModal(true);
+                                }
+                              },
+                              {
+                                label: 'View Details',
+                                icon: EyeIcon,
+                                onClick: () => window.location.href = `/admin/orders/${order.id}`
+                              }
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -279,6 +376,23 @@ export default function AdminOrdersPage() {
                 <option value="cancelled">Cancelled</option>
                 <option value="refunded">Refunded</option>
               </select>
+              
+              {/* Show automatic actions for delivered status */}
+              {statusUpdate.status === 'delivered' && selectedOrder?.payment_status !== 'paid' && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                  <div className="flex items-center">
+                    <span className="text-green-600 mr-2">ℹ️</span>
+                    <div className="text-sm text-green-800">
+                      <strong>Automatic Actions:</strong>
+                      <ul className="mt-1 ml-4 list-disc">
+                        <li>Payment status will be updated to <strong>PAID</strong></li>
+                        <li>Sale will be logged in the system</li>
+                        <li>Customer will be notified</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mb-6">

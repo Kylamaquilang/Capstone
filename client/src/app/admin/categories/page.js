@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
 import API from '@/lib/axios';
+import ActionMenu from '@/components/common/ActionMenu';
+import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -90,13 +92,11 @@ export default function AdminCategoriesPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black">
       <Navbar />
       <div className="flex flex-1">
-        <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
-          <Sidebar />
-        </div>
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+        <Sidebar />
+        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">CATEGORY MANAGEMENT</h2>
@@ -182,24 +182,23 @@ export default function AdminCategoriesPage() {
                           {category.created_at ? new Date(category.created_at).toLocaleDateString() : 'N/A'}
                         </td>
                         <td className="px-4 py-2">
-                          <div className="flex gap-2">
-                            {editingId !== category.id && (
-                              <>
-                                <button
-                                  onClick={() => startEdit(category)}
-                                  className="px-3 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteCategory(category.id, category.name)}
-                                  className="px-3 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200 transition"
-                                >
-                                  Delete
-                                </button>
-                              </>
-                            )}
-                          </div>
+                          {editingId !== category.id && (
+                            <ActionMenu
+                              actions={[
+                                {
+                                  label: 'Edit Category',
+                                  icon: PencilSquareIcon,
+                                  onClick: () => startEdit(category)
+                                },
+                                {
+                                  label: 'Delete Category',
+                                  icon: TrashIcon,
+                                  onClick: () => handleDeleteCategory(category.id, category.name),
+                                  danger: true
+                                }
+                              ]}
+                            />
+                          )}
                         </td>
                       </tr>
                     ))}

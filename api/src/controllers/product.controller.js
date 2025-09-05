@@ -93,14 +93,45 @@ export const createProduct = async (req, res) => {
       }
     }
 
-    // Check if product with same name already exists
+    // Check if product with exact same name already exists
     const [existing] = await pool.query(
-      'SELECT id FROM products WHERE name = ?',
+      'SELECT id, name FROM products WHERE LOWER(name) = LOWER(?)',
       [name.trim()]
     );
 
     if (existing.length > 0) {
-      return res.status(409).json({ error: 'Product with this name already exists' });
+      // Generate suggested alternative names
+      const baseName = name.trim();
+      const suggestions = [];
+      
+      // Try adding numbers
+      for (let i = 1; i <= 5; i++) {
+        const suggestedName = `${baseName} ${i}`;
+        const [checkSuggestion] = await pool.query(
+          'SELECT id FROM products WHERE LOWER(name) = LOWER(?)',
+          [suggestedName]
+        );
+        if (checkSuggestion.length === 0) {
+          suggestions.push(suggestedName);
+        }
+      }
+      
+      // Try adding "NEW" prefix
+      const newName = `NEW ${baseName}`;
+      const [checkNew] = await pool.query(
+        'SELECT id FROM products WHERE LOWER(name) = LOWER(?)',
+        [newName]
+      );
+      if (checkNew.length === 0) {
+        suggestions.push(newName);
+      }
+      
+      return res.status(409).json({ 
+        error: 'Product with this name already exists',
+        message: `A product named "${existing[0].name}" already exists. Please choose a different name.`,
+        existingProduct: existing[0],
+        suggestions: suggestions.slice(0, 3) // Return up to 3 suggestions
+      });
     }
 
     // Start transaction

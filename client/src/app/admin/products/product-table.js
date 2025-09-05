@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/solid';
+import { EyeIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
+import ActionMenu from '@/components/common/ActionMenu';
 
 export default function ProductTable({ category = '' }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const CATEGORY_SHOW_SIZES = new Set(['PE', 'NSTP', 'POLO']);
   const router = useRouter();
 
   const fetchProducts = async () => {
@@ -88,89 +89,157 @@ export default function ProductTable({ category = '' }) {
     );
   }
 
-  // Group products by category name
-  const groupedByCategory = products.reduce((acc, prod) => {
-    const key = (prod.category_name || prod.category || 'Uncategorized').toUpperCase();
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(prod);
-    return acc;
-  }, {});
+  // Sort products by name for consistent display
+  const sortedProducts = products
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
-  const categoryKeys = Object.keys(groupedByCategory).sort();
+  // Create separate rows for each size
+  const tableRows = [];
+  sortedProducts.forEach((prod) => {
+    if (prod.sizes && prod.sizes.length > 0) {
+      // Sort sizes logically
+      const sortedSizes = prod.sizes.sort((a, b) => {
+        const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+        const aIndex = sizeOrder.indexOf(a.size);
+        const bIndex = sizeOrder.indexOf(b.size);
+        if (aIndex === -1 && bIndex === -1) return a.size.localeCompare(b.size);
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      });
+
+      sortedSizes.forEach((size, index) => {
+        tableRows.push({
+          id: `${prod.id}-${size.size}`,
+          productId: prod.id,
+          productName: prod.name,
+          category: prod.category_name || prod.category || 'Uncategorized',
+          amount: prod.price,
+          baseStock: prod.stock,
+          size: size.size,
+          sizeStock: size.stock,
+          sizePrice: size.price,
+          isFirstSize: index === 0,
+          totalSizes: sortedSizes.length
+        });
+      });
+    } else {
+      // Product without sizes
+      tableRows.push({
+        id: prod.id,
+        productId: prod.id,
+        productName: prod.name,
+        category: prod.category_name || prod.category || 'Uncategorized',
+        amount: prod.price,
+        baseStock: prod.stock,
+        size: null,
+        sizeStock: null,
+        sizePrice: null,
+        isFirstSize: true,
+        totalSizes: 0
+      });
+    }
+  });
 
   return (
-    <div className="space-y-6">
-      {categoryKeys.map((cat) => (
-        <div key={cat} className="bg-white rounded border border-black overflow-hidden">
-          {(() => {
-            const items = groupedByCategory[cat];
-            const totalItems = items.length;
-            const totalStock = items.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
-            return (
-              <div className="px-4 py-3 border-b border-black bg-gray-50 flex items-center justify-between">
-                <div className="font-bold">{cat}</div>
-                <div className="text-sm text-gray-600">
-                  {totalItems} item{totalItems !== 1 ? 's' : ''} • {totalStock} total stock
-                </div>
-              </div>
-            );
-          })()}
-          <table className="w-full text-left">
-            <thead className="bg-white border-b border-black">
-              <tr>
-                <th className="px-4 py-2 font-bold">PRODUCT NAME</th>
-                <th className="px-4 py-2 font-bold">AMOUNT</th>
-                <th className="px-4 py-2 font-bold">STOCK</th>
-                <th className="px-4 py-2 font-bold">SIZES</th>
-                <th className="px-4 py-2 font-bold">ACTION</th>
+    <div className="bg-white rounded border border-black overflow-hidden">
+      <div className="max-h-[600px] overflow-y-auto">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b border-black sticky top-0 z-10">
+            <tr>
+              <th className="px-4 py-3 font-bold">PRODUCT NAME</th>
+              <th className="px-4 py-3 font-bold">CATEGORY</th>
+              <th className="px-4 py-3 font-bold">AMOUNT</th>
+              <th className="px-4 py-3 font-bold">BASE STOCK</th>
+              <th className="px-4 py-3 font-bold">SIZE</th>
+              <th className="px-4 py-3 font-bold">STOCK</th>
+              <th className="px-4 py-3 font-bold">ACTION</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.map((row, index) => (
+              <tr key={row.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                <td className="px-4 py-3 font-medium">
+                  {row.productName}
+                </td>
+                <td className="px-4 py-3">
+                  {row.isFirstSize ? (
+                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                      {row.category}
+                    </span>
+                  ) : ''}
+                </td>
+                <td className="px-4 py-3 font-semibold text-green-600">
+                  {row.isFirstSize ? `${Number(row.amount).toFixed(2)}` : ''}
+                </td>
+                <td className="px-4 py-3">
+                  {row.isFirstSize ? (
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                      Number(row.baseStock) === 0 
+                        ? 'bg-red-100 text-red-800' 
+                        : Number(row.baseStock) <= 5 
+                        ? 'bg-yellow-100 text-yellow-800' 
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {row.baseStock}
+                    </span>
+                  ) : ''}
+                </td>
+                <td className="px-4 py-3">
+                  {row.size ? (
+                    <span className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded font-medium">
+                      {row.size}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {row.sizeStock !== null ? (
+                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                      Number(row.sizeStock) === 0 
+                        ? 'bg-red-100 text-red-800' 
+                        : Number(row.sizeStock) <= 5 
+                        ? 'bg-yellow-100 text-yellow-800' 
+                        : 'bg-green-100 text-green-800'
+                    }`}>
+                      {row.sizeStock}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {row.isFirstSize ? (
+                    <ActionMenu
+                      actions={[
+                        {
+                          label: 'Edit Product',
+                          icon: PencilSquareIcon,
+                          onClick: () => router.push(`/admin/products/edit/${row.productId}`)
+                        },
+                        {
+                          label: 'Delete Product',
+                          icon: TrashIcon,
+                          onClick: () => handleDelete(row.productId, row.productName),
+                          danger: true
+                        }
+                      ]}
+                    />
+                  ) : ''}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {groupedByCategory[cat]
-                .slice()
-                .sort((a, b) => String(a.name).localeCompare(String(b.name)))
-                .map((prod) => (
-                <tr key={prod.id} className="even:bg-gray-100 align-top">
-                  <td className="px-4 py-2">{prod.name}</td>
-                  <td className="px-4 py-2">₱{Number(prod.price).toFixed(2)}</td>
-                  <td className="px-4 py-2">{prod.stock}</td>
-                  <td className="px-4 py-2">
-                    {CATEGORY_SHOW_SIZES.has(cat)
-                      ? (
-                        <div className="space-y-1">
-                          {(prod.sizes || []).length === 0 && <span className="text-gray-500">—</span>}
-                          {(prod.sizes || []).map((s) => (
-                            <div key={`${prod.id}-${s.id || s.size}`} className="text-sm">
-                              {s.size}: {s.stock} {s.price && s.price !== prod.price ? `(₱${Number(s.price).toFixed(2)})` : ''}
-                            </div>
-                          ))}
-                        </div>
-                      )
-                      : <span className="text-gray-500">—</span>
-                    }
-                  </td>
-                  <td className="px-4 py-2 flex items-center gap-2">
-                    <button
-                      onClick={() => router.push(`/admin/products/edit/${prod.id}`)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <PencilSquareIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(prod.id, prod.name)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <TrashIcon className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {tableRows.length === 0 && (
+        <div className="p-8 text-center text-gray-500">
+          <div className="text-4xl mb-2">📦</div>
+          <div className="text-lg font-medium">No products found</div>
+          <div className="text-sm">Add your first product to get started</div>
         </div>
-      ))}
-      {categoryKeys.length === 0 && (
-        <div className="bg-white rounded border border-black p-6 text-center">No products found.</div>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import API from '@/lib/axios';
 
 export default function AddProductForm() {
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -12,7 +13,7 @@ export default function AddProductForm() {
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
   const [categories, setCategories] = useState([]);
-  const [size, setSize] = useState('S');
+  const [sizes, setSizes] = useState([{ size: 'S', stock: '', price: '' }]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -32,30 +33,79 @@ export default function AddProductForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (!file) {
-        alert('Please choose an image file');
+      // Validate required fields
+      if (!name.trim()) {
+        alert('Please enter a product name');
+        setLoading(false);
+        return;
+      }
+      if (!price || Number(price) <= 0) {
+        alert('Please enter a valid price');
+        setLoading(false);
+        return;
+      }
+      if (!stock || Number(stock) < 0) {
+        alert('Please enter a valid stock quantity');
         setLoading(false);
         return;
       }
 
-      const formData = new FormData();
-      formData.append('image', file);
-      const uploadRes = await API.post('/products/upload-image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      const finalImageUrl = uploadRes.data.url; // e.g. /uploads/filename.jpg
+      let finalImageUrl = null;
+      
+      // Upload image if provided
+      if (file) {
+        const formData = new FormData();
+        formData.append('image', file);
+        const uploadRes = await API.post('/products/upload-image', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        finalImageUrl = uploadRes.data.url;
+      }
 
-      await API.post('/products', {
-        name,
-        description: '',
+      // Prepare sizes data
+      const sizesData = sizes.filter(sizeItem => 
+        sizeItem.size && sizeItem.stock && Number(sizeItem.stock) >= 0
+      ).map(sizeItem => ({
+        size: sizeItem.size,
+        stock: Number(sizeItem.stock),
+        price: sizeItem.price ? Number(sizeItem.price) : Number(price)
+      }));
+
+      const productData = {
+        name: name.trim(),
+        description: description.trim() || null,
         price: Number(price),
         stock: Number(stock),
         category_id: categoryId ? Number(categoryId) : null,
-        image: finalImageUrl
-      });
+        image: finalImageUrl,
+        sizes: sizesData.length > 0 ? sizesData : undefined
+      };
+
+      await API.post('/products', productData);
+      
+      // Show success message
+      alert('Product created successfully!');
       router.push('/admin/products');
     } catch (err) {
-      alert(err?.response?.data?.error || 'Failed to save product');
+      console.error('Error creating product:', err);
+      
+      // Handle specific error cases
+      if (err?.response?.status === 409) {
+        const errorMessage = err?.response?.data?.message || err?.response?.data?.error || 'Product name already exists';
+        const suggestions = err?.response?.data?.suggestions || [];
+        
+        let suggestionText = '';
+        if (suggestions.length > 0) {
+          suggestionText = `\n\n💡 Suggested names:\n${suggestions.map(s => `• ${s}`).join('\n')}`;
+        }
+        
+        alert(`❌ ${errorMessage}${suggestionText}\n\nPlease choose a different product name.`);
+      } else if (err?.response?.status === 400) {
+        const errorMessage = err?.response?.data?.error || 'Invalid product data';
+        alert(`❌ ${errorMessage}\n\nPlease check your input and try again.`);
+      } else {
+        alert('❌ Failed to save product. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -63,6 +113,23 @@ export default function AddProductForm() {
 
   const handleCancel = () => {
     router.push('/admin/products');
+  };
+
+  const addSize = () => {
+    setSizes([...sizes, { size: 'S', stock: '', price: '' }]);
+  };
+
+  const removeSize = (index) => {
+    if (sizes.length > 1) {
+      setSizes(sizes.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateSize = (index, field, value) => {
+    const updatedSizes = sizes.map((size, i) => 
+      i === index ? { ...size, [field]: value } : size
+    );
+    setSizes(updatedSizes);
   };
 
   return (
@@ -82,15 +149,25 @@ export default function AddProductForm() {
             />
           </div>
 
+          <div>
+            <label className="block font-semibold mb-1">DESCRIPTION:</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full border border-gray-400 px-3 py-2 rounded h-20 resize-none"
+              placeholder="Enter product description (optional)"
+            />
+          </div>
+
           <div className="flex space-x-4">
             <div className="flex-1">
-              <label className="block font-semibold mb-1">PRICE:</label>
+              <label className="block font-semibold mb-1">BASE PRICE:</label>
               <input
                 type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 className="w-full border border-gray-400 px-3 py-2 rounded"
-                placeholder="Enter price"
+                placeholder="Enter base price"
                 min="0"
                 step="0.01"
                 required
@@ -98,13 +175,13 @@ export default function AddProductForm() {
             </div>
 
             <div className="flex-1">
-              <label className="block font-semibold mb-1">STOCK:</label>
+              <label className="block font-semibold mb-1">BASE STOCK:</label>
               <input
                 type="number"
                 value={stock}
                 onChange={(e) => setStock(e.target.value)}
                 className="w-full border border-gray-400 px-3 py-2 rounded"
-                placeholder="Quantity in stock"
+                placeholder="Base quantity in stock"
                 min="0"
                 required
               />
@@ -125,25 +202,69 @@ export default function AddProductForm() {
             </select>
           </div>
 
-          {/* SIZE */}
+          {/* PRODUCT SIZES */}
           <div>
-            <label className="block font-semibold mb-1">SIZE:</label>
-            <select
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
-              className="w-full border border-gray-400 px-3 py-2 rounded"
-            >
-              {['XS','S','M','L','XL','XXL'].map((s) => (
-                <option key={s} value={s}>{s}</option>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block font-semibold">PRODUCT SIZES:</label>
+              <button
+                type="button"
+                onClick={addSize}
+                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+              >
+                + Add Size
+              </button>
+            </div>
+            <div className="space-y-2">
+              {sizes.map((sizeItem, index) => (
+                <div key={index} className="flex space-x-2 items-center">
+                  <select
+                    value={sizeItem.size}
+                    onChange={(e) => updateSize(index, 'size', e.target.value)}
+                    className="border border-gray-400 px-2 py-1 rounded text-sm"
+                  >
+                    {['XS','S','M','L','XL','XXL'].map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    value={sizeItem.stock}
+                    onChange={(e) => updateSize(index, 'stock', e.target.value)}
+                    placeholder="Stock"
+                    min="0"
+                    className="border border-gray-400 px-2 py-1 rounded text-sm w-20"
+                  />
+                  <input
+                    type="number"
+                    value={sizeItem.price}
+                    onChange={(e) => updateSize(index, 'price', e.target.value)}
+                    placeholder="Price (optional)"
+                    min="0"
+                    step="0.01"
+                    className="border border-gray-400 px-2 py-1 rounded text-sm w-24"
+                  />
+                  {sizes.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeSize(index)}
+                      className="bg-red-600 text-white px-2 py-1 rounded text-sm hover:bg-red-700"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               ))}
-            </select>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Leave price empty to use base price. Stock is required for each size.
+            </p>
           </div>
         </div>
 
         {/* Right Column - Enhanced Image Upload */}
         <div className="space-y-4">
           <div>
-            <label className="block font-semibold mb-3">PRODUCT IMAGE:</label>
+            <label className="block font-semibold mb-3">PRODUCT IMAGE (Optional):</label>
             
             {/* File Input Button */}
             <div className="mb-4">

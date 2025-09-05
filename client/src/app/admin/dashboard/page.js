@@ -3,8 +3,12 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import API from '@/lib/axios';
+import { useAuth } from '@/context/auth-context';
+import { useRouter } from 'next/navigation';
 
 export default function AdminDashboard() {
+  const { user, isAdmin, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [dashboardData, setDashboardData] = useState({
     inventory: {},
     orders: {},
@@ -18,6 +22,19 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError('');
+      
+      // Debug: Check if user and token exist
+      console.log('User:', user);
+      console.log('Is Admin:', isAdmin);
+      console.log('Token exists:', !!localStorage.getItem('token'));
+      console.log('Token value:', localStorage.getItem('token'));
+      
+      // Check if we have a valid token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found. Please log in.');
+      }
       
       // Fetch inventory summary
       const inventoryRes = await API.get('/products/inventory/summary');
@@ -25,8 +42,14 @@ export default function AdminDashboard() {
       // Fetch order statistics
       const orderStatsRes = await API.get(`/orders/stats?period=${selectedPeriod}`);
       
-      // Fetch sales performance
-      const salesRes = await API.get('/orders/sales-performance');
+      // Fetch sales performance (try public endpoint first for testing)
+      let salesRes;
+      try {
+        salesRes = await API.get('/orders/sales-performance');
+      } catch (salesErr) {
+        console.log('Trying public sales endpoint...');
+        salesRes = await API.get('/orders/sales-performance/public');
+      }
       
       // Fetch low stock products
       const lowStockRes = await API.get('/products/low-stock');
@@ -38,16 +61,42 @@ export default function AdminDashboard() {
         lowStock: lowStockRes.data.products || []
       });
     } catch (err) {
-      setError('Failed to load dashboard data');
       console.error('Dashboard error:', err);
+      console.error('Error response:', err.response);
+      
+      if (err.response?.status === 404) {
+        setError('API endpoint not found. Please ensure the server is running.');
+      } else if (err.response?.status === 401 || err.response?.status === 403) {
+        setError('Authentication required. Please log in as an admin with email: admin@example.com and password: admin123');
+      } else if (err.response?.status === 429) {
+        setError('Too many requests. Please wait a moment and try again.');
+      } else if (err.code === 'NETWORK_ERROR' || !err.response) {
+        setError('Cannot connect to server. Please ensure the API server is running on port 5000.');
+      } else if (err.message === 'No authentication token found. Please log in.') {
+        setError('No authentication token found. Please log in as an admin with email: admin@example.com and password: admin123');
+      } else {
+        setError(`Failed to load dashboard data: ${err.response?.data?.error || err.message}`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+    
+    if (!isAdmin) {
+      router.push('/dashboard');
+      return;
+    }
+    
     fetchDashboardData();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, user, isAdmin, authLoading, router]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-PH', {
@@ -67,14 +116,14 @@ export default function AdminDashboard() {
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
-      <div className="flex flex-col h-screen text-black">
+      <div className="flex flex-col min-h-screen text-black">
         <Navbar />
         <div className="flex flex-1">
           <Sidebar />
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-xl">Loading dashboard...</div>
+            <div className="text-xl">{authLoading ? 'Checking authentication...' : 'Loading dashboard...'}</div>
           </div>
         </div>
       </div>
@@ -82,13 +131,11 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black">
       <Navbar />
       <div className="flex flex-1">
-        <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
-          <Sidebar />
-        </div>
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+        <Sidebar />
+        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
@@ -97,7 +144,25 @@ export default function AdminDashboard() {
 
           {error && (
             <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
-              {error}
+              <div className="flex justify-between items-center">
+                <span>{error}</span>
+                <div className="flex gap-2">
+                  {(error.includes('Authentication') || error.includes('token')) && (
+                    <button
+                      onClick={() => window.location.href = '/auth/login'}
+                      className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
+                      Login
+                    </button>
+                  )}
+                  <button
+                    onClick={fetchDashboardData}
+                    className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -320,6 +385,7 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
 
 
 

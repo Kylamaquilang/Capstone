@@ -261,11 +261,10 @@ export const changePassword = async (req, res) => {
     await pool.query('DELETE FROM password_reset_codes WHERE user_id = ? AND code = ?', [user.id, verificationCode]);
 
     // Send confirmation email
-    try {
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: 'Password Changed Successfully - ESSEN Store',
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Password Changed Successfully - ESSEN Store',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #000C50 0%, #1e40af 100%); color: white; padding: 20px; text-align: center;">
@@ -309,12 +308,6 @@ export const changePassword = async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('Password change confirmation email sent to:', email);
-    
-    } catch (emailError) {
-      console.error('Failed to send password change confirmation email:', emailError.message);
-      // Continue with success response even if email fails
-    }
 
     res.status(200).json({ 
       message: 'Password changed successfully',
@@ -423,18 +416,7 @@ export const requestPasswordReset = async (req, res) => {
     );
 
     // Send email with verification code
-    try {
-      await sendPasswordResetEmail(user.email, verificationCode, user.name);
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError.message);
-      // Still return success to user but log the error
-      // This prevents revealing internal email configuration issues
-      return res.status(200).json({ 
-        message: 'Password reset verification code sent to your email',
-        email: user.email,
-        warning: 'If you do not receive the email, please contact support.'
-      });
-    }
+    await sendPasswordResetEmail(user.email, verificationCode, user.name);
 
     res.status(200).json({ 
       message: 'Password reset verification code sent to your email',
@@ -644,10 +626,9 @@ export const sendVerificationCode = async (req, res) => {
     `, [user.id, verificationCode, expiresAt]);
 
     // Send email with verification code
-    try {
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: email,
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
       subject: 'Password Change Verification Code - ESSEN Store',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -690,12 +671,6 @@ export const sendVerificationCode = async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('Verification code email sent to:', email);
-    
-    } catch (emailError) {
-      console.error('Failed to send verification code email:', emailError.message);
-      return res.status(500).json({ error: 'Failed to send verification code. Please contact support.' });
-    }
 
     res.status(200).json({ 
       message: 'Verification code sent successfully',

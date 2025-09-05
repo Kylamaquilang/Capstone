@@ -32,6 +32,7 @@ export const getAllOrders = async (req, res) => {
         o.total_amount, 
         o.payment_method, 
         o.pay_at_counter,
+        o.payment_status,
         o.status, 
         o.created_at,
         o.updated_at,
@@ -142,7 +143,7 @@ export const updateOrderStatus = async (req, res) => {
   try {
     // Get current order details
     const [currentOrder] = await pool.query(
-      'SELECT status, user_id FROM orders WHERE id = ?',
+      'SELECT status, user_id, total_amount, payment_method, payment_status FROM orders WHERE id = ?',
       [id]
     )
 
@@ -152,6 +153,9 @@ export const updateOrderStatus = async (req, res) => {
 
     const oldStatus = currentOrder[0].status
     const userId = currentOrder[0].user_id
+    const totalAmount = currentOrder[0].total_amount
+    const paymentMethod = currentOrder[0].payment_method
+    const paymentStatus = currentOrder[0].payment_status
 
     // Update order status
     const [result] = await pool.query(
@@ -169,29 +173,131 @@ export const updateOrderStatus = async (req, res) => {
       VALUES (?, ?, ?, ?, NOW())
     `, [id, oldStatus, status, notes || null])
 
-    // If order is cancelled or refunded, restore stock
-    if ((status === 'cancelled' || status === 'refunded') && oldStatus !== 'cancelled' && oldStatus !== 'refunded') {
-      const [orderItems] = await pool.query(
-        'SELECT product_id, quantity, size FROM order_items WHERE order_id = ?',
-        [id]
-      )
+    // Handle inventory and sales tracking based on status changes
+    if (status === 'cancelled' || status === 'refunded') {
+      // Restore stock for cancelled/refunded orders
+      await restoreOrderStock(id)
+      
+      // Log sales reversal
+      await logSalesMovement(id, 'reversal', totalAmount, paymentMethod, `Order ${status}`)
+      
+    } else if (status === 'delivered' && oldStatus !== 'delivered') {
+      // Record the sale when order is delivered
+      await logSalesMovement(id, 'sale', totalAmount, paymentMethod, 'Order delivered - Sale recorded')
+      
+      // Automatically mark payment as paid when order is delivered
+      if (paymentStatus !== 'paid') {
+        await pool.query(
+          'UPDATE orders SET payment_status = ? WHERE id = ?',
+          ['paid', id]
+        )
+        
+        // Log the payment completion
+        await pool.query(`
+          INSERT INTO payment_transactions (
+            order_id, 
+            transaction_id, 
+            amount, 
+            payment_method, 
+            status, 
+            gateway_response,
+            created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, NOW())
+        `, [
+          id,
+          `auto_paid_${id}_${Date.now()}`,
+          totalAmount,
+          paymentMethod,
+          'completed',
+          JSON.stringify({ 
+            auto_completed: true, 
+            reason: 'Order delivered',
+            completed_at: new Date().toISOString()
+          })
+        ])
+      }
+    }
 
-      for (const item of orderItems) {
+    // Create notification for user
+    await createOrderStatusNotification(userId, id, status)
+
+    res.json({ 
+      message: `Order status updated to '${status}'`,
+      previousStatus: oldStatus,
+      newStatus: status,
+      inventoryUpdated: (status === 'cancelled' || status === 'refunded'),
+      salesLogged: (status === 'delivered'),
+      paymentStatusUpdated: (status === 'delivered' && paymentStatus !== 'paid'),
+      paymentStatus: status === 'delivered' ? 'paid' : paymentStatus
+    })
+  } catch (err) {
+    console.error('Update status error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// Helper function to restore stock for cancelled orders
+const restoreOrderStock = async (orderId) => {
+  try {
+    const [orderItems] = await pool.query(`
+      SELECT oi.product_id, oi.quantity, oi.size_id, ps.stock as size_stock
+      FROM order_items oi
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+      WHERE oi.order_id = ?
+    `, [orderId])
+
+    for (const item of orderItems) {
+      if (item.size_id) {
+        // Restore size-specific stock
+        await pool.query(
+          'UPDATE product_sizes SET stock = stock + ? WHERE id = ?',
+          [item.quantity, item.size_id]
+        )
+      } else {
+        // Restore general product stock
         await pool.query(
           'UPDATE products SET stock = stock + ? WHERE id = ?',
           [item.quantity, item.product_id]
         )
       }
     }
+  } catch (error) {
+    console.error('Error restoring stock:', error)
+  }
+}
 
-    res.json({ 
-      message: `Order status updated to '${status}'`,
-      previousStatus: oldStatus,
-      newStatus: status
-    })
-  } catch (err) {
-    console.error('Update status error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+// Helper function to log sales movements
+const logSalesMovement = async (orderId, movementType, amount, paymentMethod, description) => {
+  try {
+    await pool.query(`
+      INSERT INTO sales_logs (order_id, movement_type, amount, payment_method, description, created_at)
+      VALUES (?, ?, ?, ?, ?, NOW())
+    `, [orderId, movementType, amount, paymentMethod, description])
+  } catch (error) {
+    console.error('Error logging sales movement:', error)
+  }
+}
+
+// Helper function to create order status notifications
+const createOrderStatusNotification = async (userId, orderId, status) => {
+  try {
+    const statusMessages = {
+      'pending': 'Your order has been received and is being processed.',
+      'processing': 'Your order is being prepared.',
+      'ready_for_pickup': 'Your order is ready for pickup!',
+      'delivered': 'Your order has been delivered successfully.',
+      'cancelled': 'Your order has been cancelled.',
+      'refunded': 'Your order has been refunded.'
+    }
+
+    const message = statusMessages[status] || `Your order status has been updated to ${status}.`
+
+    await pool.query(`
+      INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
+      VALUES (?, ?, ?, ?, ?, NOW())
+    `, [userId, `Order #${orderId} Update`, message, 'order_status', orderId])
+  } catch (error) {
+    console.error('Error creating notification:', error)
   }
 }
 
@@ -276,7 +382,11 @@ export const getSalesPerformance = async (req, res) => {
         ${groupClause} as period,
         COUNT(*) as orders,
         SUM(total_amount) as revenue,
-        AVG(total_amount) as avg_order_value
+        AVG(total_amount) as avg_order_value,
+        COUNT(CASE WHEN payment_method = 'gcash' THEN 1 END) as gcash_orders,
+        COUNT(CASE WHEN payment_method = 'cash' THEN 1 END) as cash_orders,
+        SUM(CASE WHEN payment_method = 'gcash' THEN total_amount ELSE 0 END) as gcash_revenue,
+        SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as cash_revenue
       FROM orders
       WHERE status != 'cancelled'
       ${start_date ? 'AND created_at >= ?' : ''}
@@ -302,9 +412,75 @@ export const getSalesPerformance = async (req, res) => {
       LIMIT 10
     `, [start_date, end_date].filter(Boolean))
 
+    // Get payment method breakdown
+    const [paymentBreakdown] = await pool.query(`
+      SELECT 
+        payment_method,
+        COUNT(*) as order_count,
+        SUM(total_amount) as total_revenue,
+        AVG(total_amount) as avg_order_value
+      FROM orders
+      WHERE status != 'cancelled'
+      ${start_date ? 'AND created_at >= ?' : ''}
+      ${end_date ? 'AND created_at <= ?' : ''}
+      GROUP BY payment_method
+      ORDER BY total_revenue DESC
+    `, [start_date, end_date].filter(Boolean))
+
+    // Get inventory movement summary
+    const [inventorySummary] = await pool.query(`
+      SELECT 
+        movement_type,
+        COUNT(*) as movement_count,
+        SUM(ABS(quantity_change)) as total_quantity,
+        COUNT(DISTINCT product_id) as products_affected
+      FROM inventory_movements
+      WHERE order_id IS NOT NULL
+      ${start_date ? 'AND created_at >= ?' : ''}
+      ${end_date ? 'AND created_at <= ?' : ''}
+      GROUP BY movement_type
+    `, [start_date, end_date].filter(Boolean))
+
+    // Get sales logs summary for additional tracking
+    const [salesLogsSummary] = await pool.query(`
+      SELECT 
+        COUNT(*) as total_sales_logs,
+        SUM(amount) as total_sales_revenue,
+        COUNT(CASE WHEN movement_type = 'sale' THEN 1 END) as completed_sales,
+        COUNT(CASE WHEN movement_type = 'reversal' THEN 1 END) as reversed_sales,
+        SUM(CASE WHEN movement_type = 'sale' THEN amount ELSE 0 END) as completed_revenue,
+        SUM(CASE WHEN movement_type = 'reversal' THEN amount ELSE 0 END) as reversed_revenue
+      FROM sales_logs
+      WHERE 1=1
+      ${start_date ? 'AND created_at >= ?' : ''}
+      ${end_date ? 'AND created_at <= ?' : ''}
+    `, [start_date, end_date].filter(Boolean));
+
+    // Always create summary data from orders (for accurate totals)
+    const [summary] = await pool.query(`
+      SELECT 
+        COUNT(*) as total_orders,
+        SUM(total_amount) as total_revenue,
+        AVG(total_amount) as avg_order_value,
+        COUNT(CASE WHEN payment_method = 'gcash' THEN 1 END) as gcash_orders,
+        COUNT(CASE WHEN payment_method = 'cash' THEN 1 END) as cash_orders,
+        SUM(CASE WHEN payment_method = 'gcash' THEN total_amount ELSE 0 END) as gcash_revenue,
+        SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as cash_revenue
+      FROM orders
+      WHERE status != 'cancelled'
+      ${start_date ? 'AND created_at >= ?' : ''}
+      ${end_date ? 'AND created_at <= ?' : ''}
+    `, [start_date, end_date].filter(Boolean));
+    
+    const summaryData = summary[0];
+
     res.json({
       salesData,
       topProducts,
+      paymentBreakdown,
+      inventorySummary,
+      salesLogsSummary: salesLogsSummary[0],
+      summary: summaryData,
       period: { start_date, end_date, group_by }
     })
   } catch (err) {

@@ -146,7 +146,7 @@ const CheckoutPage = () => {
         Swal.fire({
           icon: 'success',
           title: 'Order Placed Successfully!',
-          text: `Order #${response.data.orderId} has been created. Please pay ₱${totalAmount.toFixed(2)} upon pickup.`,
+          text: `Order #${response.data.orderId} has been created. Please pay ${totalAmount.toFixed(2)} upon pickup.`,
           confirmButtonColor: '#000C50',
         }).then(() => {
           router.push('/user-profile');
@@ -223,7 +223,7 @@ const CheckoutPage = () => {
                   <h4 className="font-semibold text-lg">{item.product_name}</h4>
                   <p className="text-sm text-gray-600 mt-1">Size: {item.size || 'N/A'}</p>
                   <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                  <p className="font-medium text-lg mt-2">₱{(item.price * item.quantity).toFixed(2)}</p>
+                  <p className="font-medium text-lg mt-2">{(item.price * item.quantity).toFixed(2)}</p>
                 </div>
               </div>
             ))}
@@ -235,55 +235,57 @@ const CheckoutPage = () => {
           <h3 className="font-bold mb-6 text-lg">Payment Methods</h3>
           <div className="space-y-6">
 
-                         {/* PAY UPON PICK-UP */}
-             <div 
-               className={`flex items-center justify-between cursor-pointer p-1 rounded-lg transition-colors ${
-                 selectedMethod === 'pickup' 
-                   ? 'bg-blue-50' 
-                   : 'hover:bg-gray-50'
-               }`}
-               onClick={() => handleSelect('pickup')}
-             >
-               <div className="flex items-center gap-4">
-                 <BanknotesIcon className="h-5 w-5 text-[#000C50]" />
-                 <div>
-                   <span className="font-small text-sm">PAY UPON PICK-UP</span>
-                 </div>
-               </div>
-               <input
-                 type="radio"
-                 name="payment"
-                 value="pickup"
-                 checked={selectedMethod === 'pickup'}
-                 readOnly
-                 className="h-5 w-5 text-[#000C50] accent-[#000C50] rounded-full"
-               />
-             </div>
+            {/* PAY AT COUNTER */}
+            <div 
+              className={`flex items-center justify-between cursor-pointer p-4 rounded-lg border-2 transition-colors ${
+                selectedMethod === 'pickup' 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => handleSelect('pickup')}
+            >
+              <div className="flex items-center gap-4">
+                <BanknotesIcon className="h-6 w-6 text-[#000C50]" />
+                <div>
+                  <div className="font-semibold text-lg">Pay at Counter</div>
+                  <div className="text-sm text-gray-600">Pay with cash when you pick up your order</div>
+                </div>
+              </div>
+              <input
+                type="radio"
+                name="payment"
+                value="pickup"
+                checked={selectedMethod === 'pickup'}
+                readOnly
+                className="h-5 w-5 text-[#000C50] accent-[#000C50] rounded-full"
+              />
+            </div>
 
-             {/* GCASH */}
-             <div 
-               className={`flex items-center justify-between cursor-pointer rounded-lg transition-colors ${
-                 selectedMethod === 'gcash' 
-                   ? 'bg-blue-50' 
-                   : 'hover:bg-gray-50'
-               }`}
-               onClick={() => handleSelect('gcash')}
-             >
-               <div className="flex items-center gap-4">
-                 <DevicePhoneMobileIcon className="h-5 w-5 text-[#000C50]" />
-                 <div>
-                   <span className="font-small text-sm">GCASH</span>
-                 </div>
-               </div>
-               <input
-                 type="radio"
-                 name="payment"
-                 value="gcash"
-                 checked={selectedMethod === 'gcash'}
-                 readOnly
-                 className="h-5 w-5 text-[#000C50] accent-[#000C50] rounded-full mr-1"
-               />
-             </div>
+            {/* GCASH ONLINE PAYMENT */}
+            <div 
+              className={`flex items-center justify-between cursor-pointer p-4 rounded-lg border-2 transition-colors ${
+                selectedMethod === 'gcash' 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => handleSelect('gcash')}
+            >
+              <div className="flex items-center gap-4">
+                <DevicePhoneMobileIcon className="h-6 w-6 text-[#000C50]" />
+                <div>
+                  <div className="font-semibold text-lg">GCash Online Payment</div>
+                  <div className="text-sm text-gray-600">Secure online payment via GCash</div>
+                </div>
+              </div>
+              <input
+                type="radio"
+                name="payment"
+                value="gcash"
+                checked={selectedMethod === 'gcash'}
+                readOnly
+                className="h-5 w-5 text-[#000C50] accent-[#000C50] rounded-full"
+              />
+            </div>
           </div>
         </div>
       
@@ -293,7 +295,7 @@ const CheckoutPage = () => {
            <div className="flex justify-between items-center">
              <div className="flex items-center gap-2">
                <span className="text-lg font-medium">Total ({cartItems.length} {cartItems.length === 1 ? 'Item' : 'Items'}):</span>
-               <span className="text-lg font-bold text-[#000C50]">₱{totalAmount.toFixed(2)}</span>
+               <span className="text-lg font-bold text-[#000C50]">{totalAmount.toFixed(2)}</span>
              </div>
              <button 
                onClick={handleCheckout}

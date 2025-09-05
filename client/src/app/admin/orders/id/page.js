@@ -182,7 +182,7 @@ export default function OrderDetailPage() {
                   </div>
                   <div>
                     <span className="font-medium">Total Amount:</span> 
-                    <span className="font-semibold text-green-600 ml-1">₱{Number(order.total_amount).toFixed(2)}</span>
+                    <span className="font-semibold text-green-600 ml-1">{Number(order.total_amount).toFixed(2)}</span>
                   </div>
                   <div>
                     <span className="font-medium">Payment Method:</span> {order.payment_method}
@@ -239,9 +239,9 @@ export default function OrderDetailPage() {
                         </td>
                         <td className="px-4 py-3">{item.size || 'N/A'}</td>
                         <td className="px-4 py-3">{item.quantity}</td>
-                        <td className="px-4 py-3">₱{Number(item.price).toFixed(2)}</td>
+                        <td className="px-4 py-3">{Number(item.price).toFixed(2)}</td>
                         <td className="px-4 py-3 font-medium">
-                          ₱{(Number(item.price) * Number(item.quantity)).toFixed(2)}
+                          {(Number(item.price) * Number(item.quantity)).toFixed(2)}
                         </td>
                       </tr>
                     ))}

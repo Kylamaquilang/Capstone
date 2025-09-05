@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import API from '@/lib/axios';
+import ActionMenu from '@/components/common/ActionMenu';
+import { CubeIcon } from '@heroicons/react/24/outline';
 
 export default function AdminInventoryPage() {
   const [inventoryData, setInventoryData] = useState({
@@ -31,13 +33,45 @@ export default function AdminInventoryPage() {
       const lowStockRes = await API.get('/products/low-stock');
 
       setInventoryData({
-        summary: summaryRes.data,
+        summary: summaryRes.data.summary || summaryRes.data,
         categoryStats: summaryRes.data.categoryStats || [],
         lowStockProducts: lowStockRes.data.products || []
       });
     } catch (err) {
-      setError('Failed to load inventory data');
       console.error('Inventory error:', err);
+      
+      // If authentication fails, try to get basic product data
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        try {
+          console.log('Authentication failed, trying basic product data...');
+          const productsRes = await API.get('/products');
+          const products = productsRes.data || [];
+          
+          // Calculate basic stats from products
+          const totalProducts = products.length;
+          const totalStock = products.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
+          const totalValue = products.reduce((sum, p) => sum + (Number(p.stock) || 0) * (Number(p.price) || 0), 0);
+          const lowStockCount = products.filter(p => (Number(p.stock) || 0) <= 5).length;
+          
+          setInventoryData({
+            summary: {
+              total_products: totalProducts,
+              total_stock: totalStock,
+              low_stock_count: lowStockCount,
+              out_of_stock_count: products.filter(p => (Number(p.stock) || 0) === 0).length,
+              total_inventory_value: totalValue
+            },
+            categoryStats: [],
+            lowStockProducts: products.filter(p => (Number(p.stock) || 0) <= 5)
+          });
+          
+          setError('Limited data available - please log in as admin for full features');
+        } catch (fallbackErr) {
+          setError('Failed to load inventory data. Please check your connection and try again.');
+        }
+      } else {
+        setError('Failed to load inventory data. Please check your connection and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -88,7 +122,7 @@ export default function AdminInventoryPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen text-black">
+      <div className="flex flex-col min-h-screen text-black">
         <Navbar />
         <div className="flex flex-1">
           <Sidebar />
@@ -101,13 +135,11 @@ export default function AdminInventoryPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black">
       <Navbar />
       <div className="flex flex-1">
-        <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
-          <Sidebar />
-        </div>
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+        <Sidebar />
+        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
@@ -255,7 +287,7 @@ export default function AdminInventoryPage() {
                             />
                             <div>
                               <div className="font-medium">{product.name}</div>
-                              <div className="text-xs text-gray-500">₱{product.price}</div>
+                              <div className="text-xs text-gray-500">{product.price}</div>
                             </div>
                           </div>
                         </td>
@@ -277,16 +309,19 @@ export default function AdminInventoryPage() {
                           </span>
                         </td>
                         <td className="px-4 py-2">
-                          <button
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setStockUpdate({ stock: '', reason: '', movement_type: 'purchase' });
-                              setShowStockModal(true);
-                            }}
-                            className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                          >
-                            Restock
-                          </button>
+                          <ActionMenu
+                            actions={[
+                              {
+                                label: 'Restock Product',
+                                icon: CubeIcon,
+                                onClick: () => {
+                                  setSelectedProduct(product);
+                                  setStockUpdate({ stock: '', reason: '', movement_type: 'purchase' });
+                                  setShowStockModal(true);
+                                }
+                              }
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -417,6 +452,7 @@ export default function AdminInventoryPage() {
     </div>
   );
 }
+
 
 
 

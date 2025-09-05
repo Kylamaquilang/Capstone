@@ -4,6 +4,8 @@ import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
 import Link from 'next/link';
+import ActionMenu from '@/components/common/ActionMenu';
+import { EyeIcon, PencilSquareIcon, UserMinusIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
@@ -161,13 +163,11 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black">
       <Navbar />
       <div className="flex flex-1">
-        <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
-          <Sidebar />
-        </div>
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+        <Sidebar />
+        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">USER MANAGEMENT</h2>
@@ -234,25 +234,22 @@ export default function AdminUsersPage() {
                           {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                         </td>
                         <td className="px-4 py-2">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleStatusToggle(user.id, user.is_active)}
-                              disabled={updatingStatus === user.id}
-                              className={`px-3 py-1 text-xs rounded ${
-                                user.is_active
-                                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                  : 'bg-green-100 text-green-700 hover:bg-green-200'
-                              } ${updatingStatus === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                              {updatingStatus === user.id ? 'Updating...' : (user.is_active ? 'Deactivate' : 'Activate')}
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(user.id, user.name)}
-                              className="px-3 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
-                            >
-                              Delete
-                            </button>
-                          </div>
+                          <ActionMenu
+                            actions={[
+                              {
+                                label: user.is_active ? 'Deactivate User' : 'Activate User',
+                                icon: user.is_active ? UserMinusIcon : UserPlusIcon,
+                                onClick: () => handleStatusToggle(user.id, user.is_active),
+                                disabled: updatingStatus === user.id
+                              },
+                              {
+                                label: 'Delete User',
+                                icon: PencilSquareIcon,
+                                onClick: () => handleDeleteUser(user.id, user.name),
+                                danger: true
+                              }
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}

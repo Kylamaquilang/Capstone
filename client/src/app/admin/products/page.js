@@ -23,19 +23,13 @@ export default function AdminProductPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black">
       {/* ✅ Top Navbar */}
       <Navbar />
 
-      {/* ✅ Page layout below Navbar */}
       <div className="flex flex-1">
-        {/* Sidebar with fixed height minus navbar */}
-        <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
-          <Sidebar />
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+        <Sidebar />
+        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           {/* 🟦 Card Container */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             {/* Header */}

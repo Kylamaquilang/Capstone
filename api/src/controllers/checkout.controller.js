@@ -1,6 +1,44 @@
 import { pool } from '../database/db.js'
 import { createOrderStatusNotification } from '../utils/notification-helper.js'
 
+// Helper function to create admin notifications for new orders
+const createAdminOrderNotification = async (orderId, totalAmount, paymentMethod) => {
+  try {
+    // Get all admin users
+    const [adminUsers] = await pool.query(`
+      SELECT id, name FROM users WHERE role = 'admin'
+    `);
+    
+    // Get customer info for the order
+    const [orderInfo] = await pool.query(`
+      SELECT u.name as customer_name, u.email as customer_email
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      WHERE o.id = ?
+    `, [orderId]);
+    
+    const customerName = orderInfo[0]?.customer_name || 'Customer';
+    
+    // Create notification for each admin user
+    for (const admin of adminUsers) {
+      await pool.query(`
+        INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
+      `, [
+        admin.id,
+        `🆕 New Order #${orderId}`,
+        `New order received from ${customerName} for ${totalAmount} via ${paymentMethod.toUpperCase()}`,
+        'admin_order',
+        orderId
+      ]);
+    }
+    
+    console.log(`✅ Admin notifications created for order #${orderId}`);
+  } catch (error) {
+    console.error('❌ Error creating admin notifications:', error);
+  }
+}
+
 export const checkout = async (req, res) => {
   const user_id = req.user.id
   const { payment_method, pay_at_counter } = req.body
@@ -46,9 +84,9 @@ export const checkout = async (req, res) => {
     }, 0)
 
     const [orderResult] = await pool.query(`
-      INSERT INTO orders (user_id, total_amount, payment_method, payment_status, status)
-      VALUES (?, ?, ?, 'unpaid', 'pending')
-    `, [user_id, total_amount, payment_method])
+      INSERT INTO orders (user_id, total_amount, payment_method, payment_status, status, pay_at_counter)
+      VALUES (?, ?, ?, 'unpaid', 'pending', ?)
+    `, [user_id, total_amount, payment_method, pay_at_counter || false])
 
     const orderId = orderResult.insertId
 
@@ -59,17 +97,29 @@ export const checkout = async (req, res) => {
         [orderId, item.product_id, item.size_id || null, item.quantity, item.size_price || item.price]
       )
 
-      // Update stock based on whether it's a size-specific item or general product
+      // Update stock and log inventory movement
       if (item.size_id) {
         await pool.query(
           `UPDATE product_sizes SET stock = stock - ? WHERE id = ?`,
           [item.quantity, item.size_id]
         )
+        
+        // Log inventory movement for size-specific items
+        await pool.query(`
+          INSERT INTO inventory_movements (product_id, size_id, movement_type, quantity_change, reason, order_id, created_at)
+          VALUES (?, ?, 'sale', ?, 'Order placed', ?, NOW())
+        `, [item.product_id, item.size_id, -item.quantity, orderId])
       } else {
         await pool.query(
           `UPDATE products SET stock = stock - ? WHERE id = ?`,
           [item.quantity, item.product_id]
         )
+        
+        // Log inventory movement for general products
+        await pool.query(`
+          INSERT INTO inventory_movements (product_id, movement_type, quantity_change, reason, order_id, created_at)
+          VALUES (?, 'sale', ?, 'Order placed', ?, NOW())
+        `, [item.product_id, -item.quantity, orderId])
       }
     }
 
@@ -77,6 +127,9 @@ export const checkout = async (req, res) => {
 
     // Create notification for order placement
     await createOrderStatusNotification(user_id, orderId, 'pending');
+
+    // Create admin notifications for new order
+    await createAdminOrderNotification(orderId, total_amount, payment_method);
 
     res.status(200).json({
       success: true,
