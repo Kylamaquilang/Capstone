@@ -55,35 +55,19 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS configuration
-const isProduction = process.env.NODE_ENV === 'production';
-if (!isProduction) {
-  // In development, allow all origins to simplify local testing
-  app.use(cors({
-    origin: true,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
-} else {
-  const allowedOrigins = [
-    process.env.CLIENT_URL || 'http://localhost:3000',
-    'http://localhost:3001',
+// CORS configuration - Always allow localhost in development
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001', 
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001'
-  ];
-
-  app.use(cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }));
-}
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
+}));
 
 // Compression middleware
 app.use(compression());

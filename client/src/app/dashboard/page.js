@@ -7,6 +7,7 @@ import { useAuth } from '@/context/auth-context';
 import API from '@/lib/axios';
 import Image from 'next/image';
 import Link from 'next/link';
+import { getProductImageUrl } from '@/utils/imageUtils';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -36,12 +37,7 @@ export default function UserDashboard() {
         }
         
         // Ensure we have a valid image URL
-        let imageUrl = '/images/polo.png'; // default fallback
-        if (product.image && product.image.startsWith('/')) {
-          imageUrl = product.image;
-        } else if (product.image && product.image.startsWith('http')) {
-          imageUrl = product.image;
-        }
+        const imageUrl = getProductImageUrl(product.image);
         
         acc[category].push({
           id: product.id,

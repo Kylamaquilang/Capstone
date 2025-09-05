@@ -36,6 +36,57 @@ export const createGCashPayment = async (req, res) => {
       return res.status(400).json({ error: 'Order is already paid' });
     }
 
+    // Check if PayMongo is configured
+    if (!PAYMONGO_SECRET_KEY || !PAYMONGO_PUBLIC_KEY) {
+      console.log('PayMongo not configured, creating mock payment for development');
+      
+      // Create a mock payment for development
+      const mockPaymentIntentId = `pi_mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Update order with mock payment intent ID
+      await pool.query(
+        'UPDATE orders SET payment_intent_id = ?, payment_status = ? WHERE id = ?',
+        [mockPaymentIntentId, 'pending', orderId]
+      );
+
+      // Store payment transaction
+      await pool.query(`
+        INSERT INTO payment_transactions (
+          order_id, 
+          transaction_id, 
+          amount, 
+          payment_method, 
+          status, 
+          gateway_response
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `, [
+        orderId,
+        mockPaymentIntentId,
+        amount,
+        'gcash',
+        'pending',
+        JSON.stringify({ mock: true, message: 'Development mode - PayMongo not configured' })
+      ]);
+
+      return res.json({
+        success: true,
+        payment_intent_id: mockPaymentIntentId,
+        client_key: 'mock_key',
+        payment_url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/payment/success?order_id=${orderId}&mock=true`,
+        payment_data: {
+          attributes: {
+            next_action: {
+              redirect: {
+                url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/payment/success?order_id=${orderId}&mock=true`
+              }
+            }
+          }
+        },
+        mock: true,
+        message: 'Development mode - PayMongo not configured. Payment will be marked as successful.'
+      });
+    }
+
     // Create PayMongo payment intent
     const paymentIntentData = {
       data: {
@@ -154,6 +205,41 @@ export const createGCashPayment = async (req, res) => {
       error: 'Payment processing failed',
       details: error.response?.data || error.message
     });
+  }
+};
+
+// Mock payment success for development
+export const mockPaymentSuccess = async (req, res) => {
+  const { orderId } = req.query;
+  
+  try {
+    if (!orderId) {
+      return res.status(400).json({ error: 'Order ID is required' });
+    }
+
+    // Update order status to paid
+    await pool.query(
+      'UPDATE orders SET payment_status = ?, status = ? WHERE id = ?',
+      ['paid', 'processing', orderId]
+    );
+
+    // Update payment transaction
+    await pool.query(
+      'UPDATE payment_transactions SET status = ? WHERE order_id = ?',
+      ['completed', orderId]
+    );
+
+    console.log(`Mock payment completed for order ${orderId}`);
+
+    res.json({
+      success: true,
+      message: 'Payment completed successfully (mock)',
+      orderId: orderId
+    });
+
+  } catch (error) {
+    console.error('Mock payment success error:', error);
+    res.status(500).json({ error: 'Failed to process mock payment' });
   }
 };
 

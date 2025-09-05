@@ -24,6 +24,7 @@ import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
 import Swal from 'sweetalert2';
 
+import { getProfileImageUrl } from '@/utils/imageUtils';
 import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
 
@@ -326,7 +327,7 @@ export default function UserProfilePage() {
             <div className="relative">
               {profile.profile_image ? (
                 <Image
-                  src={profile.profile_image}
+                  src={getProfileImageUrl(profile.profile_image)}
                   alt="Profile"
                   width={100}
                   height={100}

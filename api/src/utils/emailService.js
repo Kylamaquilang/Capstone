@@ -1,14 +1,36 @@
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
-// Email configuration
-export const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER || 'your-email@gmail.com',
-    pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+// Email configuration - Create transporter dynamically
+export const getTransporter = () => {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER || 'your-email@gmail.com',
+      pass: process.env.EMAIL_PASSWORD || 'your-app-password'
+    },
+    // Additional Gmail-specific settings
+    secure: true,
+    port: 465,
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+};
+
+// Legacy transporter for backward compatibility
+export const transporter = getTransporter();
+
+// Verify email configuration
+export const verifyEmailConfig = () => {
+  if (!process.env.EMAIL_USER || process.env.EMAIL_USER === 'your-email@gmail.com') {
+    throw new Error('EMAIL_USER not configured in environment variables');
   }
-});
+  if (!process.env.EMAIL_PASSWORD || process.env.EMAIL_PASSWORD === 'your-app-password') {
+    throw new Error('EMAIL_PASSWORD not configured in environment variables');
+  }
+  return true;
+};
 
 // Generate a random 6-digit verification code
 export const generateVerificationCode = () => {
@@ -23,8 +45,11 @@ export const generateResetToken = () => {
 // Send password reset email with verification code
 export const sendPasswordResetEmail = async (email, verificationCode, userName) => {
   try {
+    // Verify email configuration before sending
+    verifyEmailConfig();
+    
     const mailOptions = {
-      from: process.env.EMAIL_USER || 'your-email@gmail.com',
+      from: process.env.EMAIL_USER,
       to: email,
       subject: 'CPC Essen - Password Reset Verification',
       html: `
@@ -69,20 +94,33 @@ export const sendPasswordResetEmail = async (email, verificationCode, userName) 
       `
     };
 
-    const result = await transporter.sendMail(mailOptions);
+    const result = await getTransporter().sendMail(mailOptions);
     console.log('Password reset email sent successfully to:', email);
     return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending password reset email:', error);
-    throw new Error('Failed to send password reset email');
+    
+    // Provide more specific error messages
+    if (error.message.includes('EMAIL_USER not configured') || error.message.includes('EMAIL_PASSWORD not configured')) {
+      throw new Error('Email service not configured. Please contact administrator.');
+    } else if (error.code === 'EAUTH') {
+      throw new Error('Email authentication failed. Please check email credentials.');
+    } else if (error.code === 'ECONNECTION') {
+      throw new Error('Unable to connect to email service. Please try again later.');
+    } else {
+      throw new Error('Failed to send password reset email. Please try again later.');
+    }
   }
 };
 
 // Send welcome email for new users
 export const sendWelcomeEmail = async (email, userName, studentId, defaultPassword) => {
   try {
+    // Verify email configuration before sending
+    verifyEmailConfig();
+    
     const mailOptions = {
-      from: process.env.EMAIL_USER || 'your-email@gmail.com',
+      from: process.env.EMAIL_USER,
       to: email,
       subject: 'Welcome to CPC Essen - Your Account Details',
       html: `
@@ -125,11 +163,21 @@ export const sendWelcomeEmail = async (email, userName, studentId, defaultPasswo
       `
     };
 
-    const result = await transporter.sendMail(mailOptions);
+    const result = await getTransporter().sendMail(mailOptions);
     console.log('Welcome email sent successfully to:', email);
     return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error('Error sending welcome email:', error);
-    throw new Error('Failed to send welcome email');
+    
+    // Provide more specific error messages
+    if (error.message.includes('EMAIL_USER not configured') || error.message.includes('EMAIL_PASSWORD not configured')) {
+      throw new Error('Email service not configured. Please contact administrator.');
+    } else if (error.code === 'EAUTH') {
+      throw new Error('Email authentication failed. Please check email credentials.');
+    } else if (error.code === 'ECONNECTION') {
+      throw new Error('Unable to connect to email service. Please try again later.');
+    } else {
+      throw new Error('Failed to send welcome email. Please try again later.');
+    }
   }
 };
