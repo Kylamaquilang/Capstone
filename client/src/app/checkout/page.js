@@ -115,10 +115,27 @@ const CheckoutPage = () => {
 
       if (selectedMethod === 'gcash') {
         // Create order first
-        const orderResponse = await API.post('/checkout', {
+        // Check if we have real cart item IDs or temporary ones from BUY NOW
+        const hasRealCartIds = cartItems.every(item => typeof item.id === 'number' && item.id < 1000000000000); // Real DB IDs are smaller
+        
+        const checkoutData = {
           payment_method: 'gcash',
           pay_at_counter: false
-        });
+        };
+
+        if (hasRealCartIds) {
+          // Use existing cart items
+          checkoutData.cart_item_ids = cartItems.map(item => item.id);
+        } else {
+          // Create order directly from product data (BUY NOW flow)
+          checkoutData.products = cartItems.map(item => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            size_id: item.size_id || null
+          }));
+        }
+
+        const orderResponse = await API.post('/checkout', checkoutData);
 
         const orderId = orderResponse.data.orderId;
 
@@ -138,10 +155,27 @@ const CheckoutPage = () => {
 
       } else if (selectedMethod === 'pickup') {
         // Create order for cash payment
-        const response = await API.post('/checkout', {
+        // Check if we have real cart item IDs or temporary ones from BUY NOW
+        const hasRealCartIds = cartItems.every(item => typeof item.id === 'number' && item.id < 1000000000000); // Real DB IDs are smaller
+        
+        const checkoutData = {
           payment_method: 'cash',
           pay_at_counter: true
-        });
+        };
+
+        if (hasRealCartIds) {
+          // Use existing cart items
+          checkoutData.cart_item_ids = cartItems.map(item => item.id);
+        } else {
+          // Create order directly from product data (BUY NOW flow)
+          checkoutData.products = cartItems.map(item => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            size_id: item.size_id || null
+          }));
+        }
+
+        const response = await API.post('/checkout', checkoutData);
 
         Swal.fire({
           icon: 'success',
@@ -149,7 +183,7 @@ const CheckoutPage = () => {
           text: `Order #${response.data.orderId} has been created. Please pay ${totalAmount.toFixed(2)} upon pickup.`,
           confirmButtonColor: '#000C50',
         }).then(() => {
-          router.push('/user-profile');
+          router.push('/cart');
         });
       }
 

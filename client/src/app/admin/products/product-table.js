@@ -111,7 +111,7 @@ export default function ProductTable({ category = '' }) {
 
       sortedSizes.forEach((size, index) => {
         tableRows.push({
-          id: `${prod.id}-${size.size}`,
+          id: `${prod.id}-${size.size}-${size.id || index}`,
           productId: prod.id,
           productName: prod.name,
           category: prod.category_name || prod.category || 'Uncategorized',
@@ -127,7 +127,7 @@ export default function ProductTable({ category = '' }) {
     } else {
       // Product without sizes
       tableRows.push({
-        id: prod.id,
+        id: `product-${prod.id}-no-size`,
         productId: prod.id,
         productName: prod.name,
         category: prod.category_name || prod.category || 'Uncategorized',
@@ -143,74 +143,84 @@ export default function ProductTable({ category = '' }) {
   });
 
   return (
-    <div className="bg-white rounded border border-black overflow-hidden">
-      <div className="max-h-[600px] overflow-y-auto">
+    <div className="bg-white border-gray-600 overflow-hidden rounded-md">
+      <div className="max-h-[600px] overflow-y-auto overflow-x-auto">
         <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-black sticky top-0 z-10">
+          <thead className="bg-gray-300 text-[000C50] sticky top-0 z-10">
             <tr>
-              <th className="px-4 py-3 font-bold">PRODUCT NAME</th>
-              <th className="px-4 py-3 font-bold">CATEGORY</th>
-              <th className="px-4 py-3 font-bold">AMOUNT</th>
-              <th className="px-4 py-3 font-bold">BASE STOCK</th>
-              <th className="px-4 py-3 font-bold">SIZE</th>
-              <th className="px-4 py-3 font-bold">STOCK</th>
-              <th className="px-4 py-3 font-bold">ACTION</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Product Name</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Category</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Price</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Base Stock</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Size</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Stock</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody>
             {tableRows.map((row, index) => (
               <tr key={row.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
-                <td className="px-4 py-3 font-medium">
-                  {row.productName}
+                <td className="px-6 py-4">
+                  <div className="text-sm font-medium text-gray-900">{row.productName}</div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-6 py-4">
                   {row.isFirstSize ? (
-                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                       {row.category}
                     </span>
-                  ) : ''}
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
                 </td>
-                <td className="px-4 py-3 font-semibold text-green-600">
-                  {row.isFirstSize ? `${Number(row.amount).toFixed(2)}` : ''}
-                </td>
-                <td className="px-4 py-3">
+                <td className="px-6 py-4">
                   {row.isFirstSize ? (
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                    <div className="text-sm font-medium text-gray-900">
+                      ₱{Number(row.amount).toFixed(2)}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-4">
+                  {row.isFirstSize ? (
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
                       Number(row.baseStock) === 0 
                         ? 'bg-red-100 text-red-800' 
                         : Number(row.baseStock) <= 5 
                         ? 'bg-yellow-100 text-yellow-800' 
-                        : 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
                     }`}>
                       {row.baseStock}
                     </span>
-                  ) : ''}
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-6 py-4">
                   {row.size ? (
-                    <span className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded font-medium">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                       {row.size}
                     </span>
                   ) : (
-                    <span className="text-gray-500">—</span>
+                    <span className="text-gray-400">-</span>
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-6 py-4">
                   {row.sizeStock !== null ? (
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
                       Number(row.sizeStock) === 0 
                         ? 'bg-red-100 text-red-800' 
                         : Number(row.sizeStock) <= 5 
                         ? 'bg-yellow-100 text-yellow-800' 
-                        : 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
                     }`}>
                       {row.sizeStock}
                     </span>
                   ) : (
-                    <span className="text-gray-500">—</span>
+                    <span className="text-gray-400">-</span>
                   )}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-6 py-4">
                   {row.isFirstSize ? (
                     <ActionMenu
                       actions={[
@@ -227,7 +237,9 @@ export default function ProductTable({ category = '' }) {
                         }
                       ]}
                     />
-                  ) : ''}
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -235,10 +247,10 @@ export default function ProductTable({ category = '' }) {
         </table>
       </div>
       {tableRows.length === 0 && (
-        <div className="p-8 text-center text-gray-500">
-          <div className="text-4xl mb-2">📦</div>
-          <div className="text-lg font-medium">No products found</div>
-          <div className="text-sm">Add your first product to get started</div>
+        <div className="p-8 text-center">
+          <div className="text-gray-400 text-4xl mb-4">📦</div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
+          <p className="text-gray-500">Get started by adding your first product.</p>
         </div>
       )}
     </div>

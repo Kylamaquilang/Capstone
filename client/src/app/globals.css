@@ -23,4 +23,10 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  padding-top: 80px; /* Account for navbar height */
+}
+
+/* Override body padding for admin pages */
+.admin-page {
+  margin-top: -80px !important;
 }

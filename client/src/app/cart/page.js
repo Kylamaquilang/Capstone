@@ -20,6 +20,20 @@ export default function CartPage() {
     fetchCart();
   }, []);
 
+  // Refresh cart when returning from checkout
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchCart();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const fetchCart = async () => {
     try {
       setLoading(true);

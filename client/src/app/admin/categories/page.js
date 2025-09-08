@@ -92,7 +92,7 @@ export default function AdminCategoriesPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black admin-page">
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
@@ -136,52 +136,53 @@ export default function AdminCategoriesPage() {
             ) : error ? (
               <div className="text-red-600">{error}</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-2">ID</th>
-                      <th className="px-4 py-2">Category Name</th>
-                      <th className="px-4 py-2">Created</th>
-                      <th className="px-4 py-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categories.map((category) => (
-                      <tr key={category.id} className="border-b hover:bg-gray-50">
-                        <td className="px-4 py-2">{category.id}</td>
-                        <td className="px-4 py-2">
+              <div className="bg-white border border-gray-300 overflow-hidden">
+                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-800 text-white">
+                      <tr>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Category Name</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Created</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                    {categories.map((category, index) => (
+                      <tr key={category.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                        <td className="px-6 py-4">
                           {editingId === category.id ? (
                             <form onSubmit={handleEditCategory} className="flex gap-2">
                               <input
                                 type="text"
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
-                                className="flex-1 border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 required
                               />
                               <button
                                 type="submit"
-                                className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700 transition"
+                                className="bg-green-600 text-white px-3 py-2 rounded text-sm hover:bg-green-700 transition"
                               >
                                 Save
                               </button>
                               <button
                                 type="button"
                                 onClick={cancelEdit}
-                                className="bg-gray-500 text-white px-2 py-1 rounded text-xs hover:bg-gray-600 transition"
+                                className="bg-gray-500 text-white px-3 py-2 rounded text-sm hover:bg-gray-600 transition"
                               >
                                 Cancel
                               </button>
                             </form>
                           ) : (
-                            <span className="font-medium">{category.name}</span>
+                            <span className="text-sm font-medium text-gray-900">{category.name}</span>
                           )}
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-500">
-                          {category.created_at ? new Date(category.created_at).toLocaleDateString() : 'N/A'}
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {category.created_at ? new Date(category.created_at).toLocaleDateString() : 'N/A'}
+                          </div>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
                           {editingId !== category.id && (
                             <ActionMenu
                               actions={[
@@ -205,10 +206,13 @@ export default function AdminCategoriesPage() {
                   </tbody>
                 </table>
                 {categories.length === 0 && (
-                  <div className="text-gray-600 mt-4 text-center py-8">
-                    No categories found. Add your first category to get started.
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 text-4xl mb-4">🏷️</div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No categories found</h3>
+                    <p className="text-gray-500">Add your first category to get started.</p>
                   </div>
                 )}
+                </div>
               </div>
             )}
 

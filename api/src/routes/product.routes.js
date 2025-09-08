@@ -8,6 +8,7 @@ import {
   getAllProducts,
   getAllProductsSimple,
   getProductById,
+  getProductByName,
   updateProduct,
   deleteProduct,
   getLowStockProducts,
@@ -47,7 +48,8 @@ router.get('/', getAllProductsSimple) // Simple version for frontend
 router.get('/detailed', getAllProducts) // Detailed version with pagination
 router.get('/stats', verifyToken, isAdmin, getProductStats)
 router.get('/low-stock', verifyToken, isAdmin, getLowStockProducts)
-router.get('/:id', getProductById)
+router.get('/name/:name', getProductByName) // Get product by name
+router.get('/:id', getProductById) // Get product by ID (must be last to avoid conflicts)
 
 // ✅ Admin-only below
 router.post('/', verifyToken, isAdmin, createProduct)

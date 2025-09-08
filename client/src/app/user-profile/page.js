@@ -322,7 +322,7 @@ export default function UserProfilePage() {
 
       <main className="flex-grow">
         {/* User Info Card */}
-        <div className="bg-gradient-to-r from-[#000C50] to-blue-800 m-6 p-8 rounded-lg flex justify-between items-center relative mx-25 text-white shadow-xl">
+        <div className="bg-[#000C50] to-blue-800 m-6 p-8 rounded-lg flex justify-between items-center relative mx-25 text-white shadow-xl">
           <div className="flex gap-6 items-center">
             <div className="relative">
               {profile.profile_image ? (
@@ -387,19 +387,19 @@ export default function UserProfilePage() {
               onClick={() => setMenuOpen(!menuOpen)}
               className="bg-white bg-opacity-20 hover:bg-opacity-30 p-3 rounded-full transition-all"
             >
-              <Bars3Icon className="h-6 w-6 text-white" />
+              <Bars3Icon className="h-6 w-6 text-[#000C50]" />
             </button>
             {menuOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg z-10 border">
                 <div className="p-2">
                   <button
                     onClick={() => setEditing(!editing)}
-                    className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-gray-100 rounded-md transition-colors"
+                    className="flex items-center gap-3 w-full text-[#000C50] px-4 py-3 hover:bg-gray-100 rounded-md transition-colors"
                   >
                     <PencilIcon className="h-5 w-5 text-[#000C50]" />
                     {editing ? 'Cancel Edit' : 'Edit Profile'}
                   </button>
-                  <label className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-gray-100 rounded-md transition-colors cursor-pointer">
+                  <label className="flex items-center gap-3 w-full text-[#000C50] px-4 py-3 hover:bg-gray-100 rounded-md transition-colors cursor-pointer">
                     <CameraIcon className="h-5 w-5 text-[#000C50]" />
                     Change Photo
                     <input
@@ -412,7 +412,7 @@ export default function UserProfilePage() {
                   </label>
                   <button
                     onClick={handleSendVerificationCode}
-                    className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-gray-100 rounded-md transition-colors"
+                    className="flex items-center gap-2 w-full text-[#000C50] px-4 py-3 hover:bg-gray-100 rounded-md transition-colors"
                   >
                     <KeyIcon className="h-5 w-5 text-[#000C50]" />
                     Change Password
@@ -420,7 +420,7 @@ export default function UserProfilePage() {
                   <hr className="my-2" />
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-red-50 rounded-md transition-colors text-red-600"
+                    className="flex items-center gap-3 w-full text-[#000C50] px-4 py-3 hover:bg-red-50 rounded-md transition-colors text-red-600"
                   >
                     <ArrowRightIcon className="h-5 w-5" />
                     Logout
@@ -600,7 +600,7 @@ export default function UserProfilePage() {
         )}
 
         {/* Order History */}
-        <div className="mx-24 bg-white border rounded-lg p-8 shadow-md mb-8">
+        <div className="mx-24 bg-white rounded-lg p-8 shadow-xl mb-8">
           <div className="flex items-center gap-3 mb-6">
             <ShoppingBagIcon className="h-6 w-6 text-[#000C50]" />
             <h2 className="text-2xl font-bold">Order History</h2>

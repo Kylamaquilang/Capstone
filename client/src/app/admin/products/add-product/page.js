@@ -5,7 +5,7 @@ import AddProductForm from './add-product-form';
 
 export default function AdminProductPage() {
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen admin-page">
       <Navbar />
       <div className="flex flex-1">
         {/* Sidebar */}

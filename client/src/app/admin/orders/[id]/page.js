@@ -88,7 +88,7 @@ export default function OrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen text-black">
+      <div className="flex flex-col h-screen text-black admin-page">
         <Navbar />
         <div className="flex flex-1">
           <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
@@ -106,7 +106,7 @@ export default function OrderDetailPage() {
 
   if (error || !order) {
     return (
-      <div className="flex flex-col h-screen text-black">
+      <div className="flex flex-col h-screen text-black admin-page">
         <Navbar />
         <div className="flex flex-1">
           <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
@@ -123,7 +123,7 @@ export default function OrderDetailPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col h-screen text-black admin-page">
       <Navbar />
       <div className="flex flex-1">
         <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
@@ -232,12 +232,12 @@ export default function OrderDetailPage() {
                               />
                             )}
                             <div>
-                              <div className="font-medium">{item.name}</div>
+                              <div className="font-medium">{item.product_name || item.name || 'Unknown Product'}</div>
                               <div className="text-sm text-gray-500">ID: {item.product_id}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">{item.size || 'N/A'}</td>
+                        <td className="px-4 py-3">{item.size_name || item.size || 'N/A'}</td>
                         <td className="px-4 py-3">{item.quantity}</td>
                         <td className="px-4 py-3">{Number(item.price).toFixed(2)}</td>
                         <td className="px-4 py-3 font-medium">
@@ -262,26 +262,28 @@ export default function OrderDetailPage() {
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="space-y-3">
                     {order.status_history.map((status, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status.new_status)}`}>
-                            {status.new_status.replace('_', ' ')}
-                          </span>
-                          {status.old_status && (
-                            <span className="text-gray-500">← {status.old_status.replace('_', ' ')}</span>
-                          )}
+                      <div key={index}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status.new_status)}`}>
+                              {status.new_status.replace('_', ' ')}
+                            </span>
+                            {status.old_status && (
+                              <span className="text-gray-500">← {status.old_status.replace('_', ' ')}</span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {formatDate(status.created_at)}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-600">
-                          {formatDate(status.created_at)}
-                        </div>
+                        {status.notes && (
+                          <div className="ml-4 text-sm text-gray-600 bg-white p-2 rounded">
+                            <span className="font-medium">Notes:</span> {status.notes}
+                          </div>
+                        )}
                       </div>
-                      {status.notes && (
-                        <div className="ml-4 text-sm text-gray-600 bg-white p-2 rounded">
-                          <span className="font-medium">Notes:</span> {status.notes}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

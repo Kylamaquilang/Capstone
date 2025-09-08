@@ -27,7 +27,7 @@ export default function AdminCancelledPage() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black admin-page">
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
@@ -41,30 +41,43 @@ export default function AdminCancelledPage() {
             ) : error ? (
               <div className="text-red-600">{error}</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-2">Order ID</th>
-                      <th className="px-4 py-2">User</th>
-                      <th className="px-4 py-2">Amount</th>
-                      <th className="px-4 py-2">Created</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((o) => (
-                      <tr key={o.id} className="border-b">
-                        <td className="px-4 py-2">{o.id}</td>
-                        <td className="px-4 py-2">{o.user_name}</td>
-                        <td className="px-4 py-2">{Number(o.total_amount).toFixed(2)}</td>
-                        <td className="px-4 py-2">{new Date(o.created_at).toLocaleString()}</td>
+              <div className="bg-white border-gray-300 overflow-hidden rounded">
+                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-[000C50]-800 text-[000C50]-500">
+                      <tr>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">User</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Amount</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Created</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {orders.length === 0 && (
-                  <div className="text-gray-600 mt-4">No cancelled orders.</div>
-                )}
+                    </thead>
+                    <tbody>
+                      {orders.map((o, index) => (
+                        <tr key={o.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                          <td className="px-6 py-4">
+                            <div className="text-sm font-medium text-gray-900">{o.user_name}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              ₱{Number(o.total_amount).toFixed(2)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="text-sm text-gray-900">{new Date(o.created_at).toLocaleDateString()}</div>
+                            <div className="text-xs text-gray-500">{new Date(o.created_at).toLocaleTimeString()}</div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {orders.length === 0 && (
+                    <div className="p-8 text-center">
+                      <div className="text-gray-400 text-4xl mb-4">❌</div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No cancelled orders</h3>
+                      <p className="text-gray-500">Cancelled orders will appear here.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

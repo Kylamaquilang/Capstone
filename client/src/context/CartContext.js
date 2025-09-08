@@ -45,9 +45,16 @@ export function CartProvider({ children }) {
     );
   };
 
+  // Remove multiple items by IDs (for checkout)
+  const removeMultipleFromCart = (itemIds) => {
+    setCartItems((prev) =>
+      prev.filter((item) => !itemIds.includes(item.id))
+    );
+  };
+
   return (
     <CartContext.Provider
-      value={{ cartItems, addToCart, removeFromCart, updateQuantity }}
+      value={{ cartItems, addToCart, removeFromCart, updateQuantity, removeMultipleFromCart }}
     >
       {children}
     </CartContext.Provider>

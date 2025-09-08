@@ -124,7 +124,7 @@ export default function UserDashboard() {
                       >
                                                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
                            {/* Product Image */}
-                           <div className="relative h-55 bg-gray-100">
+                           <div className="relative h-60 bg-gray-100">
                              <Image
                                src={item.src}
                                alt={item.name}

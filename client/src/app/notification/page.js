@@ -14,6 +14,7 @@ export default function NotificationPage() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [confirmingOrder, setConfirmingOrder] = useState(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -150,6 +151,49 @@ export default function NotificationPage() {
     }
   };
 
+  const confirmOrderReceived = async (orderId) => {
+    try {
+      setConfirmingOrder(orderId);
+      
+      const result = await Swal.fire({
+        title: 'Confirm Order Receipt',
+        text: 'Have you received your order?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#000C50',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, I received it!',
+        cancelButtonText: 'Cancel'
+      });
+
+      if (result.isConfirmed) {
+        const response = await API.post(`/orders/${orderId}/user-confirm`);
+        
+        if (response.data.success) {
+          Swal.fire({
+            icon: 'success',
+            title: 'Order Confirmed!',
+            text: 'Thank you for confirming receipt! Your order has been completed.',
+            confirmButtonColor: '#000C50',
+          });
+          
+          // Refresh notifications
+          fetchNotifications();
+        }
+      }
+    } catch (err) {
+      console.error('Error confirming order:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to confirm order receipt',
+        confirmButtonColor: '#000C50',
+      });
+    } finally {
+      setConfirmingOrder(null);
+    }
+  };
+
   if (loading) {
   return (
       <ProtectedRoute>
@@ -222,28 +266,48 @@ export default function NotificationPage() {
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 mb-1">
+                        {notification.title || 'Notification'}
+                      </h3>
                       <p className="text-gray-800 mb-2">{notification.message}</p>
                       <p className="text-sm text-gray-500">
                         {new Date(notification.created_at).toLocaleString()}
-                </p>
-              </div>
+                      </p>
+                    </div>
                     <div className="flex gap-2 ml-4">
                       {!notification.is_read && (
-              <button
-                          onClick={() => markAsRead(notification.id)}
-                          className="px-3 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-              >
-                          Mark Read
-              </button>
+                        <>
+                          {notification.message && notification.message.includes('delivered successfully') ? (
+                            <button
+                              onClick={() => {
+                                // Extract order ID from related_id or try to find it in the message
+                                const orderId = notification.related_id || 
+                                  (notification.message.match(/order #(\d+)/) ? notification.message.match(/order #(\d+)/)[1] : null);
+                                if (orderId) confirmOrderReceived(orderId);
+                              }}
+                              disabled={confirmingOrder}
+                              className="px-3 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            >
+                              {confirmingOrder ? 'Processing...' : 'Order Received'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => markAsRead(notification.id)}
+                              className="px-3 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                            >
+                              Mark Read
+                            </button>
+                          )}
+                        </>
                       )}
-              <button
+                      <button
                         onClick={() => deleteNotification(notification.id)}
                         className="px-3 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-              >
+                      >
                         Delete
-              </button>
-            </div>
-          </div>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
         </div>

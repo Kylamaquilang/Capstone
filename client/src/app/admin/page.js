@@ -11,7 +11,7 @@ export default function AdminRedirect() {
   }, [router]);
 
   return (
-    <div className="flex flex-col h-screen text-black">
+    <div className="flex flex-col h-screen text-black admin-page">
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center">
           <div className="text-xl mb-4">Redirecting to Orders...</div>

@@ -1,5 +1,43 @@
 import { pool } from '../database/db.js'
 
+// Helper function to create delivered order notification for admin confirmation
+const createDeliveredOrderNotification = async (orderId, userId) => {
+  try {
+    // Get all admin users
+    const [adminUsers] = await pool.query(`
+      SELECT id, name FROM users WHERE role = 'admin'
+    `);
+    
+    // Get customer info for the order
+    const [orderInfo] = await pool.query(`
+      SELECT u.name as customer_name
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      WHERE o.id = ?
+    `, [orderId]);
+    
+    const customerName = orderInfo[0]?.customer_name || 'Customer';
+    
+    // Create notification for each admin user
+    for (const admin of adminUsers) {
+      await pool.query(`
+        INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
+      `, [
+        admin.id,
+        `📦 Order Delivered - Confirmation Needed`,
+        `Order #${orderId} from ${customerName} has been delivered. Please confirm receipt.`,
+        'delivered_confirmation',
+        orderId
+      ]);
+    }
+    
+    console.log(`✅ Delivered order confirmation notifications created for order #${orderId}`);
+  } catch (error) {
+    console.error('❌ Error creating delivered order notification:', error);
+  }
+}
+
 // 📄 User views their orders
 export const getUserOrders = async (req, res) => {
   const user_id = req.user.id
@@ -100,9 +138,10 @@ export const getOrderById = async (req, res) => {
 
     // Get order items
     const [items] = await pool.query(`
-      SELECT oi.quantity, oi.size, oi.price, p.name, p.image, p.id as product_id
+      SELECT oi.quantity, oi.price, p.name as product_name, p.image, p.id as product_id, ps.size as size_name
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
       WHERE oi.order_id = ?
     `, [id])
 
@@ -220,6 +259,11 @@ export const updateOrderStatus = async (req, res) => {
 
     // Create notification for user
     await createOrderStatusNotification(userId, id, status)
+    
+    // If order is marked as delivered, create special notification for admin confirmation
+    if (status === 'delivered') {
+      await createDeliveredOrderNotification(id, userId)
+    }
 
     res.json({ 
       message: `Order status updated to '${status}'`,
@@ -485,6 +529,217 @@ export const getSalesPerformance = async (req, res) => {
     })
   } catch (err) {
     console.error('Get sales performance error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// ✅ Admin confirms order receipt
+export const confirmOrderReceipt = async (req, res) => {
+  const { id } = req.params
+  const { action } = req.body // 'received' or 'cancelled'
+
+  try {
+    // Get order details
+    const [orderData] = await pool.query(
+      'SELECT user_id, status FROM orders WHERE id = ?',
+      [id]
+    )
+
+    if (orderData.length === 0) {
+      return res.status(404).json({ error: 'Order not found' })
+    }
+
+    const userId = orderData[0].user_id
+    const currentStatus = orderData[0].status
+
+    if (currentStatus !== 'delivered') {
+      return res.status(400).json({ 
+        error: 'Order must be in delivered status to confirm receipt' 
+      })
+    }
+
+    if (action === 'received') {
+      // Order successfully received - create thank you notification for user
+      await pool.query(`
+        INSERT INTO notifications (user_id, title, message, type, created_at)
+        VALUES (?, ?, ?, ?, NOW())
+      `, [
+        userId,
+        '🎉 Order Successfully Received!',
+        'Thank you! Your order has been successfully received and confirmed. We appreciate your business!',
+        'system'
+      ])
+
+      // Update order status to completed
+      await pool.query(
+        'UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?',
+        ['completed', id]
+      )
+
+      res.json({ 
+        success: true,
+        message: 'Order receipt confirmed successfully',
+        userNotified: true
+      })
+
+    } else if (action === 'cancelled') {
+      // Order cancelled after delivery
+      await pool.query(`
+        INSERT INTO notifications (user_id, title, message, type, created_at)
+        VALUES (?, ?, ?, ?, NOW())
+      `, [
+        userId,
+        '❌ Order Cancelled',
+        'Your order has been cancelled after delivery. Please contact support for assistance.',
+        'system'
+      ])
+
+      // Update order status to cancelled
+      await pool.query(
+        'UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?',
+        ['cancelled', id]
+      )
+
+      res.json({ 
+        success: true,
+        message: 'Order cancelled successfully',
+        userNotified: true
+      })
+
+    } else {
+      return res.status(400).json({ 
+        error: 'Invalid action. Must be "received" or "cancelled"' 
+      })
+    }
+
+  } catch (err) {
+    console.error('Confirm order receipt error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// ✅ User confirms order receipt
+export const userConfirmOrderReceipt = async (req, res) => {
+  const { id } = req.params
+  const user_id = req.user.id
+
+  try {
+    // Get order details and verify ownership
+    const [orderData] = await pool.query(
+      'SELECT user_id, status FROM orders WHERE id = ?',
+      [id]
+    )
+
+    if (orderData.length === 0) {
+      return res.status(404).json({ error: 'Order not found' })
+    }
+
+    if (orderData[0].user_id !== user_id) {
+      return res.status(403).json({ error: 'You can only confirm your own orders' })
+    }
+
+    const currentStatus = orderData[0].status
+
+    if (currentStatus !== 'delivered') {
+      return res.status(400).json({ 
+        error: 'Order must be in delivered status to confirm receipt' 
+      })
+    }
+
+    // Update order status to completed
+    await pool.query(
+      'UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?',
+      ['completed', id]
+    )
+
+    // Update sales and inventory - get order items and update stock
+    const [orderItems] = await pool.query(`
+      SELECT oi.product_id, oi.quantity, oi.size_id, p.name as product_name, s.size_name
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN sizes s ON oi.size_id = s.id
+      WHERE oi.order_id = ?
+    `, [id]);
+
+    // Update inventory for each item
+    for (const item of orderItems) {
+      if (item.size_id) {
+        // Product with size - update product_sizes table
+        await pool.query(`
+          UPDATE product_sizes 
+          SET stock_quantity = stock_quantity - ?
+          WHERE product_id = ? AND size_id = ?
+        `, [item.quantity, item.product_id, item.size_id]);
+      } else {
+        // Product without size - update products table
+        await pool.query(`
+          UPDATE products 
+          SET stock_quantity = stock_quantity - ?
+          WHERE id = ?
+        `, [item.quantity, item.product_id]);
+      }
+    }
+
+    // Create product summary for notifications
+    let productSummary = '';
+    if (orderItems.length > 0) {
+      if (orderItems.length === 1) {
+        const item = orderItems[0];
+        productSummary = item.size_name 
+          ? `${item.quantity}x ${item.product_name} (${item.size_name})`
+          : `${item.quantity}x ${item.product_name}`;
+      } else if (orderItems.length <= 3) {
+        productSummary = orderItems.map(item => 
+          item.size_name 
+            ? `${item.quantity}x ${item.product_name} (${item.size_name})`
+            : `${item.quantity}x ${item.product_name}`
+        ).join(', ');
+      } else {
+        const firstItem = orderItems[0];
+        const firstItemText = firstItem.size_name 
+          ? `${firstItem.quantity}x ${firstItem.product_name} (${firstItem.size_name})`
+          : `${firstItem.quantity}x ${firstItem.product_name}`;
+        productSummary = `${firstItemText} and ${orderItems.length - 1} more items`;
+      }
+    }
+
+    // Create thank you notification for user
+    await pool.query(`
+      INSERT INTO notifications (user_id, title, message, type, created_at)
+      VALUES (?, ?, ?, ?, NOW())
+    `, [
+      user_id,
+      '🎉 Order Confirmed!',
+      `Thank you for confirming receipt! Your order for ${productSummary} has been successfully completed. We appreciate your business!`,
+      'system'
+    ])
+
+    // Notify admins that user confirmed receipt and inventory updated
+    const [adminUsers] = await pool.query(`
+      SELECT id FROM users WHERE role = 'admin'
+    `);
+    
+    for (const admin of adminUsers) {
+      await pool.query(`
+        INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
+      `, [
+        admin.id,
+        '✅ Order Confirmed & Inventory Updated',
+        `Customer confirmed receipt of order containing ${productSummary}. Sales and inventory have been automatically updated.`,
+        'admin_order',
+        id
+      ]);
+    }
+
+    res.json({ 
+      success: true,
+      message: 'Order receipt confirmed successfully',
+      status: 'completed'
+    })
+
+  } catch (err) {
+    console.error('User confirm order receipt error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }

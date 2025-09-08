@@ -53,7 +53,8 @@ export default function ProductDetailPage() {
   };
 
   const handleAddToCart = async () => {
-    if (!selectedSize) {
+    // Only require size selection if the product has sizes available
+    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
       Swal.fire({
         icon: 'warning',
         title: 'Size Required',
@@ -76,24 +77,45 @@ export default function ProductDetailPage() {
     try {
       setAddingToCart(true);
       
-      // Find the selected size info
-      const sizeInfo = product.sizes.find(s => s.size === selectedSize);
-      if (!sizeInfo || sizeInfo.stock < quantity) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Out of Stock',
-          text: 'Selected size is out of stock or insufficient quantity',
-          confirmButtonColor: '#000C50',
-        });
-        return;
+      // Check stock for products with sizes
+      if (product.sizes && product.sizes.length > 0) {
+        const sizeInfo = product.sizes.find(s => s.size === selectedSize);
+        if (!sizeInfo || sizeInfo.stock < quantity) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Out of Stock',
+            text: 'Selected size is out of stock or insufficient quantity',
+            confirmButtonColor: '#000C50',
+          });
+          return;
+        }
+      } else {
+        // Check stock for products without sizes (like lanyards)
+        if (product.stock < quantity) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Out of Stock',
+            text: 'Insufficient stock available',
+            confirmButtonColor: '#000C50',
+          });
+          return;
+        }
       }
 
-      // Add to cart (backend expects POST /api/cart with body)
-      const response = await API.post('/cart', {
+      // Prepare cart data
+      const cartData = {
         product_id: product.id,
-        size_id: sizeInfo.id,
         quantity: quantity
-      });
+      };
+
+      // Only include size_id if sizes are available and selected
+      if (product.sizes && product.sizes.length > 0 && selectedSize) {
+        const sizeInfo = product.sizes.find(s => s.size === selectedSize);
+        cartData.size_id = sizeInfo.id;
+      }
+
+      // Add to cart
+      const response = await API.post('/cart', cartData);
 
       if (response.data.success) {
         // Increment cart count
@@ -112,6 +134,7 @@ export default function ProductDetailPage() {
             router.push('/cart');
           }
         });
+        return true; // Return success for BUY NOW button
       }
     } catch (err) {
       console.log('Error adding to cart (server might be starting):', err.message);
@@ -124,6 +147,114 @@ export default function ProductDetailPage() {
         text: errorMessage,
         confirmButtonColor: '#000C50',
       });
+      throw err; // Re-throw for BUY NOW button
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  // Separate function for BUY NOW that doesn't show success message
+  const handleBuyNow = async () => {
+    // Only require size selection if the product has sizes available
+    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Size Required',
+        text: 'Please select a size before adding to cart',
+        confirmButtonColor: '#000C50',
+      });
+      return;
+    }
+
+    if (quantity < 1) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Invalid Quantity',
+        text: 'Please select a valid quantity (at least 1)',
+        confirmButtonColor: '#000C50',
+      });
+      return;
+    }
+
+    try {
+      setAddingToCart(true);
+      
+      // Check stock for products with sizes
+      if (product.sizes && product.sizes.length > 0) {
+        const sizeInfo = product.sizes.find(s => s.size === selectedSize);
+        if (!sizeInfo || sizeInfo.stock < quantity) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Out of Stock',
+            text: 'Selected size is out of stock or insufficient quantity',
+            confirmButtonColor: '#000C50',
+          });
+          return;
+        }
+      } else {
+        // Check stock for products without sizes (like lanyards)
+        if (product.stock < quantity) {
+          Swal.fire({
+            icon: 'error',
+            title: 'Out of Stock',
+            text: 'Insufficient stock available',
+            confirmButtonColor: '#000C50',
+          });
+          return;
+        }
+      }
+
+      // Prepare cart data
+      const cartData = {
+        product_id: product.id,
+        quantity: quantity
+      };
+
+      // Only include size_id if sizes are available and selected
+      if (product.sizes && product.sizes.length > 0 && selectedSize) {
+        const sizeInfo = product.sizes.find(s => s.size === selectedSize);
+        cartData.size_id = sizeInfo.id;
+      }
+
+      // Add to cart
+      const response = await API.post('/cart', cartData);
+
+      if (response.data.success) {
+        // Increment cart count
+        incrementCartCount();
+        
+        // No success message - go directly to checkout
+        // Create cart item data for checkout
+        const cartItem = {
+          id: Date.now(), // Temporary ID for checkout
+          product_id: product.id,
+          product_name: product.name,
+          product_image: product.image || '/images/polo.png',
+          price: parseFloat(product.price),
+          quantity: quantity,
+          size: selectedSize || null
+        };
+        
+        // Pass the cart item to checkout page
+        const queryString = new URLSearchParams({
+          items: JSON.stringify([cartItem])
+        }).toString();
+        
+        router.push(`/checkout?${queryString}`);
+        return true;
+      }
+    } catch (err) {
+      console.log('Error adding to cart (server might be starting):', err.message);
+      
+      const errorMessage = err?.response?.data?.message || err?.response?.data?.error || 'Failed to add to cart. Please try again in a moment.';
+      
+      Swal.fire({
+        icon: 'error',
+        title: 'Add to Cart Failed',
+        text: errorMessage,
+        confirmButtonColor: '#000C50',
+      });
+      throw err;
     } finally {
       setAddingToCart(false);
     }
@@ -245,18 +376,32 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* Add to Cart Button */}
-              <button
-                onClick={handleAddToCart}
-                disabled={!selectedSize || addingToCart}
-                className={`w-full py-3 px-6 rounded font-semibold ${
-                  !selectedSize || addingToCart
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-[#000C50] text-white hover:bg-[#1a237e]'
-                }`}
-              >
-                {addingToCart ? 'Adding to Cart...' : 'Add to Cart'}
-              </button>
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                <button
+                  onClick={handleAddToCart}
+                  disabled={addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)}
+                  className={`w-full py-3 px-6 rounded font-semibold ${
+                    addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-[#000C50] text-white hover:bg-[#1a237e]'
+                  }`}
+                >
+                  {addingToCart ? 'Adding to Cart...' : 'Add to Cart'}
+                </button>
+                
+                <button
+                  onClick={handleBuyNow}
+                  disabled={addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)}
+                  className={`w-full py-3 px-6 rounded font-semibold ${
+                    addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                >
+                  {addingToCart ? 'Adding to Cart...' : 'BUY NOW'}
+                </button>
+              </div>
 
               {/* Stock Info */}
               <div className="text-sm text-gray-600">

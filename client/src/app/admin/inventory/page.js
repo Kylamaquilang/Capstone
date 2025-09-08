@@ -122,7 +122,7 @@ export default function AdminInventoryPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen text-black">
+      <div className="flex flex-col min-h-screen text-black admin-page">
         <Navbar />
         <div className="flex flex-1">
           <Sidebar />
@@ -135,7 +135,7 @@ export default function AdminInventoryPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black admin-page">
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
@@ -223,7 +223,7 @@ export default function AdminInventoryPage() {
           <div className="bg-white p-6 rounded-lg shadow-md mb-8">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Category Breakdown</h3>
             {inventoryData.categoryStats && inventoryData.categoryStats.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
@@ -235,7 +235,7 @@ export default function AdminInventoryPage() {
                   </thead>
                   <tbody>
                     {inventoryData.categoryStats.map((category, index) => (
-                      <tr key={index} className="border-b hover:bg-gray-50">
+                      <tr key={index} className="hover:bg-gray-50">
                         <td className="px-4 py-2 font-medium">{category.category || 'Uncategorized'}</td>
                         <td className="px-4 py-2">{category.product_count}</td>
                         <td className="px-4 py-2">{category.total_stock}</td>
@@ -264,7 +264,7 @@ export default function AdminInventoryPage() {
             </div>
             
             {inventoryData.lowStockProducts.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
@@ -277,7 +277,7 @@ export default function AdminInventoryPage() {
                   </thead>
                   <tbody>
                     {inventoryData.lowStockProducts.map((product) => (
-                      <tr key={product.id} className="border-b hover:bg-gray-50">
+                      <tr key={product.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2">
                           <div className="flex items-center">
                             <img 
@@ -287,7 +287,10 @@ export default function AdminInventoryPage() {
                             />
                             <div>
                               <div className="font-medium">{product.name}</div>
-                              <div className="text-xs text-gray-500">{product.price}</div>
+                              <div className="text-xs text-gray-500">₱{Number(product.price || 0).toFixed(2)}</div>
+                              {product.category_name && (
+                                <div className="text-xs text-gray-400">{product.category_name}</div>
+                              )}
                             </div>
                           </div>
                         </td>

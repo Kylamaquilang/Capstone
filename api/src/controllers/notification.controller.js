@@ -33,7 +33,7 @@ export const getNotifications = async (req, res) => {
     const offset = (page - 1) * limit;
     
     const [notifications] = await pool.query(`
-      SELECT id, message, is_read, created_at
+      SELECT id, title, message, type, is_read, created_at
       FROM notifications 
       WHERE user_id = ?
       ORDER BY created_at DESC

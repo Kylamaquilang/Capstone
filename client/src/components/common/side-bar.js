@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { 
   CubeIcon, ClipboardDocumentListIcon, XCircleIcon, BanknotesIcon, 
   BellIcon, UserCircleIcon, ArrowLeftOnRectangleIcon, 
-  ArchiveBoxIcon, ChartBarIcon, TagIcon, Bars3Icon, XMarkIcon
+  ArchiveBoxIcon, TagIcon, Bars3Icon, XMarkIcon
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
@@ -47,13 +47,12 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <div className={`
-        w-72 sm:w-64 bg-white text-black-900 flex flex-col justify-between border-r shadow-md min-h-screen
+        w-72 sm:w-64 bg-white text-black-900 flex flex-col justify-between shadow-md min-h-screen
         fixed lg:relative z-50 transform transition-transform duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Top - Navigation Items */}
         <div className="flex flex-col space-y-4 sm:space-y-6 px-4 sm:px-6 py-6 sm:py-8 ml-2 sm:ml-3">
-          <SidebarItem href="/admin/dashboard" icon={ChartBarIcon} label="Dashboard" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/products" icon={CubeIcon} label="Products" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/categories" icon={TagIcon} label="Categories" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" onClick={toggleMobileMenu} />

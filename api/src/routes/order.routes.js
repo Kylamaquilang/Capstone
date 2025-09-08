@@ -6,7 +6,9 @@ import {
   getOrderById,
   updateOrderStatus,
   getOrderStats,
-  getSalesPerformance
+  getSalesPerformance,
+  confirmOrderReceipt,
+  userConfirmOrderReceipt
 } from '../controllers/order.controller.js'
 import { verifyToken, isAdmin } from '../middleware/verifyToken.js'
 
@@ -17,6 +19,8 @@ router.get('/:id', verifyToken, isAdmin, getOrderById)
 
 router.get('/:id/items', verifyToken, getOrderItems)
 router.patch('/:id/status', verifyToken, isAdmin, updateOrderStatus)
+router.post('/:id/confirm-receipt', verifyToken, isAdmin, confirmOrderReceipt)
+router.post('/:id/user-confirm', verifyToken, userConfirmOrderReceipt)
 
 // Analytics and reporting routes
 router.get('/stats', verifyToken, isAdmin, getOrderStats)

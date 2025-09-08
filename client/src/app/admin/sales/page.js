@@ -175,7 +175,7 @@ export default function AdminSalesPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black admin-page">
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
@@ -401,7 +401,7 @@ export default function AdminSalesPage() {
               <div className="bg-white p-6 rounded-lg shadow-md mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Detailed Sales Data</h3>
                 {salesData.salesData && salesData.salesData.length > 0 ? (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
                         <tr>
@@ -413,7 +413,7 @@ export default function AdminSalesPage() {
                       </thead>
                       <tbody>
                         {salesData.salesData.map((item, index) => (
-                          <tr key={index} className="border-b hover:bg-gray-50">
+                          <tr key={index} className="hover:bg-gray-50">
                             <td className="px-4 py-2 font-medium">{formatDate(item.period)}</td>
                             <td className="px-4 py-2">{item.orders}</td>
                             <td className="px-4 py-2 text-green-600 font-semibold">
@@ -483,7 +483,7 @@ export default function AdminSalesPage() {
               <div className="bg-white p-6 rounded-lg shadow-md mb-8">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Inventory Movement Summary</h3>
                 {salesData.inventorySummary && salesData.inventorySummary.length > 0 ? (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
                         <tr>
@@ -495,7 +495,7 @@ export default function AdminSalesPage() {
                       </thead>
                       <tbody>
                         {salesData.inventorySummary.map((movement, index) => (
-                          <tr key={index} className="border-b hover:bg-gray-50">
+                          <tr key={index} className="hover:bg-gray-50">
                             <td className="px-4 py-2 font-medium capitalize">{movement.movement_type}</td>
                             <td className="px-4 py-2">{movement.movement_count}</td>
                             <td className="px-4 py-2">{movement.total_quantity}</td>
@@ -510,6 +510,48 @@ export default function AdminSalesPage() {
                     <p>No inventory movement data available</p>
                   </div>
                 )}
+              </div>
+
+              {/* Recent Orders Summary */}
+              <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Orders Summary</h3>
+                <div className="text-sm text-gray-600 mb-4">
+                  Showing orders from {formatDate(dateRange.start_date)} to {formatDate(dateRange.end_date)}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-gray-900">Total Orders</h4>
+                      <span className="text-2xl font-bold text-blue-600">{salesData.summary?.total_orders || 0}</span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Average order value: {formatCurrency(salesData.summary?.avg_order_value || 0)}
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-gray-900">Total Revenue</h4>
+                      <span className="text-2xl font-bold text-green-600">{formatCurrency(salesData.summary?.total_revenue || 0)}</span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      From {salesData.summary?.total_orders || 0} orders
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-gray-900">Growth Rate</h4>
+                      <span className="text-2xl font-bold text-purple-600">
+                        {salesData.salesData && salesData.salesData.length > 1 && salesData.salesData[1].revenue > 0 ? 
+                          `${Math.round(((salesData.salesData[0].revenue - salesData.salesData[1].revenue) / salesData.salesData[1].revenue) * 100)}%` : 
+                          'N/A'
+                        }
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Compared to previous period
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Top Products */}
@@ -528,6 +570,9 @@ export default function AdminSalesPage() {
                           <div>
                             <h4 className="font-medium text-gray-900">{product.product_name}</h4>
                             <p className="text-sm text-gray-500">#{index + 1} Top Seller</p>
+                            {product.category_name && (
+                              <p className="text-xs text-gray-400">{product.category_name}</p>
+                            )}
                           </div>
                         </div>
                         <div className="space-y-2">

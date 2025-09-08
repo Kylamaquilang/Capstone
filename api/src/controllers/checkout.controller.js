@@ -19,15 +19,15 @@ const createAdminOrderNotification = async (orderId, totalAmount, paymentMethod)
     
     const customerName = orderInfo[0]?.customer_name || 'Customer';
     
-    // Create notification for each admin user
+    // Create simple notification for each admin user
     for (const admin of adminUsers) {
       await pool.query(`
         INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
         VALUES (?, ?, ?, ?, ?, NOW())
       `, [
         admin.id,
-        `🆕 New Order #${orderId}`,
-        `New order received from ${customerName} for ${totalAmount} via ${paymentMethod.toUpperCase()}`,
+        `🆕 New Order`,
+        `You have a new order #${orderId} from ${customerName}`,
         'admin_order',
         orderId
       ]);
@@ -41,7 +41,7 @@ const createAdminOrderNotification = async (orderId, totalAmount, paymentMethod)
 
 export const checkout = async (req, res) => {
   const user_id = req.user.id
-  const { payment_method, pay_at_counter } = req.body
+  const { payment_method, pay_at_counter, cart_item_ids, products } = req.body
 
   if (!payment_method) {
     return res.status(400).json({ 
@@ -51,14 +51,59 @@ export const checkout = async (req, res) => {
   }
 
   try {
-    const [cartItems] = await pool.query(`
-      SELECT c.id AS cart_id, c.quantity, c.product_id, c.size_id,
-             p.stock, p.price, ps.stock as size_stock, ps.price as size_price
-      FROM cart_items c
-      JOIN products p ON c.product_id = p.id
-      LEFT JOIN product_sizes ps ON c.size_id = ps.id
-      WHERE c.user_id = ?
-    `, [user_id])
+    let cartItems;
+    
+    // Check if we're processing direct products (BUY NOW flow) or cart items
+    if (products && products.length > 0) {
+      // Process direct products (BUY NOW flow)
+      cartItems = [];
+      for (const product of products) {
+        const [productData] = await pool.query(`
+          SELECT p.id as product_id, p.stock, p.price, ps.id as size_id, ps.stock as size_stock, ps.price as size_price
+          FROM products p
+          LEFT JOIN product_sizes ps ON p.id = ps.product_id AND ps.id = ?
+          WHERE p.id = ?
+        `, [product.size_id || null, product.product_id]);
+        
+        if (productData.length === 0) {
+          return res.status(404).json({ 
+            error: 'Product not found',
+            message: `Product ID ${product.product_id} not found`
+          });
+        }
+        
+        const item = productData[0];
+        cartItems.push({
+          cart_id: null, // No cart ID for direct products
+          quantity: product.quantity,
+          product_id: item.product_id,
+          size_id: product.size_id || null,
+          stock: item.size_id ? item.size_stock : item.stock,
+          price: item.size_id ? item.size_price : item.price
+        });
+      }
+    } else if (cart_item_ids && cart_item_ids.length > 0) {
+      // Process only selected cart items
+      const placeholders = cart_item_ids.map(() => '?').join(',');
+      [cartItems] = await pool.query(`
+        SELECT c.id AS cart_id, c.quantity, c.product_id, c.size_id,
+               p.stock, p.price, ps.stock as size_stock, ps.price as size_price
+        FROM cart_items c
+        JOIN products p ON c.product_id = p.id
+        LEFT JOIN product_sizes ps ON c.size_id = ps.id
+        WHERE c.user_id = ? AND c.id IN (${placeholders})
+      `, [user_id, ...cart_item_ids])
+    } else {
+      // Fallback: process all cart items
+      [cartItems] = await pool.query(`
+        SELECT c.id AS cart_id, c.quantity, c.product_id, c.size_id,
+               p.stock, p.price, ps.stock as size_stock, ps.price as size_price
+        FROM cart_items c
+        JOIN products p ON c.product_id = p.id
+        LEFT JOIN product_sizes ps ON c.size_id = ps.id
+        WHERE c.user_id = ?
+      `, [user_id])
+    }
 
     if (cartItems.length === 0) {
       return res.status(400).json({ 
@@ -123,7 +168,18 @@ export const checkout = async (req, res) => {
       }
     }
 
-    await pool.query(`DELETE FROM cart_items WHERE user_id = ?`, [user_id])
+    // Only delete cart items if we processed cart items (not direct products)
+    if (products && products.length > 0) {
+      // For direct products (BUY NOW), don't delete cart items since they weren't in cart
+      console.log('Direct product checkout - no cart items to delete');
+    } else if (cart_item_ids && cart_item_ids.length > 0) {
+      // Delete only the selected cart items
+      const placeholders = cart_item_ids.map(() => '?').join(',');
+      await pool.query(`DELETE FROM cart_items WHERE user_id = ? AND id IN (${placeholders})`, [user_id, ...cart_item_ids])
+    } else {
+      // Fallback: delete all cart items (for backward compatibility)
+      await pool.query(`DELETE FROM cart_items WHERE user_id = ?`, [user_id])
+    }
 
     // Create notification for order placement
     await createOrderStatusNotification(user_id, orderId, 'pending');

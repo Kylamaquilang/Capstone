@@ -322,6 +322,48 @@ export const getProductById = async (req, res) => {
   }
 };
 
+// ✅ Get Product by Name
+export const getProductByName = async (req, res) => {
+  try {
+    const { name } = req.params;
+    
+    if (!name || name.trim().length === 0) {
+      return res.status(400).json({ error: 'Product name is required' });
+    }
+
+    const [rows] = await pool.query(`
+      SELECT p.*, c.name AS category_name 
+      FROM products p 
+      LEFT JOIN categories c ON p.category_id = c.id 
+      WHERE p.name = ?
+    `, [name.trim()]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const product = rows[0];
+    
+    // Try to get product sizes if the table exists, otherwise set empty array
+    try {
+      const [sizes] = await pool.query(
+        'SELECT * FROM product_sizes WHERE product_id = ?',
+        [product.id]
+      );
+      product.sizes = sizes;
+    } catch (sizeError) {
+      // If product_sizes table doesn't exist, just set empty array
+      console.log('Product sizes table not available, setting empty array');
+      product.sizes = [];
+    }
+
+    res.json(product);
+  } catch (error) {
+    console.error('Get Product by Name Error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
 // ✅ Update product (admin only)
 export const updateProduct = async (req, res) => {
   try {

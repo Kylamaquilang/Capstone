@@ -143,7 +143,7 @@ export default function AdminOrdersPage() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black admin-page">
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
@@ -203,149 +203,172 @@ export default function AdminOrdersPage() {
             ) : error ? (
               <div className="text-red-600">{error}</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-2">Order ID</th>
-                      <th className="px-4 py-2">Customer</th>
-                      <th className="px-4 py-2">Items</th>
-                      <th className="px-4 py-2">Amount</th>
-                      <th className="px-4 py-2">Payment Method</th>
-                      <th className="px-4 py-2">Payment Status</th>
-                      <th className="px-4 py-2">Order Status</th>
-                      <th className="px-4 py-2">Created</th>
-                      <th className="px-4 py-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredOrders.map((order) => (
-                      <tr key={order.id} className="border-b hover:bg-gray-50">
-                        <td className="px-4 py-2 font-mono text-sm">#{order.id}</td>
-                        <td className="px-4 py-2">
-                          <div>
-                            <div className="font-medium">{order.user_name}</div>
-                            <div className="text-xs text-gray-500">
-                              Student ID: {order.student_id || 'N/A'}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Email: {order.email}
-                            </div>
+              <div className="bg-white border-gray-800 overflow-hidden rounded-md">
+                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-800 text-white">
+                      <tr>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Products</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Customer</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Items</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Amount</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Payment Method</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Payment Status</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Order Status</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Created</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredOrders.map((order, index) => (
+                        <tr key={order.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                        <td className="px-6 py-4">
+                          <div className="text-sm">
+                            {order.items && order.items.length > 0 ? (
+                              <div className="space-y-1">
+                                {order.items.slice(0, 3).map((item, idx) => (
+                                  <div key={idx} className="text-gray-900">
+                                    <span className="font-medium">{item.quantity}x</span> {item.product_name}
+                                    {item.size_name && (
+                                      <span className="text-gray-600"> ({item.size_name})</span>
+                                    )}
+                                  </div>
+                                ))}
+                                {order.items.length > 3 && (
+                                  <div className="text-gray-500 text-xs">
+                                    +{order.items.length - 3} more items
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">No items</span>
+                            )}
                           </div>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{order.user_name}</div>
+                            <div className="text-xs text-gray-500">ID: {order.student_id || 'N/A'}</div>
+                            <div className="text-xs text-gray-400">{order.email}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
                           <div className="text-center">
-                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                               {order.item_count || 0} items
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-2">
-                          <span className="font-semibold text-green-600 text-lg">
-                            {Number(order.total_amount || 0).toFixed(2)}
-                          </span>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            ₱{Number(order.total_amount || 0).toFixed(2)}
+                          </div>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
                           <div className="flex flex-col space-y-1">
                             <div className="flex items-center space-x-2">
                               {order.payment_method === 'gcash' ? (
-                                <span className="font-medium text-blue-600">GCash</span>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                  GCash
+                                </span>
                               ) : (
-                                <span className="font-medium text-green-600">Cash</span>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                  Cash
+                                </span>
                               )}
                             </div>
                             <div className="text-xs">
                               {order.pay_at_counter ? (
-                                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full font-medium">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                                   Pay at Counter
                                 </span>
                               ) : (
-                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                                   Online Payment
                                 </span>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
                           <div className="flex items-center space-x-2">
                             {order.payment_status === 'paid' ? (
                               <>
-                                <CheckCircleIcon className="h-5 w-5 text-green-600" />
-                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                                <CheckCircleIcon className="h-4 w-4 text-green-600" />
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                                   Paid
                                 </span>
                               </>
                             ) : order.payment_status === 'pending' ? (
                               <>
-                                <ClockIcon className="h-5 w-5 text-yellow-600" />
-                                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium">
+                                <ClockIcon className="h-4 w-4 text-yellow-600" />
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
                                   Pending
                                 </span>
                               </>
                             ) : order.payment_status === 'failed' ? (
                               <>
-                                <XCircleIcon className="h-5 w-5 text-red-600" />
-                                <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium">
+                                <XCircleIcon className="h-4 w-4 text-red-600" />
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
                                   Failed
                                 </span>
                               </>
                             ) : (
                               <>
-                                <ClockIcon className="h-5 w-5 text-gray-600" />
-                                <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs font-medium">
+                                <ClockIcon className="h-4 w-4 text-gray-600" />
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                                   Unpaid
                                 </span>
                               </>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
                           <div className="flex items-center space-x-2">
                             {getStatusIcon(order.status)}
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)}`}>
                               {order.status.replace('_', ' ')}
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-sm">
-                          <div>{new Date(order.created_at).toLocaleDateString()}</div>
-                          <div className="text-gray-500">{new Date(order.created_at).toLocaleTimeString()}</div>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{new Date(order.created_at).toLocaleDateString()}</div>
+                          <div className="text-xs text-gray-500">{new Date(order.created_at).toLocaleTimeString()}</div>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
                           <ActionMenu
-                            actions={[
-                              {
-                                label: 'Update Status',
-                                icon: PencilSquareIcon,
-                                onClick: () => {
-                                  setSelectedOrder(order);
-                                  setStatusUpdate({ status: order.status, notes: '' });
-                                  setShowStatusModal(true);
+                              actions={[
+                                {
+                                  label: 'Update Status',
+                                  icon: PencilSquareIcon,
+                                  onClick: () => {
+                                    setSelectedOrder(order);
+                                    setStatusUpdate({ status: order.status, notes: '' });
+                                    setShowStatusModal(true);
+                                  }
+                                },
+                                {
+                                  label: 'View Details',
+                                  icon: EyeIcon,
+                                  onClick: () => window.location.href = `/admin/orders/${order.id}`
                                 }
-                              },
-                              {
-                                label: 'View Details',
-                                icon: EyeIcon,
-                                onClick: () => window.location.href = `/admin/orders/${order.id}`
-                              }
-                            ]}
-                          />
+                              ]}
+                            />
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 {filteredOrders.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    <p>
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 text-4xl mb-4">📦</div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
                       {orders.length === 0 ? 'No orders found' : 'No orders match your search criteria'}
-                    </p>
+                    </h3>
+                    <p className="text-gray-500">Orders will appear here when customers place them.</p>
                   </div>
                 )}
+                </div>
               </div>
             )}
           </div>

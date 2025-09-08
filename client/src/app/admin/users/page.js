@@ -163,7 +163,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black admin-page">
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
@@ -189,30 +189,33 @@ export default function AdminUsersPage() {
             ) : error ? (
               <div className="text-red-600">{error}</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-2">ID</th>
-                      <th className="px-4 py-2">Student ID</th>
-                      <th className="px-4 py-2">Name</th>
-                      <th className="px-4 py-2">Email</th>
-                      <th className="px-4 py-2">Role</th>
-                      <th className="px-4 py-2">Degree</th>
-                      <th className="px-4 py-2">Status</th>
-                      <th className="px-4 py-2">Active</th>
-                      <th className="px-4 py-2">Created</th>
-                      <th className="px-4 py-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map((user) => (
-                      <tr key={user.id} className="border-b hover:bg-gray-50">
-                        <td className="px-4 py-2">{user.id}</td>
-                        <td className="px-4 py-2 font-mono text-sm">{user.student_id || 'N/A'}</td>
-                        <td className="px-4 py-2">
+              <div className="bg-white border-gray-600 overflow-hidden rounded-md">
+                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-800 text-white">
+                      <tr>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Stud ID</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Name</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Role</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Degree</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Active</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Created</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user, index) => (
+                        <tr key={user.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 font-mono">
+                            {user.student_id || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
                           <div>
-                            <div className="font-medium">{user.name || 'N/A'}</div>
+                            <div className="text-sm font-medium text-gray-900">{user.name || 'N/A'}</div>
                             {user.first_name && user.last_name && (
                               <div className="text-xs text-gray-500">
                                 {user.first_name} {user.middle_name ? user.middle_name + ' ' : ''}{user.last_name}{user.suffix ? ' ' + user.suffix : ''}
@@ -220,20 +223,24 @@ export default function AdminUsersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-sm">{user.email || 'N/A'}</td>
-                        <td className="px-4 py-2">{getRoleBadge(user.role)}</td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">{user.email || 'N/A'}</div>
+                        </td>
+                        <td className="px-6 py-4">{getRoleBadge(user.role)}</td>
+                        <td className="px-6 py-4">
                           <div className="text-sm">
-                            <div className="font-medium">{user.degree || 'N/A'}</div>
+                            <div className="font-medium text-gray-900">{user.degree || 'N/A'}</div>
                             <div className="text-xs text-gray-500">{getDegreeDisplayName(user.degree)}</div>
                           </div>
                         </td>
-                        <td className="px-4 py-2">{getStatusBadge(user.status)}</td>
-                        <td className="px-4 py-2">{getActiveStatusBadge(user.is_active)}</td>
-                        <td className="px-4 py-2 text-sm text-gray-500">
-                          {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                        <td className="px-6 py-4">{getStatusBadge(user.status)}</td>
+                        <td className="px-6 py-4">{getActiveStatusBadge(user.is_active)}</td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                          </div>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
                           <ActionMenu
                             actions={[
                               {
@@ -256,10 +263,13 @@ export default function AdminUsersPage() {
                   </tbody>
                 </table>
                 {users.length === 0 && (
-                  <div className="text-gray-600 mt-4 text-center py-8">
-                    No users found.
+                  <div className="p-8 text-center">
+                    <div className="text-gray-400 text-4xl mb-4">👥</div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+                    <p className="text-gray-500">Users will appear here when they register.</p>
                   </div>
                 )}
+                </div>
               </div>
             )}
           </div>

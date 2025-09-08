@@ -23,7 +23,7 @@ export default function AdminProductPage() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen text-black">
+    <div className="flex flex-col min-h-screen text-black admin-page">
       {/* ✅ Top Navbar */}
       <Navbar />
 
@@ -46,12 +46,6 @@ export default function AdminProductPage() {
 
             {/* Category Buttons */}
             <div className="flex items-center gap-2 mb-4">
-              <button
-                onClick={() => setSelectedCategory('')}
-                className={`${selectedCategory === '' ? 'bg-[#000C50] text-white' : 'bg-gray-200 text-black'} px-3 py-1 rounded font-semibold text-sm`}
-              >
-                All
-              </button>
               {categories.map((cat) => (
                 <button
                   key={cat.id}
