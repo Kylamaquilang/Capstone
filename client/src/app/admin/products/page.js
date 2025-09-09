@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import ProductTable from './product-table';
 import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
+import ErrorBoundary from '@/components/common/ErrorBoundary';
 import API from '@/lib/axios';
 
 export default function AdminProductPage() {
@@ -11,21 +12,33 @@ export default function AdminProductPage() {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchCategories = async () => {
       try {
         const { data } = await API.get('/categories');
-        setCategories(Array.isArray(data) ? data : []);
+        if (isMounted) {
+          setCategories(Array.isArray(data) ? data : []);
+        }
       } catch (e) {
-        setCategories([]);
+        console.error('Fetch categories error:', e);
+        if (isMounted) {
+          setCategories([]);
+        }
       }
     };
     fetchCategories();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen text-black admin-page">
-      {/* ✅ Top Navbar */}
-      <Navbar />
+    <ErrorBoundary>
+      <div className="flex flex-col min-h-screen text-black admin-page">
+        {/* ✅ Top Navbar */}
+        <Navbar />
 
       <div className="flex flex-1">
         <Sidebar />
@@ -63,5 +76,6 @@ export default function AdminProductPage() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

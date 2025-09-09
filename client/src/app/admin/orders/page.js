@@ -1,6 +1,7 @@
 'use client';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
+import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
 import { 
@@ -31,10 +32,12 @@ export default function AdminOrdersPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
+      setError('');
       const { data } = await API.get('/orders/admin');
       setOrders(data || []);
       setFilteredOrders(data || []);
     } catch (err) {
+      console.error('Fetch orders error:', err);
       setError('Failed to load orders');
     } finally {
       setLoading(false);
@@ -139,14 +142,54 @@ export default function AdminOrdersPage() {
   };
 
   useEffect(() => {
-    fetchOrders();
+    let isMounted = true;
+    
+    // Reset state when component mounts
+    setOrders([]);
+    setFilteredOrders([]);
+    setError('');
+    setSelectedOrder(null);
+    setShowStatusModal(false);
+    setStatusUpdate({ status: '', notes: '' });
+    setUpdating(false);
+    setSearchTerm('');
+    setStatusFilter('');
+    setPaymentStatusFilter('');
+    
+    const loadOrders = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const { data } = await API.get('/orders/admin');
+        if (isMounted) {
+          setOrders(data || []);
+          setFilteredOrders(data || []);
+        }
+      } catch (err) {
+        console.error('Fetch orders error:', err);
+        if (isMounted) {
+          setError('Failed to load orders');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadOrders();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen text-black admin-page">
-      <Navbar />
-      <div className="flex flex-1">
-        <Sidebar />
+    <ErrorBoundary>
+      <div className="flex flex-col min-h-screen text-black admin-page">
+        <Navbar />
+        <div className="flex flex-1">
+          <Sidebar />
         <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <div className="flex justify-between items-center mb-6">
@@ -450,6 +493,7 @@ export default function AdminOrdersPage() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }
 

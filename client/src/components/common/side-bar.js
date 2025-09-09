@@ -79,10 +79,22 @@ export default function Sidebar() {
 }
 
 function SidebarItem({ href, icon: Icon, label, onClick }) {
+  const handleClick = (e) => {
+    try {
+      if (onClick) {
+        onClick();
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+      // Fallback to window.location if Link fails
+      window.location.href = href;
+    }
+  };
+
   return (
     <Link
       href={href}
-      onClick={onClick}
+      onClick={handleClick}
       className="flex items-center space-x-3 sm:space-x-4 hover:text-[#000C50] transition text-base sm:text-[18px] font-medium py-2 px-2 rounded-md hover:bg-gray-100"
     >
       <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
