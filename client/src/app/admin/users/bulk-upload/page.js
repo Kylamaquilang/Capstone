@@ -73,7 +73,7 @@ Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
         <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
           <Sidebar />
         </div>
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl">
             <h2 className="text-2xl font-bold mb-6">Bulk Upload Students</h2>
             

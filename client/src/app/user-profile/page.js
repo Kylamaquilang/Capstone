@@ -259,20 +259,8 @@ export default function UserProfilePage() {
   };
 
   const handleLogout = () => {
-    Swal.fire({
-      title: 'Logout',
-      text: 'Are you sure you want to logout?',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#000C50',
-      cancelButtonColor: '#aaa',
-      confirmButtonText: 'Yes, logout',
-    }).then((result) => {
-      if (result.isConfirmed) {
-        logout();
-        router.push('/auth/login');
-      }
-    });
+    logout();
+    router.push('/auth/login');
   };
 
   const getStatusBadge = (status) => {

@@ -19,7 +19,40 @@ const createAdminOrderNotification = async (orderId, totalAmount, paymentMethod)
     
     const customerName = orderInfo[0]?.customer_name || 'Customer';
     
-    // Create simple notification for each admin user
+    // Get product details for the order
+    const [productInfo] = await pool.query(`
+      SELECT p.name as product_name, oi.quantity, ps.size as size_name
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+      WHERE oi.order_id = ?
+      ORDER BY oi.id
+    `, [orderId]);
+    
+    // Create product summary
+    let productSummary = '';
+    if (productInfo.length > 0) {
+      if (productInfo.length === 1) {
+        const item = productInfo[0];
+        productSummary = item.size_name 
+          ? `${item.quantity}x ${item.product_name} (${item.size_name})`
+          : `${item.quantity}x ${item.product_name}`;
+      } else if (productInfo.length <= 3) {
+        productSummary = productInfo.map(item => 
+          item.size_name 
+            ? `${item.quantity}x ${item.product_name} (${item.size_name})`
+            : `${item.quantity}x ${item.product_name}`
+        ).join(', ');
+      } else {
+        const firstItem = productInfo[0];
+        const firstItemText = firstItem.size_name 
+          ? `${firstItem.quantity}x ${firstItem.product_name} (${firstItem.size_name})`
+          : `${firstItem.quantity}x ${firstItem.product_name}`;
+        productSummary = `${firstItemText} and ${productInfo.length - 1} more items`;
+      }
+    }
+    
+    // Create notification for each admin user
     for (const admin of adminUsers) {
       await pool.query(`
         INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
@@ -27,7 +60,7 @@ const createAdminOrderNotification = async (orderId, totalAmount, paymentMethod)
       `, [
         admin.id,
         `🆕 New Order`,
-        `You have a new order #${orderId} from ${customerName}`,
+        `New order #${orderId} from ${customerName} for ${productSummary} - ₱${totalAmount.toFixed(2)}`,
         'admin_order',
         orderId
       ]);

@@ -48,7 +48,7 @@ export default function Sidebar() {
       {/* Sidebar */}
       <div className={`
         w-72 sm:w-64 bg-white text-black-900 flex flex-col justify-between shadow-md min-h-screen
-        fixed lg:relative z-50 transform transition-transform duration-300 ease-in-out
+        fixed lg:relative transform transition-transform duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Top - Navigation Items */}
@@ -59,19 +59,7 @@ export default function Sidebar() {
           <SidebarItem href="/admin/orders" icon={ClipboardDocumentListIcon} label="Orders" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/cancelled" icon={XCircleIcon} label="Cancelled" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/sales" icon={BanknotesIcon} label="Sales" onClick={toggleMobileMenu} />
-          <SidebarItem href="/admin/notification" icon={BellIcon} label="Notifications" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/users" icon={UserCircleIcon} label="Users" onClick={toggleMobileMenu} />
-        </div>
-
-        {/* Bottom - Logout */}
-        <div className="p-4 sm:p-6">
-          <button 
-            onClick={handleLogout}
-            className="flex items-center text-black-900 hover:text-red-600 transition ml-2 sm:ml-3 w-full py-2 px-2 rounded-md hover:bg-gray-100"
-          >
-            <ArrowLeftOnRectangleIcon className="h-6 w-6 sm:h-7 sm:w-7 mr-2 sm:mr-3" />
-            <span className="text-sm sm:text-base font-medium">Logout</span>
-          </button>
         </div>
       </div>
     </>

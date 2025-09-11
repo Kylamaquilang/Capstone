@@ -94,7 +94,7 @@ export default function OrderDetailPage() {
           <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
             <Sidebar />
           </div>
-          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="text-center">Loading order details...</div>
             </div>
@@ -112,7 +112,7 @@ export default function OrderDetailPage() {
           <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
             <Sidebar />
           </div>
-          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="text-center text-red-600">{error || 'Order not found'}</div>
             </div>
@@ -233,7 +233,6 @@ export default function OrderDetailPage() {
                             )}
                             <div>
                               <div className="font-medium">{item.product_name || item.name || 'Unknown Product'}</div>
-                              <div className="text-sm text-gray-500">ID: {item.product_id}</div>
                             </div>
                           </div>
                         </td>

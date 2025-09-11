@@ -92,7 +92,7 @@ export default function EditProductPage() {
           <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
             <Sidebar />
           </div>
-          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="text-center">Loading product...</div>
             </div>
@@ -110,7 +110,7 @@ export default function EditProductPage() {
           <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
             <Sidebar />
           </div>
-          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
+          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="text-center text-red-600">{error}</div>
             </div>

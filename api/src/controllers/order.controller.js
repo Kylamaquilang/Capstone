@@ -80,6 +80,26 @@ export const getAllOrders = async (req, res) => {
       ORDER BY o.created_at DESC
     `)
 
+    // Get order items for each order to include product names
+    for (let order of orders) {
+      const [items] = await pool.query(`
+        SELECT 
+          oi.quantity, 
+          oi.price as unit_price,
+          (oi.quantity * oi.price) as total_price,
+          p.name as product_name, 
+          p.image, 
+          p.id as product_id,
+          ps.size as size_name
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+        WHERE oi.order_id = ?
+      `, [order.id])
+      
+      order.items = items
+    }
+
     res.json(orders)
   } catch (err) {
     console.error('Admin orders fetch error:', err)

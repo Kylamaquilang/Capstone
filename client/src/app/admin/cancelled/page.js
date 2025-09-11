@@ -32,7 +32,7 @@ export default function AdminCancelledPage() {
       <div className="flex flex-1">
         <Sidebar />
         <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
-          <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">CANCELLED ORDERS</h2>
             </div>
