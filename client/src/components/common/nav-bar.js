@@ -65,7 +65,6 @@ export default function Navbar() {
         <Image src="/images/logo1.png" alt="Logo" width={100} height={100} priority />
       </div>
       <div className="flex gap-4 items-center">
-        <button><MagnifyingGlassIcon className="h-6 w-6 text-white" /></button>
         
         <Link href="/notification">
           <Badge count={notificationCount}>

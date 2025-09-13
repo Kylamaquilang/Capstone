@@ -173,7 +173,7 @@ export default function NotificationPage() {
           Swal.fire({
             icon: 'success',
             title: 'Order Confirmed!',
-            text: 'Thank you for confirming receipt! Your order has been completed.',
+            text: 'Thank you for confirming receipt! Your order has been completed and an email receipt has been sent to you.',
             confirmButtonColor: '#000C50',
           });
           

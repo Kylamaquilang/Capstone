@@ -1,4 +1,5 @@
 import { pool } from '../database/db.js'
+import { sendOrderReceiptEmail } from '../utils/emailService.js'
 
 // Helper function to create delivered order notification for admin confirmation
 const createDeliveredOrderNotification = async (orderId, userId) => {
@@ -750,6 +751,49 @@ export const userConfirmOrderReceipt = async (req, res) => {
         'admin_order',
         id
       ]);
+    }
+
+    // Send email receipt to customer
+    try {
+      // Get user details and complete order information for email
+      const [userDetails] = await pool.query(`
+        SELECT u.name, u.email, o.total_amount, o.payment_method, o.created_at, o.status
+        FROM users u
+        JOIN orders o ON u.id = o.user_id
+        WHERE o.id = ?
+      `, [id]);
+
+      if (userDetails.length > 0) {
+        const user = userDetails[0];
+        
+        // Get order items with prices for email
+        const [orderItemsWithPrices] = await pool.query(`
+          SELECT oi.quantity, oi.price, p.name as product_name, s.size_name
+          FROM order_items oi
+          JOIN products p ON oi.product_id = p.id
+          LEFT JOIN sizes s ON oi.size_id = s.id
+          WHERE oi.order_id = ?
+        `, [id]);
+
+        const orderData = {
+          orderId: id,
+          items: orderItemsWithPrices,
+          totalAmount: user.total_amount,
+          paymentMethod: user.payment_method,
+          createdAt: user.created_at,
+          status: 'completed'
+        };
+
+        const emailResult = await sendOrderReceiptEmail(user.email, user.name, orderData);
+        if (emailResult.success) {
+          console.log(`Email receipt sent to ${user.email} for order #${id}`);
+        } else {
+          console.log(`Email receipt not sent for order #${id}: ${emailResult.message}`);
+        }
+      }
+    } catch (emailError) {
+      console.error('Error sending email receipt:', emailError);
+      // Don't fail the entire operation if email fails
     }
 
     res.json({ 
