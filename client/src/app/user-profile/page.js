@@ -82,40 +82,40 @@ export default function UserProfilePage() {
   }, []);
 
   // Fetch user's profile and orders
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch profile
+      const { data: profileData } = await API.get('/users/profile');
+      setProfile(prev => ({
+        ...prev,
+        ...profileData.user,
+        initials: profileData.user.name
+          ? profileData.user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+          : '??'
+      }));
+      
+      setFormData({
+        name: profileData.user.name || '',
+        email: profileData.user.email || '',
+        contact_number: profileData.user.contact_number || ''
+      });
+
+      // Fetch orders
+      setOrdersLoading(true);
+      const { data: ordersData } = await API.get('/orders/student');
+      setOrders(ordersData || []);
+    } catch (err) {
+      console.error('Failed to fetch data:', err);
+      setError(err?.response?.data?.error || 'Failed to load profile');
+    } finally {
+      setLoading(false);
+      setOrdersLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch profile
-        const { data: profileData } = await API.get('/users/profile');
-        setProfile(prev => ({
-          ...prev,
-          ...profileData.user,
-          initials: profileData.user.name
-            ? profileData.user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-            : '??'
-        }));
-        
-        setFormData({
-          name: profileData.user.name || '',
-          email: profileData.user.email || '',
-          contact_number: profileData.user.contact_number || ''
-        });
-
-        // Fetch orders
-        setOrdersLoading(true);
-        const { data: ordersData } = await API.get('/orders/student');
-        setOrders(ordersData || []);
-      } catch (err) {
-        console.error('Failed to fetch data:', err);
-        setError(err?.response?.data?.error || 'Failed to load profile');
-      } finally {
-        setLoading(false);
-        setOrdersLoading(false);
-      }
-    };
-
     fetchData();
   }, []);
 
@@ -263,14 +263,59 @@ export default function UserProfilePage() {
     router.push('/auth/login');
   };
 
+  const handleReceiveOrder = async (orderId) => {
+    try {
+      // Show confirmation dialog
+      const result = await Swal.fire({
+        title: 'Confirm Receipt',
+        text: 'Are you sure you have received your order? This will complete your order and send you a receipt via email.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Yes, I received it!',
+        cancelButtonText: 'Cancel'
+      });
+
+      if (result.isConfirmed) {
+        // Call API to confirm receipt
+        const response = await API.post(`/orders/${orderId}/user-confirm`);
+        
+        if (response.data.success) {
+          // Show success message
+          await Swal.fire({
+            title: 'Order Confirmed!',
+            text: 'Your order has been confirmed and a receipt has been sent to your email.',
+            icon: 'success',
+            confirmButtonColor: '#10b981'
+          });
+
+          // Refresh orders to show updated status
+          await fetchData();
+        } else {
+          throw new Error(response.data.message || 'Failed to confirm receipt');
+        }
+      }
+    } catch (err) {
+      console.error('Confirm receipt error:', err);
+      await Swal.fire({
+        title: 'Error',
+        text: err?.response?.data?.error || 'Failed to confirm receipt. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#ef4444'
+      });
+    }
+  };
+
   const getStatusBadge = (status) => {
     const statusClasses = {
       'pending': 'bg-yellow-100 text-yellow-800',
       'processing': 'bg-blue-100 text-blue-800',
+      'ready_for_pickup': 'bg-purple-100 text-purple-800',
+      'delivered': 'bg-green-100 text-green-800',
       'completed': 'bg-green-100 text-green-800',
       'cancelled': 'bg-red-100 text-red-800',
-      'delivered': 'bg-green-100 text-green-800',
-      'done': 'bg-green-100 text-green-800'
+      'refunded': 'bg-gray-100 text-gray-800'
     };
     
     return (
@@ -664,11 +709,33 @@ export default function UserProfilePage() {
                     {/* Status Message */}
                     <div className="mt-4 p-4 rounded-lg bg-gray-50 border-l-4 border-[#000C50]">
                       <p className="text-sm text-gray-700">
-                        {order.status === 'done'
-                          ? '✅ You have successfully claimed your order. We appreciate your support. Thank you for shopping with us!'
+                        {order.status === 'delivered'
+                          ? '📦 Your order has been delivered! Please confirm receipt to complete your order.'
+                          : order.status === 'completed'
+                          ? '✅ You have successfully confirmed receipt of your order. We appreciate your support. Thank you for shopping with us!'
+                          : order.status === 'ready_for_pickup'
+                          ? '📦 Your order is ready for pickup! Please visit the store to collect your items.'
                           : '⏳ Your order is still being processed. Please wait for confirmation.'}
                       </p>
                     </div>
+
+                    {/* Receive Order Button */}
+                    {order.status === 'delivered' && (
+                      <div className="mt-4">
+                        <button
+                          onClick={() => handleReceiveOrder(order.id)}
+                          className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Confirm Receipt & Get Receipt
+                        </button>
+                        <p className="text-xs text-gray-500 mt-2 text-center">
+                          Click to confirm you have received your order and get your receipt via email
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))

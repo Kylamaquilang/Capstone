@@ -5,9 +5,10 @@ import {
   markAsRead,
   markAllAsRead,
   deleteNotification,
-  createNotification
+  createNotification,
+  getAdminNotifications
 } from '../controllers/notification.controller.js';
-import { verifyToken } from '../middleware/auth.middleware.js';
+import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
@@ -16,6 +17,9 @@ router.get('/unread-count', verifyToken, getUnreadCount);
 
 // Get all notifications for user
 router.get('/', verifyToken, getNotifications);
+
+// Get admin notifications (admin only)
+router.get('/admin', verifyToken, isAdmin, getAdminNotifications);
 
 // Mark notification as read
 router.put('/:id/read', verifyToken, markAsRead);

@@ -96,10 +96,7 @@ export const createGCashPayment = async (req, res) => {
           capture_method: 'automatic',
           statement_descriptor: 'CPC Store',
           description: description,
-          metadata: {
-            order_id: orderId,
-            user_id: userId
-          }
+          payment_method_allowed: ['gcash']
         }
       }
     };
@@ -255,7 +252,10 @@ export const handlePayMongoWebhook = async (req, res) => {
     
     if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.attributes;
-      const orderId = paymentIntent.metadata?.order_id;
+      // Extract order ID from description since metadata is not working
+      const description = paymentIntent.description || '';
+      const orderIdMatch = description.match(/Order #(\d+)/);
+      const orderId = orderIdMatch ? orderIdMatch[1] : null;
       
       if (orderId) {
         // Update order status

@@ -402,21 +402,21 @@ export default function AdminSalesPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Detailed Sales Data</h3>
                 {salesData.salesData && salesData.salesData.length > 0 ? (
                   <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm border-collapse">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-gray-600">Period</th>
-                          <th className="px-4 py-2 text-left text-gray-600">Orders</th>
-                          <th className="px-4 py-2 text-left text-gray-600">Revenue</th>
+                          <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Period</th>
+                          <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Orders</th>
+                          <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Revenue</th>
                           <th className="px-4 py-2 text-left text-gray-600">Avg Order</th>
                         </tr>
                       </thead>
                       <tbody>
                         {salesData.salesData.map((item, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 font-medium">{formatDate(item.period)}</td>
-                            <td className="px-4 py-2">{item.orders}</td>
-                            <td className="px-4 py-2 text-green-600 font-semibold">
+                          <tr key={index} className="hover:bg-gray-50 border-b border-gray-200">
+                            <td className="px-4 py-2 font-medium border-r border-gray-200">{formatDate(item.period)}</td>
+                            <td className="px-4 py-2 border-r border-gray-200">{item.orders}</td>
+                            <td className="px-4 py-2 text-green-600 font-semibold border-r border-gray-200">
                               {formatCurrency(item.revenue)}
                             </td>
                             <td className="px-4 py-2">{formatCurrency(item.avg_order_value)}</td>
@@ -484,21 +484,21 @@ export default function AdminSalesPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Inventory Movement Summary</h3>
                 {salesData.inventorySummary && salesData.inventorySummary.length > 0 ? (
                   <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm border-collapse">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-gray-600">Movement Type</th>
-                          <th className="px-4 py-2 text-left text-gray-600">Count</th>
-                          <th className="px-4 py-2 text-left text-gray-600">Total Quantity</th>
+                          <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Movement Type</th>
+                          <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Count</th>
+                          <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Total Quantity</th>
                           <th className="px-4 py-2 text-left text-gray-600">Products Affected</th>
                         </tr>
                       </thead>
                       <tbody>
                         {salesData.inventorySummary.map((movement, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 font-medium capitalize">{movement.movement_type}</td>
-                            <td className="px-4 py-2">{movement.movement_count}</td>
-                            <td className="px-4 py-2">{movement.total_quantity}</td>
+                          <tr key={index} className="hover:bg-gray-50 border-b border-gray-200">
+                            <td className="px-4 py-2 font-medium capitalize border-r border-gray-200">{movement.movement_type}</td>
+                            <td className="px-4 py-2 border-r border-gray-200">{movement.movement_count}</td>
+                            <td className="px-4 py-2 border-r border-gray-200">{movement.total_quantity}</td>
                             <td className="px-4 py-2">{movement.products_affected}</td>
                           </tr>
                         ))}

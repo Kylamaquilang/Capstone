@@ -224,21 +224,21 @@ export default function AdminInventoryPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Category Breakdown</h3>
             {inventoryData.categoryStats && inventoryData.categoryStats.length > 0 ? (
               <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm border-collapse">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-gray-600">Category</th>
-                      <th className="px-4 py-2 text-left text-gray-600">Products</th>
-                      <th className="px-4 py-2 text-left text-gray-600">Total Stock</th>
+                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Category</th>
+                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Products</th>
+                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Total Stock</th>
                       <th className="px-4 py-2 text-left text-gray-600">Avg Price</th>
                     </tr>
                   </thead>
                   <tbody>
                     {inventoryData.categoryStats.map((category, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 font-medium">{category.category || 'Uncategorized'}</td>
-                        <td className="px-4 py-2">{category.product_count}</td>
-                        <td className="px-4 py-2">{category.total_stock}</td>
+                      <tr key={index} className="hover:bg-gray-50 border-b border-gray-200">
+                        <td className="px-4 py-2 font-medium border-r border-gray-200">{category.category || 'Uncategorized'}</td>
+                        <td className="px-4 py-2 border-r border-gray-200">{category.product_count}</td>
+                        <td className="px-4 py-2 border-r border-gray-200">{category.total_stock}</td>
                         <td className="px-4 py-2 text-green-600">
                           {formatCurrency(category.avg_price || 0)}
                         </td>
@@ -265,20 +265,20 @@ export default function AdminInventoryPage() {
             
             {inventoryData.lowStockProducts.length > 0 ? (
               <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm border-collapse">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-gray-600">Product</th>
-                      <th className="px-4 py-2 text-left text-gray-600">Category</th>
-                      <th className="px-4 py-2 text-left text-gray-600">Current Stock</th>
-                      <th className="px-4 py-2 text-left text-gray-600">Status</th>
+                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Product</th>
+                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Category</th>
+                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Current Stock</th>
+                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Status</th>
                       <th className="px-4 py-2 text-left text-gray-600">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {inventoryData.lowStockProducts.map((product) => (
-                      <tr key={product.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2">
+                      <tr key={product.id} className="hover:bg-gray-50 border-b border-gray-200">
+                        <td className="px-4 py-2 border-r border-gray-200">
                           <div className="flex items-center">
                             <img 
                               src={product.image || '/images/polo.png'} 
@@ -294,17 +294,17 @@ export default function AdminInventoryPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-gray-600">
+                        <td className="px-4 py-2 text-gray-600 border-r border-gray-200">
                           {product.category_name || 'N/A'}
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-4 py-2 border-r border-gray-200">
                           <span className={`font-semibold ${
                             product.stock === 0 ? 'text-red-600' : 'text-yellow-600'
                           }`}>
                             {product.stock}
                           </span>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-4 py-2 border-r border-gray-200">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                             getStockStatusColor(product.stock)
                           }`}>

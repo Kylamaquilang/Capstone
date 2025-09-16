@@ -55,6 +55,18 @@ export const signup = async (req, res) => {
       });
     }
 
+    // Generate password if not provided
+    const finalPassword = password || (role === 'admin' ? 'admin123' : DEFAULT_STUDENT_PASSWORD);
+    
+    // Validate password strength
+    if (!validatePassword(finalPassword)) {
+      return res.status(400).json({ 
+        error: 'Password must be at least 6 characters long' 
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(finalPassword, SALT_ROUNDS);
+
     // Check if user already exists
     const checkQuery = role === 'admin'
       ? 'SELECT * FROM users WHERE email = ?'
@@ -68,18 +80,6 @@ export const signup = async (req, res) => {
         error: `${role} already exists with this ${role === 'admin' ? 'email' : 'student ID'}` 
       });
     }
-
-    // Generate password if not provided
-    const finalPassword = password || (role === 'admin' ? 'admin123' : DEFAULT_STUDENT_PASSWORD);
-    
-    // Validate password strength
-    if (!validatePassword(finalPassword)) {
-      return res.status(400).json({ 
-        error: 'Password must be at least 6 characters long' 
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(finalPassword, SALT_ROUNDS);
 
     // Insert new user
     const [result] = await pool.query(

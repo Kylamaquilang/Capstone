@@ -191,29 +191,29 @@ export default function AdminUsersPage() {
             ) : (
               <div className="bg-white border-gray-600 overflow-hidden rounded-md">
                 <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                  <table className="w-full text-left">
+                  <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-800 text-white">
                       <tr>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Stud ID</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Name</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Email</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Role</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Degree</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Active</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Created</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Stud ID</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Name</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Email</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Role</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Degree</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Status</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Active</th>
+                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Created</th>
                         <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {users.map((user, index) => (
-                        <tr key={user.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
-                        <td className="px-6 py-4">
+                        <tr key={user.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 font-mono">
                             {user.student_id || 'N/A'}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div>
                             <div className="text-sm font-medium text-gray-900">{user.name || 'N/A'}</div>
                             {user.first_name && user.last_name && (
@@ -223,19 +223,19 @@ export default function AdminUsersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="text-sm text-gray-900">{user.email || 'N/A'}</div>
                         </td>
-                        <td className="px-6 py-4">{getRoleBadge(user.role)}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">{getRoleBadge(user.role)}</td>
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="text-sm">
                             <div className="font-medium text-gray-900">{user.degree || 'N/A'}</div>
                             <div className="text-xs text-gray-500">{getDegreeDisplayName(user.degree)}</div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">{getStatusBadge(user.status)}</td>
-                        <td className="px-6 py-4">{getActiveStatusBadge(user.is_active)}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">{getStatusBadge(user.status)}</td>
+                        <td className="px-6 py-4 border-r border-gray-200">{getActiveStatusBadge(user.is_active)}</td>
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="text-sm text-gray-900">
                             {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                           </div>

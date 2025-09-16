@@ -204,7 +204,7 @@ export const sendOrderReceiptEmail = async (email, userName, orderData) => {
     // Format items for display
     const itemsHtml = items.map(item => `
       <tr style="border-bottom: 1px solid #eee;">
-        <td style="padding: 15px 0; color: #333;">${item.quantity}x ${item.product_name}${item.size_name ? ` (${item.size_name})` : ''}</td>
+        <td style="padding: 15px 0; color: #333;">${item.quantity}x ${item.product_name}</td>
         <td style="padding: 15px 0; text-align: right; color: #333;">₱${Number(item.price).toFixed(2)}</td>
         <td style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">₱${Number(item.price * item.quantity).toFixed(2)}</td>
       </tr>

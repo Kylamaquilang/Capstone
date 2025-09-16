@@ -15,25 +15,33 @@ export default function AdminNotificationPage() {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const { data } = await API.get('/notifications');
-      setNotifications(data.notifications || []);
-      
-      // Mark all unread notifications as read when admin views the page
-      const unreadNotifications = data.notifications?.filter(n => !n.is_read) || [];
-      if (unreadNotifications.length > 0) {
-        await Promise.all(
-          unreadNotifications.map(notification => 
-            API.put(`/notifications/${notification.id}/read`)
-          )
-        );
-        // Refresh notifications to get updated read status
-        const { data: updatedData } = await API.get('/notifications');
-        setNotifications(updatedData.notifications || []);
-        
-        // Dispatch custom event to notify navbar to refresh unread count
-        window.dispatchEvent(new CustomEvent('notificationsMarkedAsRead'));
+      // Try admin endpoint first, fallback to regular endpoint
+      let response;
+      try {
+        response = await API.get('/notifications/admin');
+      } catch (adminError) {
+        console.log('Admin endpoint failed, trying regular endpoint:', adminError.response?.status);
+        response = await API.get('/notifications');
       }
+      
+      const notifications = response.data.notifications || [];
+      
+      // Filter for admin-relevant notifications
+      const adminNotifications = notifications.filter(n => 
+        n.type === 'admin_order' || 
+        n.type === 'delivered_confirmation' ||
+        n.type === 'system' ||
+        n.title?.includes('Order') ||
+        n.title?.includes('Delivered')
+      );
+      
+      setNotifications(adminNotifications);
+      
+      // Note: Admin notifications are read-only for display purposes
+      // We don't automatically mark them as read since they may belong to different users
+      console.log(`Loaded ${adminNotifications.length} admin notifications`);
     } catch (err) {
+      console.error('Failed to load notifications:', err);
       setError('Failed to load notifications');
     } finally {
       setLoading(false);
@@ -87,6 +95,58 @@ export default function AdminNotificationPage() {
     }
   };
 
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      await API.put(`/notifications/${notificationId}/read`);
+      
+      // Update the notification in the local state
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, is_read: true }
+            : notification
+        )
+      );
+      
+      // Dispatch custom event to notify navbar to refresh unread count
+      window.dispatchEvent(new CustomEvent('notificationsMarkedAsRead'));
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+      // Don't show error to user since this is not critical
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const unreadNotifications = notifications.filter(n => !n.is_read);
+      
+      // Mark each notification as read individually
+      const results = await Promise.allSettled(
+        unreadNotifications.map(notification => 
+          API.put(`/notifications/${notification.id}/read`)
+        )
+      );
+      
+      // Count successful operations
+      const successful = results.filter(result => result.status === 'fulfilled').length;
+      const failed = results.filter(result => result.status === 'rejected').length;
+      
+      // Update all notifications in local state
+      setNotifications(prev => 
+        prev.map(notification => ({ ...notification, is_read: true }))
+      );
+      
+      // Dispatch custom event to notify navbar to refresh unread count
+      window.dispatchEvent(new CustomEvent('notificationsMarkedAsRead'));
+      
+      if (failed > 0) {
+        console.log(`Marked ${successful} notifications as read, ${failed} failed`);
+      }
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err);
+    }
+  };
+
   useEffect(() => {
     fetchNotifications();
     fetchLowStock();
@@ -101,6 +161,14 @@ export default function AdminNotificationPage() {
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">NOTIFICATIONS</h2>
+              {notifications.filter(n => !n.is_read).length > 0 && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  ✓ Mark All as Read
+                </button>
+              )}
             </div>
             
             {/* Tab Navigation */}
@@ -117,7 +185,7 @@ export default function AdminNotificationPage() {
                   <span className="text-lg">📦</span>
                   <span>Order Notifications</span>
                   <span className="bg-white text-[#000C50] px-2 py-1 rounded-full text-xs font-bold">
-                    {notifications.filter(n => n.type === 'admin_order' || n.type === 'delivered_confirmation').length}
+                    {notifications.length}
                   </span>
                 </span>
               </button>
@@ -158,10 +226,8 @@ export default function AdminNotificationPage() {
             ) : (
               <div className="space-y-4">
                 {activeTab === 'orders' ? (
-                  notifications.filter(n => n.type === 'admin_order' || n.type === 'delivered_confirmation').length > 0 ? (
-                    notifications
-                      .filter(n => n.type === 'admin_order' || n.type === 'delivered_confirmation')
-                      .map((notification) => {
+                  notifications.length > 0 ? (
+                    notifications.map((notification) => {
                         // Extract order ID from the message
                         const orderIdMatch = notification.message.match(/Order #(\d+)/);
                         const orderId = orderIdMatch ? orderIdMatch[1] : null;
@@ -197,25 +263,38 @@ export default function AdminNotificationPage() {
                                   {new Date(notification.created_at).toLocaleString()}
                                 </p>
                                 
-                                {/* Action Buttons for Delivered Confirmation Notifications */}
-                                {notification.type === 'delivered_confirmation' && orderId && (
-                                  <div className="flex gap-2">
+                                {/* Action Buttons */}
+                                <div className="flex gap-2 flex-wrap">
+                                  {/* Mark as Read Button (only for unread notifications) */}
+                                  {!notification.is_read && (
                                     <button
-                                      onClick={() => handleOrderReceived(orderId)}
-                                      disabled={processingOrder === orderId}
-                                      className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                                      onClick={() => handleMarkAsRead(notification.id)}
+                                      className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
                                     >
-                                      {processingOrder === orderId ? 'Processing...' : '✅ Order Received'}
+                                      ✓ Mark as Read
                                     </button>
-                                    <button
-                                      onClick={() => handleOrderCancel(orderId)}
-                                      disabled={processingOrder === orderId}
-                                      className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                      {processingOrder === orderId ? 'Processing...' : '❌ Cancel Order'}
-                                    </button>
-                                  </div>
-                                )}
+                                  )}
+                                  
+                                  {/* Order Action Buttons for Delivered Confirmation Notifications */}
+                                  {notification.type === 'delivered_confirmation' && orderId && (
+                                    <>
+                                      <button
+                                        onClick={() => handleOrderReceived(orderId)}
+                                        disabled={processingOrder === orderId}
+                                        className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                                      >
+                                        {processingOrder === orderId ? 'Processing...' : '✅ Order Received'}
+                                      </button>
+                                      <button
+                                        onClick={() => handleOrderCancel(orderId)}
+                                        disabled={processingOrder === orderId}
+                                        className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                                      >
+                                        {processingOrder === orderId ? 'Processing...' : '❌ Cancel Order'}
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>

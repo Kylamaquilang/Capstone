@@ -155,24 +155,11 @@ export const createProduct = async (req, res) => {
 
       const productId = productResult.insertId;
 
-      // Insert product sizes if provided
+      // Note: product_sizes table doesn't exist in current database structure
+      // Size information is not stored separately - products only have base stock
+      // If sizes are provided, we'll just log them for future reference
       if (sizes && Array.isArray(sizes) && sizes.length > 0) {
-        for (const sizeData of sizes) {
-          if (!validateSize(sizeData.size)) {
-            throw new Error(`Invalid size: ${sizeData.size}. Valid sizes are: XS, S, M, L, XL, XXL`);
-          }
-
-          if (!validateStock(sizeData.stock)) {
-            throw new Error(`Invalid stock quantity for size ${sizeData.size}`);
-          }
-
-          const sizePrice = sizeData.price || price; // Use product price if size price not specified
-
-          await connection.query(
-            `INSERT INTO product_sizes (product_id, size, stock, price) VALUES (?, ?, ?, ?)`,
-            [productId, sizeData.size.toUpperCase(), parseInt(sizeData.stock), parseFloat(sizePrice)]
-          );
-        }
+        console.log(`Product ${productId} created with ${sizes.length} sizes, but sizes are not stored in current database structure`);
       }
 
       await connection.commit();
@@ -250,19 +237,11 @@ export const getAllProducts = async (req, res) => {
       [...queryParams, validLimit, offset]
     );
 
-    // Get product sizes for each product
-    const productsWithSizes = await Promise.all(
-      products.map(async (product) => {
-        const [sizes] = await pool.query(
-          'SELECT * FROM product_sizes WHERE product_id = ?',
-          [product.id]
-        );
-        return {
-          ...product,
-          sizes: sizes
-        };
-      })
-    );
+    // Since product_sizes table doesn't exist, return products without sizes
+    const productsWithSizes = products.map(product => ({
+      ...product,
+      sizes: [] // No sizes available in current database structure
+    }));
 
     res.json({
       products: productsWithSizes,

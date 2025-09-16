@@ -19,10 +19,9 @@ export const createOrderStatusNotification = async (user_id, orderId, status) =>
   try {
     // Get product details for the order with size information
     const [productInfo] = await pool.query(`
-      SELECT p.name, oi.quantity, oi.size_id, s.size_name
+      SELECT p.name, oi.quantity, oi.size
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
-      LEFT JOIN sizes s ON oi.size_id = s.id
       WHERE oi.order_id = ?
       ORDER BY oi.id
     `, [orderId]);
@@ -32,19 +31,19 @@ export const createOrderStatusNotification = async (user_id, orderId, status) =>
     if (productInfo.length > 0) {
       if (productInfo.length === 1) {
         const item = productInfo[0];
-        productSummary = item.size_name 
-          ? `${item.quantity}x ${item.name} (${item.size_name})`
+        productSummary = item.size 
+          ? `${item.quantity}x ${item.name} (${item.size})`
           : `${item.quantity}x ${item.name}`;
       } else if (productInfo.length <= 3) {
         productSummary = productInfo.map(item => 
-          item.size_name 
-            ? `${item.quantity}x ${item.name} (${item.size_name})`
+          item.size 
+            ? `${item.quantity}x ${item.name} (${item.size})`
             : `${item.quantity}x ${item.name}`
         ).join(', ');
       } else {
         const firstItem = productInfo[0];
-        const firstItemText = firstItem.size_name 
-          ? `${firstItem.quantity}x ${firstItem.name} (${firstItem.size_name})`
+        const firstItemText = firstItem.size 
+          ? `${firstItem.quantity}x ${firstItem.name} (${firstItem.size})`
           : `${firstItem.quantity}x ${firstItem.name}`;
         productSummary = `${firstItemText} and ${productInfo.length - 1} more items`;
       }

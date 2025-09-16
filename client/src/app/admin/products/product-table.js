@@ -94,152 +94,92 @@ export default function ProductTable({ category = '' }) {
     .slice()
     .sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
-  // Create separate rows for each size
+  // Create table rows - since sizes are not stored in database, show one row per product
   const tableRows = [];
   sortedProducts.forEach((prod) => {
-    if (prod.sizes && prod.sizes.length > 0) {
-      // Sort sizes logically
-      const sortedSizes = prod.sizes.sort((a, b) => {
-        const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-        const aIndex = sizeOrder.indexOf(a.size);
-        const bIndex = sizeOrder.indexOf(b.size);
-        if (aIndex === -1 && bIndex === -1) return a.size.localeCompare(b.size);
-        if (aIndex === -1) return 1;
-        if (bIndex === -1) return -1;
-        return aIndex - bIndex;
-      });
-
-      sortedSizes.forEach((size, index) => {
-        tableRows.push({
-          id: `${prod.id}-${size.size}-${size.id || index}`,
-          productId: prod.id,
-          productName: prod.name,
-          category: prod.category_name || prod.category || 'Uncategorized',
-          amount: prod.price,
-          baseStock: prod.stock,
-          size: size.size,
-          sizeStock: size.stock,
-          sizePrice: size.price,
-          isFirstSize: index === 0,
-          totalSizes: sortedSizes.length
-        });
-      });
-    } else {
-      // Product without sizes
-      tableRows.push({
-        id: `product-${prod.id}-no-size`,
-        productId: prod.id,
-        productName: prod.name,
-        category: prod.category_name || prod.category || 'Uncategorized',
-        amount: prod.price,
-        baseStock: prod.stock,
-        size: null,
-        sizeStock: null,
-        sizePrice: null,
-        isFirstSize: true,
-        totalSizes: 0
-      });
-    }
+    tableRows.push({
+      id: `product-${prod.id}`,
+      productId: prod.id,
+      productName: prod.name,
+      category: prod.category_name || prod.category || 'Uncategorized',
+      amount: prod.price,
+      baseStock: prod.stock,
+      size: 'N/A', // No sizes available in current database structure
+      sizeStock: 'N/A',
+      sizePrice: 'N/A',
+      isFirstSize: true,
+      totalSizes: 0
+    });
   });
 
   return (
     <div className="bg-white border-gray-600 overflow-hidden rounded-md">
       <div className="max-h-[600px] overflow-y-auto overflow-x-auto">
-        <table className="w-full text-left">
+        <table className="w-full text-left border-collapse">
           <thead className="bg-gray-300 text-[000C50] sticky top-0 z-10">
             <tr>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Product Name</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Category</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Price</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Base Stock</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Size</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Stock</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Product Name</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Category</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Price</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Base Stock</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Size</th>
+              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Stock</th>
               <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody>
             {tableRows.map((row, index) => (
-              <tr key={row.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
-                <td className="px-6 py-4">
+              <tr key={row.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
+                <td className="px-6 py-4 border-r border-gray-200">
                   <div className="text-sm font-medium text-gray-900">{row.productName}</div>
                 </td>
-                <td className="px-6 py-4">
-                  {row.isFirstSize ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                      {row.category}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
+                <td className="px-6 py-4 border-r border-gray-200">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    {row.category}
+                  </span>
+                </td>
+                <td className="px-6 py-4 border-r border-gray-200">
+                  <div className="text-sm font-medium text-gray-900">
+                    ₱{Number(row.amount).toFixed(2)}
+                  </div>
+                </td>
+                <td className="px-6 py-4 border-r border-gray-200">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
+                    Number(row.baseStock) === 0 
+                      ? 'bg-red-100 text-red-800' 
+                      : Number(row.baseStock) <= 5 
+                      ? 'bg-yellow-100 text-yellow-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {row.baseStock}
+                  </span>
+                </td>
+                <td className="px-6 py-4 border-r border-gray-200">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    {row.size}
+                  </span>
+                </td>
+                <td className="px-6 py-4 border-r border-gray-200">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                    {row.sizeStock}
+                  </span>
                 </td>
                 <td className="px-6 py-4">
-                  {row.isFirstSize ? (
-                    <div className="text-sm font-medium text-gray-900">
-                      ₱{Number(row.amount).toFixed(2)}
-                    </div>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {row.isFirstSize ? (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
-                      Number(row.baseStock) === 0 
-                        ? 'bg-red-100 text-red-800' 
-                        : Number(row.baseStock) <= 5 
-                        ? 'bg-yellow-100 text-yellow-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {row.baseStock}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {row.size ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                      {row.size}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {row.sizeStock !== null ? (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
-                      Number(row.sizeStock) === 0 
-                        ? 'bg-red-100 text-red-800' 
-                        : Number(row.sizeStock) <= 5 
-                        ? 'bg-yellow-100 text-yellow-800' 
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {row.sizeStock}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {row.isFirstSize ? (
-                    <ActionMenu
-                      actions={[
-                        {
-                          label: 'Edit Product',
-                          icon: PencilSquareIcon,
-                          onClick: () => router.push(`/admin/products/edit/${row.productId}`)
-                        },
-                        {
-                          label: 'Delete Product',
-                          icon: TrashIcon,
-                          onClick: () => handleDelete(row.productId, row.productName),
-                          danger: true
-                        }
-                      ]}
-                    />
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
+                  <ActionMenu
+                    actions={[
+                      {
+                        label: 'Edit Product',
+                        icon: PencilSquareIcon,
+                        onClick: () => router.push(`/admin/products/edit/${row.productId}`)
+                      },
+                      {
+                        label: 'Delete Product',
+                        icon: TrashIcon,
+                        onClick: () => handleDelete(row.productId, row.productName),
+                        danger: true
+                      }
+                    ]}
+                  />
                 </td>
               </tr>
             ))}

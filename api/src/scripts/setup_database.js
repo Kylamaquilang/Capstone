@@ -165,6 +165,8 @@ async function setupDatabase() {
     await dbConnection.execute('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
     console.log('✅ Indexes created');
     
+    console.log('✅ Database setup completed (using optimized SQL queries)');
+    
     // Insert sample data
     console.log('🔧 Inserting sample data...');
     

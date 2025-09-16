@@ -138,18 +138,18 @@ export default function AdminCategoriesPage() {
             ) : (
               <div className="bg-white border border-gray-300 overflow-hidden">
                 <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                  <table className="w-full text-left">
+                  <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-800 text-white">
                       <tr>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Category Name</th>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Created</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Category Name</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Created</th>
                         <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                     {categories.map((category, index) => (
-                      <tr key={category.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
-                        <td className="px-6 py-4">
+                      <tr key={category.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
+                        <td className="px-6 py-4 border-r border-gray-200">
                           {editingId === category.id ? (
                             <form onSubmit={handleEditCategory} className="flex gap-2">
                               <input
@@ -177,7 +177,7 @@ export default function AdminCategoriesPage() {
                             <span className="text-sm font-medium text-gray-900">{category.name}</span>
                           )}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="text-sm text-gray-900">
                             {category.created_at ? new Date(category.created_at).toLocaleDateString() : 'N/A'}
                           </div>

@@ -248,24 +248,24 @@ export default function AdminOrdersPage() {
             ) : (
               <div className="bg-white border-gray-800 overflow-hidden rounded-md">
                 <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                  <table className="w-full text-left">
+                  <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-800 text-white">
                       <tr>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Products</th>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Customer</th>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Items</th>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Amount</th>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Payment Method</th>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Payment Status</th>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Order Status</th>
-                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Created</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Products</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Customer</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Items</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Amount</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Payment Method</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Payment Status</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Order Status</th>
+                        <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-600">Created</th>
                         <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredOrders.map((order, index) => (
-                        <tr key={order.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
-                        <td className="px-6 py-4">
+                        <tr key={order.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="text-sm">
                             {order.items && order.items.length > 0 ? (
                               <div className="space-y-1">
@@ -288,26 +288,26 @@ export default function AdminOrdersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div>
                             <div className="text-sm font-medium text-gray-900">{order.user_name}</div>
                             <div className="text-xs text-gray-500">ID: {order.student_id || 'N/A'}</div>
                             <div className="text-xs text-gray-400">{order.email}</div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="text-center">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
                               {order.item_count || 0} items
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="text-sm font-medium text-gray-900">
                             ₱{Number(order.total_amount || 0).toFixed(2)}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="flex flex-col space-y-1">
                             <div className="flex items-center space-x-2">
                               {order.payment_method === 'gcash' ? (
@@ -333,7 +333,7 @@ export default function AdminOrdersPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="flex items-center space-x-2">
                             {order.payment_status === 'paid' ? (
                               <>
@@ -366,7 +366,7 @@ export default function AdminOrdersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="flex items-center space-x-2">
                             {getStatusIcon(order.status)}
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)}`}>
@@ -374,7 +374,7 @@ export default function AdminOrdersPage() {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 border-r border-gray-200">
                           <div className="text-sm text-gray-900">{new Date(order.created_at).toLocaleDateString()}</div>
                           <div className="text-xs text-gray-500">{new Date(order.created_at).toLocaleTimeString()}</div>
                         </td>

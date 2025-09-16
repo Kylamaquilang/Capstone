@@ -1,5 +1,6 @@
 import { pool } from '../database/db.js'
 import { sendOrderReceiptEmail } from '../utils/emailService.js'
+import { createOrderStatusNotification } from '../utils/notification-helper.js'
 
 // Helper function to create delivered order notification for admin confirmation
 const createDeliveredOrderNotification = async (orderId, userId) => {
@@ -343,28 +344,6 @@ const logSalesMovement = async (orderId, movementType, amount, paymentMethod, de
   }
 }
 
-// Helper function to create order status notifications
-const createOrderStatusNotification = async (userId, orderId, status) => {
-  try {
-    const statusMessages = {
-      'pending': 'Your order has been received and is being processed.',
-      'processing': 'Your order is being prepared.',
-      'ready_for_pickup': 'Your order is ready for pickup!',
-      'delivered': 'Your order has been delivered successfully.',
-      'cancelled': 'Your order has been cancelled.',
-      'refunded': 'Your order has been refunded.'
-    }
-
-    const message = statusMessages[status] || `Your order status has been updated to ${status}.`
-
-    await pool.query(`
-      INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
-      VALUES (?, ?, ?, ?, ?, NOW())
-    `, [userId, `Order #${orderId} Update`, message, 'order_status', orderId])
-  } catch (error) {
-    console.error('Error creating notification:', error)
-  }
-}
 
 // 📊 Get order statistics
 export const getOrderStats = async (req, res) => {
@@ -675,30 +654,20 @@ export const userConfirmOrderReceipt = async (req, res) => {
 
     // Update sales and inventory - get order items and update stock
     const [orderItems] = await pool.query(`
-      SELECT oi.product_id, oi.quantity, oi.size_id, p.name as product_name, s.size_name
+      SELECT oi.product_id, oi.quantity, p.name as product_name
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
-      LEFT JOIN sizes s ON oi.size_id = s.id
       WHERE oi.order_id = ?
     `, [id]);
 
     // Update inventory for each item
     for (const item of orderItems) {
-      if (item.size_id) {
-        // Product with size - update product_sizes table
-        await pool.query(`
-          UPDATE product_sizes 
-          SET stock_quantity = stock_quantity - ?
-          WHERE product_id = ? AND size_id = ?
-        `, [item.quantity, item.product_id, item.size_id]);
-      } else {
-        // Product without size - update products table
-        await pool.query(`
-          UPDATE products 
-          SET stock_quantity = stock_quantity - ?
-          WHERE id = ?
-        `, [item.quantity, item.product_id]);
-      }
+      // Update products table stock
+      await pool.query(`
+        UPDATE products 
+        SET stock = stock - ?
+        WHERE id = ?
+      `, [item.quantity, item.product_id]);
     }
 
     // Create product summary for notifications
@@ -706,20 +675,14 @@ export const userConfirmOrderReceipt = async (req, res) => {
     if (orderItems.length > 0) {
       if (orderItems.length === 1) {
         const item = orderItems[0];
-        productSummary = item.size_name 
-          ? `${item.quantity}x ${item.product_name} (${item.size_name})`
-          : `${item.quantity}x ${item.product_name}`;
+        productSummary = `${item.quantity}x ${item.product_name}`;
       } else if (orderItems.length <= 3) {
         productSummary = orderItems.map(item => 
-          item.size_name 
-            ? `${item.quantity}x ${item.product_name} (${item.size_name})`
-            : `${item.quantity}x ${item.product_name}`
+          `${item.quantity}x ${item.product_name}`
         ).join(', ');
       } else {
         const firstItem = orderItems[0];
-        const firstItemText = firstItem.size_name 
-          ? `${firstItem.quantity}x ${firstItem.product_name} (${firstItem.size_name})`
-          : `${firstItem.quantity}x ${firstItem.product_name}`;
+        const firstItemText = `${firstItem.quantity}x ${firstItem.product_name}`;
         productSummary = `${firstItemText} and ${orderItems.length - 1} more items`;
       }
     }
@@ -768,10 +731,9 @@ export const userConfirmOrderReceipt = async (req, res) => {
         
         // Get order items with prices for email
         const [orderItemsWithPrices] = await pool.query(`
-          SELECT oi.quantity, oi.price, p.name as product_name, s.size_name
+          SELECT oi.quantity, oi.price, p.name as product_name
           FROM order_items oi
           JOIN products p ON oi.product_id = p.id
-          LEFT JOIN sizes s ON oi.size_id = s.id
           WHERE oi.order_id = ?
         `, [id]);
 

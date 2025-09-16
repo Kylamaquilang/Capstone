@@ -152,6 +152,30 @@ export const deleteNotification = async (req, res) => {
   }
 };
 
+// ✅ Get admin notifications (all notifications for admin users)
+export const getAdminNotifications = async (req, res) => {
+  try {
+    const [notifications] = await pool.query(`
+      SELECT n.id, n.title, n.message, n.type, n.is_read, n.related_id, n.created_at
+      FROM notifications n
+      JOIN users u ON n.user_id = u.id
+      WHERE u.role = 'admin' 
+      ORDER BY n.created_at DESC
+    `);
+
+    res.json({
+      success: true,
+      notifications
+    });
+  } catch (err) {
+    console.error('Get admin notifications error:', err);
+    res.status(500).json({
+      error: 'Server error',
+      message: 'Failed to get admin notifications'
+    });
+  }
+};
+
 // ✅ Create notification (for system use)
 export const createNotification = async (req, res) => {
   const { user_id, message } = req.body;

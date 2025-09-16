@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { 
-  CubeIcon, ClipboardDocumentListIcon, XCircleIcon, BanknotesIcon, 
+  CubeIcon, ClipboardDocumentListIcon, BanknotesIcon, 
   BellIcon, UserCircleIcon, ArrowLeftOnRectangleIcon, 
   ArchiveBoxIcon, TagIcon, Bars3Icon, XMarkIcon
 } from '@heroicons/react/24/outline';
@@ -57,7 +57,6 @@ export default function Sidebar() {
           <SidebarItem href="/admin/categories" icon={TagIcon} label="Categories" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/orders" icon={ClipboardDocumentListIcon} label="Orders" onClick={toggleMobileMenu} />
-          <SidebarItem href="/admin/cancelled" icon={XCircleIcon} label="Cancelled" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/sales" icon={BanknotesIcon} label="Sales" onClick={toggleMobileMenu} />
           <SidebarItem href="/admin/users" icon={UserCircleIcon} label="Users" onClick={toggleMobileMenu} />
         </div>
