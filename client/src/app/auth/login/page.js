@@ -2,6 +2,7 @@
 
 import useLogin from '@/hooks/useLogin';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
 
 export default function LoginPage() {
@@ -22,34 +23,34 @@ export default function LoginPage() {
 
   return (
     <div
-      className="flex justify-center items-center min-h-screen text-black"
+      className="flex justify-center items-center min-h-screen text-black py-4"
       style={{ backgroundColor: '#000C50' }}
     >
-      <div className="bg-white w-full max-w-4xl h-[70%] rounded-xl shadow-lg flex overflow-hidden">
+      <div className="bg-white w-full max-w-3xl h-auto rounded-xl shadow-lg flex overflow-hidden">
         {/* Left Section */}
         <div
-          className="w-1/2 p-10 border-r-4 flex flex-col justify-between"
+          className="w-1/2 p-8 border-r-4 flex flex-col justify-between"
           style={{ borderColor: '#000C50' }}
         >
-          <Image src="/images/cpc.png" alt="Logo" width={80} height={80} className="-mt-6" />
-          <h4 className="text-2xl font-bold">Log in to your <br />ESSEN account.</h4>
-          <p className="text-sm font-medium mt-4">
+          <Image src="/images/cpc.png" alt="Logo" width={70} height={70} className="mb-4" />
+          <h4 className="text-xl font-bold">Log in to your <br />ESSEN account.</h4>
+          <p className="text-sm font-medium mt-3">
             "Equip yourself for success, find everything you need to thrive in school, 
             from study tools to personal essentials, all in one place."
           </p>
-          <p className="text-xs text-gray-500 mt-6">ESSEN © 2024</p>
+          <p className="text-xs text-gray-500 mt-4">ESSEN © 2024</p>
         </div>
 
         {/* Right Section */}
-        <div className="w-1/2 h-[540px] p-10 relative">
+        <div className="w-1/2 p-8 relative">
           <Image
             src="/images/logo.png"
             alt="ESSEN Logo"
-            width={250}
-            height={80}
-            className="absolute top-6 left-1/3 transform -translate-x-1/2"
+            width={200}
+            height={60}
+            className="mb-6"
           />
-          <h4 className="mt-32 text-xl font-bold mb-8">Sign in</h4>
+          <h4 className="text-lg font-bold mb-6">Sign in</h4>
 
           {error && (
             <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">
@@ -95,19 +96,20 @@ export default function LoginPage() {
               )}
             </button>
 
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => window.location.href = '/auth/reset-password'}
-              className="w-full py-3 font-semibold text-sm rounded-lg mt-2 border transition-colors disabled:opacity-50"
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderColor: '#000C50',
-                color: '#000C50',
-              }}
-            >
-              RESET PASSWORD
-            </button>
+            <Link href="/auth/reset-password">
+              <button
+                type="button"
+                disabled={loading}
+                className="w-full py-3 font-semibold text-sm rounded-lg mt-2 border transition-colors disabled:opacity-50"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#000C50',
+                  color: '#000C50',
+                }}
+              >
+                RESET PASSWORD
+              </button>
+            </Link>
           </form>
         </div>
       </div>

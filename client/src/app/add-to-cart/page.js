@@ -71,7 +71,6 @@ export default function ProductPage() {
   };
 
   const handleAddToCart = async () => {
-    // Only require size selection if the product has sizes available
     if (sizes.length > 0 && !selectedSize) {
       Swal.fire({
         icon: 'warning',
@@ -98,7 +97,6 @@ export default function ProductPage() {
         quantity: quantity
       };
 
-      // Only include size_id if sizes are available and selected
       if (sizes.length > 0 && selectedSize) {
         cartData.size_id = selectedSize;
       }
@@ -113,7 +111,7 @@ export default function ProductPage() {
           text: response.data.message || 'Product added to cart successfully.',
           confirmButtonColor: '#000C50'
         });
-        return true; // Return success
+        return true;
       }
     } catch (err) {
       console.error('Error adding to cart:', err);
@@ -123,13 +121,11 @@ export default function ProductPage() {
         text: err.response?.data?.message || 'Failed to add product to cart.',
         confirmButtonColor: '#000C50'
       });
-      throw err; // Re-throw error
+      throw err;
     }
   };
 
-  // Separate function for BUY NOW that doesn't show success message
   const handleBuyNow = async () => {
-    // Only require size selection if the product has sizes available
     if (sizes.length > 0 && !selectedSize) {
       Swal.fire({
         icon: 'warning',
@@ -156,7 +152,6 @@ export default function ProductPage() {
         quantity: quantity
       };
 
-      // Only include size_id if sizes are available and selected
       if (sizes.length > 0 && selectedSize) {
         cartData.size_id = selectedSize;
       }
@@ -165,11 +160,9 @@ export default function ProductPage() {
 
       if (response.data.success) {
         incrementCartCount();
-        
-        // No success message - go directly to checkout
-        // Create cart item data for checkout
+
         const cartItem = {
-          id: Date.now(), // Temporary ID for checkout
+          id: Date.now(),
           product_id: product.id,
           product_name: product.name,
           product_image: product.image || '/images/polo.png',
@@ -178,7 +171,6 @@ export default function ProductPage() {
           size: selectedSize || null
         };
         
-        // Pass the cart item to checkout page
         const queryString = new URLSearchParams({
           items: JSON.stringify([cartItem])
         }).toString();
@@ -232,8 +224,7 @@ export default function ProductPage() {
     );
   }
 
-  // Ensure we have a valid image URL
-  let imageUrl = '/images/polo.png'; // default fallback
+  let imageUrl = '/images/polo.png';
   if (product.image && product.image.startsWith('/')) {
     imageUrl = product.image;
   } else if (product.image && product.image.startsWith('http')) {
@@ -249,13 +240,13 @@ export default function ProductPage() {
         <div className="min-h-screen p-10 bg-white flex justify-center items-center">
           <div className="flex flex-col md:flex-row gap-10">
             {/* Product Image */}
-            <div className="border rounded-md shadow-md p-6">
+            <div className="border rounded-lg shadow-sm p-4">
               <Image
                 src={imageUrl}
                 alt={product.name}
-                width={300}
-                height={300}
-                className="object-contain"
+                width={280}
+                height={280}
+                className="object-contain max-w-xs mx-auto"
                 onError={(e) => {
                   e.target.src = '/images/polo.png';
                 }}
@@ -263,33 +254,33 @@ export default function ProductPage() {
             </div>
 
             {/* Product Info */}
-            <div className="max-w-md space-y-4">
-              <h1 className="text-2xl font-extrabold">{product.name}</h1>
+            <div className="max-w-sm space-y-3">
+              <h1 className="text-xl font-bold">{product.name}</h1>
 
-              <span className="inline-block text-white bg-[#000C50] text-xs font-semibold px-3 py-1 rounded-full">
+              <span className="inline-block text-white bg-[#000C50] text-xs font-medium px-2 py-0.5 rounded-full">
                 {product.category || 'PRODUCT'}
               </span>
 
-              <p className="text-xl font-bold">₱{product.price?.toFixed(2) || '0.00'}</p>
+              <p className="text-lg font-semibold">₱{product.price?.toFixed(2) || '0.00'}</p>
 
               {product.description && (
                 <p className="text-sm text-gray-600">{product.description}</p>
               )}
 
               {/* Quantity */}
-              <div className="mt-4">
-                <p className="font-semibold mb-1">QUANTITY:</p>
+              <div className="mt-3">
+                <p className="font-medium text-sm mb-1">QUANTITY:</p>
                 <div className="flex items-center gap-2">
                   <button
-                    className="w-8 h-8 border text-lg font-bold hover:bg-gray-100"
+                    className="w-7 h-7 border text-base font-semibold hover:bg-gray-100"
                     onClick={handleDecrease}
                     disabled={quantity <= 1}
                   >
                     –
                   </button>
-                  <span className="w-8 text-center">{quantity}</span>
+                  <span className="w-6 text-center text-sm">{quantity}</span>
                   <button
-                    className="w-8 h-8 border text-lg font-bold hover:bg-gray-100"
+                    className="w-7 h-7 border text-base font-semibold hover:bg-gray-100"
                     onClick={handleIncrease}
                     disabled={quantity >= product.stock}
                   >
@@ -299,19 +290,19 @@ export default function ProductPage() {
               </div>
 
               {/* Stock */}
-              <p className="text-sm mt-2">
+              <p className="text-xs mt-1 text-gray-500">
                 AVAILABLE STOCK: <strong>{product.stock}</strong>
               </p>
 
               {/* Size Selector */}
               {sizes.length > 0 && (
-                <div className="mt-4">
-                  <p className="font-semibold mb-1">CHOOSE A SIZE:</p>
+                <div className="mt-3">
+                  <p className="font-medium text-sm mb-1">CHOOSE A SIZE:</p>
                   <div className="flex gap-2 flex-wrap">
                     {sizes.map((size) => (
                       <button
                         key={size.id}
-                        className={`border px-4 py-1 font-semibold ${
+                        className={`border px-3 py-0.5 text-sm font-medium rounded ${
                           selectedSize === size.id
                             ? 'bg-[#000C50] text-white'
                             : 'bg-white text-black hover:bg-gray-100'
@@ -326,9 +317,9 @@ export default function ProductPage() {
               )}
 
               {/* Action Buttons */}
-              <div className="mt-6 space-y-3">
+              <div className="mt-5 space-y-2">
                 <button 
-                  className="bg-[#000C50] text-white w-full py-3 font-bold hover:bg-blue-900 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="bg-[#000C50] text-white w-40 py-2 text-sm font-medium rounded-md hover:bg-blue-900 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                   onClick={handleAddToCart}
                   disabled={product.stock <= 0}
                 >
@@ -336,7 +327,7 @@ export default function ProductPage() {
                 </button>
                 
                 <button 
-                  className="bg-green-600 text-white w-full py-3 font-bold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="bg-green-600 text-white w-40 py-2 text-sm font-medium rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                   onClick={handleBuyNow}
                   disabled={product.stock <= 0}
                 >

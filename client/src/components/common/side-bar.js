@@ -5,7 +5,7 @@ import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { 
   CubeIcon, ClipboardDocumentListIcon, BanknotesIcon, 
-  BellIcon, UserCircleIcon, ArrowLeftOnRectangleIcon, 
+  UserCircleIcon, ArrowLeftOnRectangleIcon, 
   ArchiveBoxIcon, TagIcon, Bars3Icon, XMarkIcon
 } from '@heroicons/react/24/outline';
 
@@ -28,37 +28,51 @@ export default function Sidebar() {
       {/* Mobile Hamburger Button */}
       <button
         onClick={toggleMobileMenu}
-        className="lg:hidden fixed top-4 left-4 z-50 bg-[#000C50] text-white p-3 rounded-md shadow-lg hover:bg-blue-900 transition-colors"
+        className="lg:hidden fixed top-4 left-4 z-50 bg-white text-gray-700 p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
       >
         {isMobileMenuOpen ? (
-          <XMarkIcon className="h-6 w-6" />
+          <XMarkIcon className="h-5 w-5" />
         ) : (
-          <Bars3Icon className="h-6 w-6" />
+          <Bars3Icon className="h-5 w-5" />
         )}
       </button>
 
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-20 z-40"
           onClick={toggleMobileMenu}
         />
       )}
 
       {/* Sidebar */}
       <div className={`
-        w-72 sm:w-64 bg-white text-black-900 flex flex-col justify-between shadow-md min-h-screen
-        fixed lg:relative transform transition-transform duration-300 ease-in-out
-        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+         w-50 bg-white border-r border-gray-100 flex flex-col min-h-screen  
+        fixed lg:relative transform transition-transform duration-300 ease-in-out z-30  
+        shadow-md  
+      ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}  
       `}>
-        {/* Top - Navigation Items */}
-        <div className="flex flex-col space-y-4 sm:space-y-6 px-4 sm:px-6 py-6 sm:py-8 ml-2 sm:ml-3">
-          <SidebarItem href="/admin/products" icon={CubeIcon} label="Products" onClick={toggleMobileMenu} />
-          <SidebarItem href="/admin/categories" icon={TagIcon} label="Categories" onClick={toggleMobileMenu} />
-          <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" onClick={toggleMobileMenu} />
-          <SidebarItem href="/admin/orders" icon={ClipboardDocumentListIcon} label="Orders" onClick={toggleMobileMenu} />
-          <SidebarItem href="/admin/sales" icon={BanknotesIcon} label="Sales" onClick={toggleMobileMenu} />
-          <SidebarItem href="/admin/users" icon={UserCircleIcon} label="Users" onClick={toggleMobileMenu} />
+        {/* Navigation Items */}
+        <div className="flex-1 px-3 py-6">
+          <nav className="space-y-1">
+            <SidebarItem href="/admin/products" icon={CubeIcon} label="Products" onClick={toggleMobileMenu} />
+            <SidebarItem href="/admin/categories" icon={TagIcon} label="Categories" onClick={toggleMobileMenu} />
+            <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" onClick={toggleMobileMenu} />
+            <SidebarItem href="/admin/orders" icon={ClipboardDocumentListIcon} label="Orders" onClick={toggleMobileMenu} />
+            <SidebarItem href="/admin/sales" icon={BanknotesIcon} label="Sales" onClick={toggleMobileMenu} />
+            <SidebarItem href="/admin/users" icon={UserCircleIcon} label="Users" onClick={toggleMobileMenu} />
+          </nav>
+        </div>
+
+        {/* Logout Section */}
+        <div className="px-3 py-4 border-t border-gray-100">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center space-x-3 px-3 py-3 text-sm font-medium text-gray-600 hover:text-white hover:bg-[#000C50] rounded-md transition-colors"
+          >
+            <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
     </>
@@ -73,7 +87,6 @@ function SidebarItem({ href, icon: Icon, label, onClick }) {
       }
     } catch (error) {
       console.error('Navigation error:', error);
-      // Fallback to window.location if Link fails
       window.location.href = href;
     }
   };
@@ -82,11 +95,10 @@ function SidebarItem({ href, icon: Icon, label, onClick }) {
     <Link
       href={href}
       onClick={handleClick}
-      className="flex items-center space-x-3 sm:space-x-4 hover:text-[#000C50] transition text-base sm:text-[18px] font-medium py-2 px-2 rounded-md hover:bg-gray-100"
+      className="flex items-center space-x-3 px-3 py-3 text-sm font-medium text-gray-600 hover:text-white hover:bg-[#000C50] rounded-md transition-all duration-150 group"
     >
-      <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
+      <Icon className="h-5 w-5 text-gray-400 group-hover:text-white transition-colors" />
       <span>{label}</span>
     </Link>
   );
 }
-

@@ -133,13 +133,13 @@ export default function AddProductForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white border border-black p-8 rounded-md w-full max-w-4xl mx-auto">
-      <h2 className="text-xl font-bold mb-6">ADD PRODUCT</h2>
+    <form onSubmit={handleSubmit} className="bg-white p-8 rounded-sm w-full max-w-2xl mx-auto">
+      <h2 className="text-l font-bold mb-6">ADD PRODUCT</h2>
 
       <div className="grid grid-cols-2 gap-8">
         <div className="space-y-4">
           <div>
-            <label className="block font-semibold mb-1">PRODUCT NAME:</label>
+            <label className="block text-sm mb-1">PRODUCT NAME:</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -150,7 +150,7 @@ export default function AddProductForm() {
           </div>
 
           <div>
-            <label className="block font-semibold mb-1">DESCRIPTION:</label>
+            <label className="block text-sm mb-1">DESCRIPTION:</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -161,7 +161,7 @@ export default function AddProductForm() {
 
           <div className="flex space-x-4">
             <div className="flex-1">
-              <label className="block font-semibold mb-1">BASE PRICE:</label>
+              <label className="block text-sm mb-1">BASE PRICE:</label>
               <input
                 type="number"
                 value={price}
@@ -175,7 +175,7 @@ export default function AddProductForm() {
             </div>
 
             <div className="flex-1">
-              <label className="block font-semibold mb-1">BASE STOCK:</label>
+              <label className="block text-sm mb-1">BASE STOCK:</label>
               <input
                 type="number"
                 value={stock}
@@ -189,7 +189,7 @@ export default function AddProductForm() {
           </div>
 
           <div>
-            <label className="block font-semibold mb-1">CATEGORY:</label>
+            <label className="block text-sm mb-1">CATEGORY:</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
@@ -205,7 +205,7 @@ export default function AddProductForm() {
           {/* PRODUCT SIZES */}
           <div>
             <div className="flex justify-between items-center mb-2">
-              <label className="block font-semibold">PRODUCT SIZES:</label>
+              <label className="block text-sm">PRODUCT SIZES:</label>
               <button
                 type="button"
                 onClick={addSize}
@@ -264,7 +264,7 @@ export default function AddProductForm() {
         {/* Right Column - Enhanced Image Upload */}
         <div className="space-y-4">
           <div>
-            <label className="block font-semibold mb-3">PRODUCT IMAGE (Optional):</label>
+            <label className="block text-sm mb-3">PRODUCT IMAGE (Optional):</label>
             
             {/* File Input Button */}
             <div className="mb-4">
@@ -325,7 +325,7 @@ export default function AddProductForm() {
                     <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Upload an image</p>
+                    <p className="text-sm text-gray-900">Upload an image</p>
                     <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
                   </div>
                 </div>

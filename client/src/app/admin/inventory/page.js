@@ -126,8 +126,11 @@ export default function AdminInventoryPage() {
         <Navbar />
         <div className="flex flex-1">
           <Sidebar />
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-xl">Loading inventory data...</div>
+          <div className="flex-1 flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#000C50] mx-auto mb-4"></div>
+              <div className="text-sm text-gray-600">Loading inventory data...</div>
+            </div>
           </div>
         </div>
       </div>
@@ -139,79 +142,79 @@ export default function AdminInventoryPage() {
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
+        <div className="flex-1 flex flex-col bg-gray-50 p-6 overflow-auto lg:ml-0 ml-0">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
-            <p className="text-gray-600">Monitor stock levels and manage inventory</p>
+            <h1 className="text-xl font-semibold text-gray-900">Inventory</h1>
+            <p className="text-gray-600 text-sm">Monitor stock levels and manage inventory</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md">
+            <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md text-sm">
               {error}
             </div>
           )}
 
           {/* Inventory Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="p-2 bg-blue-50 rounded-md">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                   </svg>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Products</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                <div className="ml-3">
+                  <p className="text-xs font-medium text-gray-600">Total Products</p>
+                  <p className="text-lg font-bold text-gray-900">
                     {inventoryData.summary.total_products || 0}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="p-2 bg-green-50 rounded-md">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-14 0h14" />
                   </svg>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total Stock</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                <div className="ml-3">
+                  <p className="text-xs font-medium text-gray-600">Total Stock</p>
+                  <p className="text-lg font-bold text-gray-900">
                     {inventoryData.summary.total_stock || 0}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="p-2 bg-yellow-50 rounded-md">
+                  <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Low Stock</p>
-                  <p className="text-2xl font-bold text-yellow-600">
+                <div className="ml-3">
+                  <p className="text-xs font-medium text-gray-600">Low Stock</p>
+                  <p className="text-lg font-bold text-yellow-600">
                     {inventoryData.summary.low_stock_count || 0}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="p-2 bg-purple-50 rounded-md">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                   </svg>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Inventory Value</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                <div className="ml-3">
+                  <p className="text-xs font-medium text-gray-600">Inventory Value</p>
+                  <p className="text-lg font-bold text-gray-900">
                     {formatCurrency(inventoryData.summary.total_inventory_value || 0)}
                   </p>
                 </div>
@@ -220,73 +223,92 @@ export default function AdminInventoryPage() {
           </div>
 
           {/* Category Statistics */}
-          <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Category Breakdown</h3>
-            {inventoryData.categoryStats && inventoryData.categoryStats.length > 0 ? (
-              <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead className="bg-gray-50">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900">Category Breakdown</h3>
+            </div>
+            <div className="p-4">
+              {inventoryData.categoryStats && inventoryData.categoryStats.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                  <thead className="bg-blue-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Category</th>
-                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Products</th>
-                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Total Stock</th>
-                      <th className="px-4 py-2 text-left text-gray-600">Avg Price</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Category</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Products</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Total Stock</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700">Avg Price</th>
                     </tr>
                   </thead>
                   <tbody>
                     {inventoryData.categoryStats.map((category, index) => (
-                      <tr key={index} className="hover:bg-gray-50 border-b border-gray-200">
-                        <td className="px-4 py-2 font-medium border-r border-gray-200">{category.category || 'Uncategorized'}</td>
-                        <td className="px-4 py-2 border-r border-gray-200">{category.product_count}</td>
-                        <td className="px-4 py-2 border-r border-gray-200">{category.total_stock}</td>
-                        <td className="px-4 py-2 text-green-600">
-                          {formatCurrency(category.avg_price || 0)}
+                      <tr key={index} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      }`}>
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <span className="text-xs font-medium text-gray-900">{category.category || 'Uncategorized'}</span>
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <span className="text-xs text-gray-900">{category.product_count}</span>
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <span className="text-xs text-gray-900">{category.total_stock}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-medium text-green-600">
+                            {formatCurrency(category.avg_price || 0)}
+                          </span>
                         </td>
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No category data available</p>
-              </div>
-            )}
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <div className="text-gray-300 text-2xl mb-2">📊</div>
+                  <p className="text-xs">No category data available</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Low Stock Alerts */}
-          <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Low Stock Alerts</h3>
-              <span className="text-sm text-gray-500">
-                Threshold: {inventoryData.summary.lowStockThreshold || 5} units
-              </span>
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-semibold text-gray-900">Low Stock Alerts</h3>
+                <span className="text-xs text-gray-500">
+                  Threshold: {inventoryData.summary.lowStockThreshold || 5} units
+                </span>
+              </div>
             </div>
-            
-            {inventoryData.lowStockProducts.length > 0 ? (
-              <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead className="bg-gray-50">
+            <div className="p-4">
+              {inventoryData.lowStockProducts.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                  <thead className="bg-blue-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Product</th>
-                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Category</th>
-                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Current Stock</th>
-                      <th className="px-4 py-2 text-left text-gray-600 border-r border-gray-300">Status</th>
-                      <th className="px-4 py-2 text-left text-gray-600">Actions</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Product</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Category</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Current Stock</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Status</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {inventoryData.lowStockProducts.map((product) => (
-                      <tr key={product.id} className="hover:bg-gray-50 border-b border-gray-200">
-                        <td className="px-4 py-2 border-r border-gray-200">
+                    {inventoryData.lowStockProducts.map((product, index) => (
+                      <tr key={product.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      }`}>
+                        <td className="px-4 py-3 border-r border-gray-100">
                           <div className="flex items-center">
                             <img 
                               src={product.image || '/images/polo.png'} 
                               alt={product.name}
-                              className="w-10 h-10 rounded object-cover mr-3"
+                              className="w-8 h-8 rounded object-cover mr-2"
                             />
                             <div>
-                              <div className="font-medium">{product.name}</div>
+                              <div className="text-xs font-medium text-gray-900">{product.name}</div>
                               <div className="text-xs text-gray-500">₱{Number(product.price || 0).toFixed(2)}</div>
                               {product.category_name && (
                                 <div className="text-xs text-gray-400">{product.category_name}</div>
@@ -294,24 +316,24 @@ export default function AdminInventoryPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-2 text-gray-600 border-r border-gray-200">
-                          {product.category_name || 'N/A'}
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <span className="text-xs text-gray-600">{product.category_name || 'N/A'}</span>
                         </td>
-                        <td className="px-4 py-2 border-r border-gray-200">
-                          <span className={`font-semibold ${
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <span className={`text-xs font-semibold ${
                             product.stock === 0 ? 'text-red-600' : 'text-yellow-600'
                           }`}>
                             {product.stock}
                           </span>
                         </td>
-                        <td className="px-4 py-2 border-r border-gray-200">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                             getStockStatusColor(product.stock)
                           }`}>
                             {getStockStatusText(product.stock)}
                           </span>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-4 py-3">
                           <ActionMenu
                             actions={[
                               {
@@ -329,53 +351,52 @@ export default function AdminInventoryPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <svg className="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p>All products have sufficient stock!</p>
-              </div>
-            )}
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <div className="text-gray-300 text-2xl mb-2">✅</div>
+                  <p className="text-xs">All products have sufficient stock!</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <button
               onClick={() => window.location.href = '/admin/products'}
-              className="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-700 transition-colors"
+              className="bg-[#000C50] text-white p-3 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium"
             >
               <div className="text-center">
-                <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
-                <p className="font-semibold">Manage Products</p>
+                <p className="text-xs">Manage Products</p>
               </div>
             </button>
 
             <button
               onClick={() => window.location.href = '/admin/products/add-product'}
-              className="bg-green-600 text-white p-4 rounded-lg hover:bg-green-700 transition-colors"
+              className="bg-green-600 text-white p-3 rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
             >
               <div className="text-center">
-                <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                <p className="font-semibold">Add New Product</p>
+                <p className="text-xs">Add New Product</p>
               </div>
             </button>
 
             <button
               onClick={() => window.location.href = '/admin/dashboard'}
-              className="bg-purple-600 text-white p-4 rounded-lg hover:bg-purple-700 transition-colors"
+              className="bg-purple-600 text-white p-3 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
             >
               <div className="text-center">
-                <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <p className="font-semibold">View Dashboard</p>
+                <p className="text-xs">View Dashboard</p>
               </div>
             </button>
           </div>

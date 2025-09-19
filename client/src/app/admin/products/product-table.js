@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
-import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/solid';
-import { EyeIcon } from '@heroicons/react/24/outline';
+import { PencilSquareIcon, TrashIcon, MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import { EyeIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import ActionMenu from '@/components/common/ActionMenu';
 
@@ -11,6 +11,11 @@ export default function ProductTable({ category = '' }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
   const router = useRouter();
 
   const fetchProducts = async () => {
@@ -55,6 +60,50 @@ export default function ProductTable({ category = '' }) {
     fetchProducts();
   }, [category]);
 
+  // Filter and sort products
+  const filteredAndSortedProducts = products
+    .filter(product => {
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (product.category_name || product.category || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = !category || product.category_name === category || product.category === category;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      let aValue = a[sortField];
+      let bValue = b[sortField];
+      
+      if (sortField === 'price' || sortField === 'stock') {
+        aValue = Number(aValue) || 0;
+        bValue = Number(bValue) || 0;
+      } else {
+        aValue = String(aValue || '').toLowerCase();
+        bValue = String(bValue || '').toLowerCase();
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedProducts = filteredAndSortedProducts.slice(startIndex, endIndex);
+
+
+  // Handle sorting
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
   const handleDelete = (id, name) => {
     Swal.fire({
       title: 'Are you sure?',
@@ -79,103 +128,154 @@ export default function ProductTable({ category = '' }) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded border border-black p-6 text-center">Loading products...</div>
+      <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#000C50] mx-auto mb-3"></div>
+        <p className="text-gray-600 text-sm">Loading products...</p>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white rounded border border-black p-6 text-center text-red-600">{error}</div>
+      <div className="bg-white border border-red-200 rounded-lg p-6 text-center">
+        <div className="text-red-500 text-2xl mb-3">⚠️</div>
+        <p className="text-red-600 text-sm">{error}</p>
+      </div>
     );
   }
 
-  // Sort products by name for consistent display
-  const sortedProducts = products
-    .slice()
-    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
-
-  // Create table rows - since sizes are not stored in database, show one row per product
-  const tableRows = [];
-  sortedProducts.forEach((prod) => {
-    tableRows.push({
-      id: `product-${prod.id}`,
-      productId: prod.id,
-      productName: prod.name,
-      category: prod.category_name || prod.category || 'Uncategorized',
-      amount: prod.price,
-      baseStock: prod.stock,
-      size: 'N/A', // No sizes available in current database structure
-      sizeStock: 'N/A',
-      sizePrice: 'N/A',
-      isFirstSize: true,
-      totalSizes: 0
-    });
-  });
-
   return (
-    <div className="bg-white border-gray-600 overflow-hidden rounded-md">
-      <div className="max-h-[600px] overflow-y-auto overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-300 text-[000C50] sticky top-0 z-10">
+    <>
+      {/* Table Header with Search and Filters */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <FunnelIcon className="h-4 w-4" />
+            <span>{filteredAndSortedProducts.length} products</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse mb-50">
+          <thead className="bg-blue-50">
             <tr>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Product Name</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Category</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Price</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Base Stock</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Size</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider border-r border-gray-400">Stock</th>
-              <th className="px-6 py-4 font-medium text-sm uppercase tracking-wider">Actions</th>
+              <th 
+                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('name')}
+              >
+                <div className="flex items-center gap-1">
+                  Product Name
+                  {sortField === 'name' && (
+                    <span className="text-blue-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('category_name')}
+              >
+                <div className="flex items-center gap-1">
+                  Category
+                  {sortField === 'category_name' && (
+                    <span className="text-blue-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('price')}
+              >
+                <div className="flex items-center gap-1">
+                  Price
+                  {sortField === 'price' && (
+                    <span className="text-blue-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('stock')}
+              >
+                <div className="flex items-center gap-1">
+                  Base Stock
+                  {sortField === 'stock' && (
+                    <span className="text-blue-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Size</th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stock</th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {tableRows.map((row, index) => (
-              <tr key={row.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                <td className="px-6 py-4 border-r border-gray-200">
-                  <div className="text-sm font-medium text-gray-900">{row.productName}</div>
+            {paginatedProducts.map((product, index) => (
+              <tr 
+                key={product.id} 
+                className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                }`}
+              >
+                <td className="px-4 py-3 border-r border-gray-100">
+                  <div className="text-xs font-medium text-gray-900">{product.name}</div>
                 </td>
-                <td className="px-6 py-4 border-r border-gray-200">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                    {row.category}
+                <td className="px-4 py-3 border-r border-gray-100">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                    {product.category_name || product.category || 'Uncategorized'}
                   </span>
                 </td>
-                <td className="px-6 py-4 border-r border-gray-200">
-                  <div className="text-sm font-medium text-gray-900">
-                    ₱{Number(row.amount).toFixed(2)}
+                <td className="px-4 py-3 border-r border-gray-100">
+                  <div className="text-xs font-medium text-gray-900">
+                    ₱{Number(product.price).toFixed(2)}
                   </div>
                 </td>
-                <td className="px-6 py-4 border-r border-gray-200">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
-                    Number(row.baseStock) === 0 
-                      ? 'bg-red-100 text-red-800' 
-                      : Number(row.baseStock) <= 5 
-                      ? 'bg-yellow-100 text-yellow-800' 
-                      : 'bg-gray-100 text-gray-800'
+                <td className="px-4 py-3 border-r border-gray-100">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    Number(product.stock) === 0 
+                      ? 'bg-red-50 text-red-700' 
+                      : Number(product.stock) <= 5 
+                      ? 'bg-yellow-50 text-yellow-700' 
+                      : 'bg-green-50 text-green-700'
                   }`}>
-                    {row.baseStock}
+                    {product.stock}
                   </span>
                 </td>
-                <td className="px-6 py-4 border-r border-gray-200">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                    {row.size}
+                <td className="px-4 py-3 border-r border-gray-100">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
+                    N/A
                   </span>
                 </td>
-                <td className="px-6 py-4 border-r border-gray-200">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                    {row.sizeStock}
+                <td className="px-4 py-3 border-r border-gray-100">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
+                    N/A
                   </span>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-4 py-3">
                   <ActionMenu
                     actions={[
                       {
                         label: 'Edit Product',
                         icon: PencilSquareIcon,
-                        onClick: () => router.push(`/admin/products/edit/${row.productId}`)
+                        onClick: () => router.push(`/admin/products/edit/${product.id}`)
                       },
                       {
                         label: 'Delete Product',
                         icon: TrashIcon,
-                        onClick: () => handleDelete(row.productId, row.productName),
+                        onClick: () => handleDelete(product.id, product.name),
                         danger: true
                       }
                     ]}
@@ -186,13 +286,47 @@ export default function ProductTable({ category = '' }) {
           </tbody>
         </table>
       </div>
-      {tableRows.length === 0 && (
-        <div className="p-8 text-center">
-          <div className="text-gray-400 text-4xl mb-4">📦</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
-          <p className="text-gray-500">Get started by adding your first product.</p>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="px-4 py-3 border-t border-gray-200 bg-blue-50">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-600">
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredAndSortedProducts.length)} of {filteredAndSortedProducts.length} products
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="p-1 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+              >
+                <ChevronLeftIcon className="h-4 w-4" />
+              </button>
+              <span className="text-xs text-gray-600 px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+              >
+                <ChevronRightIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
-  );
-}
+
+      {/* Empty State */}
+      {filteredAndSortedProducts.length === 0 && (
+        <div className="p-8 text-center">
+          <div className="text-gray-300 text-3xl mb-4">📦</div>
+          <h3 className="text-sm font-medium text-gray-900 mb-2">No products found</h3>
+          <p className="text-gray-500 text-xs">
+            {searchTerm ? 'Try adjusting your search terms.' : 'Get started by adding your first product.'}
+          </p>
+        </div>
+        )}
+      </>
+    );
+  }

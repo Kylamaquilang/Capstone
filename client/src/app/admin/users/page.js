@@ -167,55 +167,71 @@ export default function AdminUsersPage() {
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">USER MANAGEMENT</h2>
-              <div className="flex items-center gap-2">
-                <Link href="/admin/users/add-student">
-                  <button className="bg-[#000C50] text-white px-4 py-2 rounded hover:bg-blue-900 transition">
-                    Add Student
-                  </button>
-                </Link>
-                <Link href="/admin/users/bulk-upload">
-                  <button className="border border-[#000C50] text-[#000C50] px-4 py-2 rounded hover:bg-[#000C50] hover:text-white transition">
-                    Bulk Upload
-                  </button>
-                </Link>
+        <div className="flex-1 flex flex-col bg-gray-50 p-6 overflow-auto lg:ml-0 ml-0">
+          {/* Main Container with Buttons and Table */}
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+            {/* Header Section */}
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h1 className="text-xl font-semibold text-gray-900">Users</h1>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link href="/admin/users/add-student">
+                    <button className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium">
+                      Add Student
+                    </button>
+                  </Link>
+                  <Link href="/admin/users/bulk-upload">
+                    <button className="border border-[#000C50] text-[#000C50] px-4 py-2 rounded-md hover:bg-[#000C50] hover:text-white transition-colors text-sm font-medium">
+                      Bulk Upload
+                    </button>
+                  </Link>
+                </div>
               </div>
             </div>
+
+            {/* Users Table */}
             {loading ? (
-              <div className="text-gray-600">Loading users...</div>
+              <div className="p-6 text-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#000C50] mx-auto mb-3"></div>
+                <p className="text-gray-600 text-sm">Loading users...</p>
+              </div>
             ) : error ? (
-              <div className="text-red-600">{error}</div>
+              <div className="p-6 text-center">
+                <div className="text-red-500 text-2xl mb-3">⚠️</div>
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
             ) : (
-              <div className="bg-white border-gray-600 overflow-hidden rounded-md">
-                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-800 text-white">
-                      <tr>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Stud ID</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Name</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Email</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Role</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Degree</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Status</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Active</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider border-r border-gray-600">Created</th>
-                        <th className="px-6 py-4 font-medium text-xs uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map((user, index) => (
-                        <tr key={user.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                        <td className="px-6 py-4 border-r border-gray-200">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 font-mono">
+              <div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-blue-50">
+                    <tr>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stud ID</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Name</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Email</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Role</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Degree</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Status</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Active</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Created</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((user, index) => (
+                      <tr key={user.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                      }`}>
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 font-mono">
                             {user.student_id || 'N/A'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 border-r border-gray-200">
+                        <td className="px-4 py-3 border-r border-gray-100">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{user.name || 'N/A'}</div>
+                            <div className="text-xs font-medium text-gray-900">{user.name || 'N/A'}</div>
                             {user.first_name && user.last_name && (
                               <div className="text-xs text-gray-500">
                                 {user.first_name} {user.middle_name ? user.middle_name + ' ' : ''}{user.last_name}{user.suffix ? ' ' + user.suffix : ''}
@@ -223,24 +239,24 @@ export default function AdminUsersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 border-r border-gray-200">
-                          <div className="text-sm text-gray-900">{user.email || 'N/A'}</div>
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <div className="text-xs text-gray-900">{user.email || 'N/A'}</div>
                         </td>
-                        <td className="px-6 py-4 border-r border-gray-200">{getRoleBadge(user.role)}</td>
-                        <td className="px-6 py-4 border-r border-gray-200">
-                          <div className="text-sm">
+                        <td className="px-4 py-3 border-r border-gray-100">{getRoleBadge(user.role)}</td>
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <div className="text-xs">
                             <div className="font-medium text-gray-900">{user.degree || 'N/A'}</div>
                             <div className="text-xs text-gray-500">{getDegreeDisplayName(user.degree)}</div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 border-r border-gray-200">{getStatusBadge(user.status)}</td>
-                        <td className="px-6 py-4 border-r border-gray-200">{getActiveStatusBadge(user.is_active)}</td>
-                        <td className="px-6 py-4 border-r border-gray-200">
-                          <div className="text-sm text-gray-900">
+                        <td className="px-4 py-3 border-r border-gray-100">{getStatusBadge(user.status)}</td>
+                        <td className="px-4 py-3 border-r border-gray-100">{getActiveStatusBadge(user.is_active)}</td>
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <div className="text-xs text-gray-900">
                             {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-4 py-3">
                           <ActionMenu
                             actions={[
                               {
@@ -262,16 +278,16 @@ export default function AdminUsersPage() {
                     ))}
                   </tbody>
                 </table>
-                {users.length === 0 && (
-                  <div className="p-8 text-center">
-                    <div className="text-gray-400 text-4xl mb-4">👥</div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
-                    <p className="text-gray-500">Users will appear here when they register.</p>
-                  </div>
-                )}
-                </div>
               </div>
-            )}
+              {users.length === 0 && (
+                <div className="p-8 text-center">
+                  <div className="text-gray-300 text-3xl mb-4">👥</div>
+                  <h3 className="text-sm font-medium text-gray-900 mb-2">No users found</h3>
+                  <p className="text-gray-500 text-xs">Users will appear here when they register.</p>
+                </div>
+              )}
+            </div>
+          )}
           </div>
         </div>
       </div>
