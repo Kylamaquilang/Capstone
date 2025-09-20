@@ -105,7 +105,7 @@ export default function ResetPasswordPage() {
   const renderStep1 = () => (
     <form onSubmit={handleRequestReset} className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Email Address
         </label>
         <input
@@ -117,12 +117,12 @@ export default function ResetPasswordPage() {
         />
       </div>
       
-      <div className="text-center text-gray-500">
+      <div className="text-center text-gray-500 ">
         <span>OR</span>
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Student ID
         </label>
         <input
@@ -145,7 +145,7 @@ export default function ResetPasswordPage() {
       <button
         type="button"
         onClick={() => router.push('/auth/login')}
-        className="w-full border border-[#000C50] text-[#000C50] py-2 rounded-md font-semibold hover:bg-gray-50"
+        className="w-full border border-[#000C50] text-[#000C50] py-2 rounded-md font-medium hover:bg-gray-50"
       >
         Back to Login
       </button>
@@ -258,18 +258,18 @@ export default function ResetPasswordPage() {
 
   return (
     <div
-      className="flex justify-center items-center min-h-screen text-black"
+      className="flex justify-center items-center min-h-screen text-black py-0"
       style={{ backgroundColor: '#000C50' }}
     >
-      <div className="bg-white w-full max-w-4xl h-[600px] rounded-xl shadow-lg flex overflow-hidden">
+      <div className="bg-white w-full max-w-4xl h-[550px] rounded-xl shadow-lg flex overflow-hidden">
         {/* Left Side - Form */}
         <div
-          className="w-1/2 p-10 border-r-4 flex flex-col justify-between"
+          className="w-1/2 p-8 border-r-4 flex flex-col justify-center"
           style={{ borderColor: '#000C50' }}
         >
           <div>
             <h2 className="text-2xl font-bold text-black mb-2">{getStepTitle()}</h2>
-            <p className="text-sm text-gray-600 mb-8">{getStepDescription()}</p>
+            <p className="text-sm text-gray-600 mb-6">{getStepDescription()}</p>
             
             {/* Error Message */}
             {error && (
@@ -289,7 +289,7 @@ export default function ResetPasswordPage() {
             <div className="flex items-center justify-center mb-6">
               {[1, 2, 3].map((stepNumber) => (
                 <div key={stepNumber} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium ${
                     stepNumber <= step 
                       ? 'bg-[#000C50] text-white' 
                       : 'bg-gray-200 text-gray-600'
@@ -313,7 +313,7 @@ export default function ResetPasswordPage() {
         </div>
 
         {/* Right Side - Welcome */}
-        <div className="w-1/2 bg-white relative flex flex-col items-end text-right mb-10 p-10 border-l mt-1">
+        <div className="w-1/2 bg-white relative flex flex-col items-center justify-center p-8">
           <Image
             src="/images/cpc.png"
             alt="Logo"
@@ -321,7 +321,7 @@ export default function ResetPasswordPage() {
             height={90}
             className="mb-6"
           />
-          <h2 className="text-3xl font-bold text-black mt-14 mr-6">Welcome to<br />CPC Essen!</h2>
+          <h2 className="text-3xl font-bold text-black text-center mb-4">Welcome to<br />CPC Essen!</h2>
           <p className="text-xs font-semibold text-gray-600 absolute bottom-4 right-8">ESSEN © 2024</p>
         </div>
       </div>

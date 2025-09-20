@@ -177,11 +177,21 @@ const CheckoutPage = () => {
 
         const response = await API.post('/checkout', checkoutData);
 
+        // Create product summary
+        const productSummary = cartItems.length === 1 
+          ? cartItems[0].product_name
+          : `${cartItems[0].product_name} and ${cartItems.length - 1} other item${cartItems.length - 1 !== 1 ? 's' : ''}`;
+
         Swal.fire({
           icon: 'success',
           title: 'Order Placed Successfully!',
-          text: `Order #${response.data.orderId} has been created. Please pay ${totalAmount.toFixed(2)} upon pickup.`,
+          text: `${productSummary} - Please pay ₱${totalAmount.toFixed(2)} upon pickup.`,
           confirmButtonColor: '#000C50',
+          customClass: {
+            title: 'text-lg font-medium',
+            content: 'text-sm font-normal',
+            confirmButton: 'text-sm font-medium'
+          }
         }).then(() => {
           router.push('/cart');
         });
@@ -234,123 +244,141 @@ const CheckoutPage = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <main className="flex-grow px-5 py-8 pt-5">
-        <h2 className="text-center font-bold text-2xl mb-6">CHECKOUT</h2>
-
-        {/* Cart Items */}
-        <div className="bg-white p-8 rounded-lg shadow-lg mb-6 max-w-4xl mx-auto">
-          <h3 className="font-bold mb-6 text-lg">Order Summary</h3>
-          <div className="space-y-6">
-            {cartItems.map((item) => (
-              <div key={item.id} className="flex gap-6 border-b pb-6">
-                <Image
-                  src={item.product_image || '/images/polo.png'}
-                  alt={item.product_name}
-                  width={100}
-                  height={100}
-                  className="rounded object-cover"
-                />
-                <div className="flex-1">
-                  <h4 className="font-semibold text-lg">{item.product_name}</h4>
-                  <p className="text-sm text-gray-600 mt-1">Size: {item.size || 'N/A'}</p>
-                  <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                  <p className="font-medium text-lg mt-2">{(item.price * item.quantity).toFixed(2)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Checkout</h1>
+          <p className="text-gray-600">{cartItems.length} item{cartItems.length !== 1 ? 's' : ''} in your order</p>
         </div>
 
-        {/* Payment Methods */}
-        <div className="bg-white p-8 rounded-lg shadow-lg mb-6 max-w-4xl mx-auto">
-          <h3 className="font-bold mb-6 text-lg">Payment Methods</h3>
-          <div className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Panel - Order Summary */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Order Summary</h2>
+              
+              <div className="space-y-4">
+                {cartItems.map((item) => (
+                  <div key={item.id} className="flex items-center gap-4 py-4 border-b border-gray-100 last:border-b-0">
+                    {/* Product Image */}
+                    <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
+                      <Image
+                        src={item.product_image || '/images/polo.png'}
+                        alt={item.product_name}
+                        width={64}
+                        height={64}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
 
-            {/* PAY AT COUNTER */}
-            <div 
-              className={`flex items-center justify-between cursor-pointer p-4 rounded-lg border-2 transition-colors ${
-                selectedMethod === 'pickup' 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-              onClick={() => handleSelect('pickup')}
-            >
-              <div className="flex items-center gap-4">
-                <BanknotesIcon className="h-6 w-6 text-[#000C50]" />
-                <div>
-                  <div className="font-semibold text-lg">Pay at Counter</div>
-                  <div className="text-sm text-gray-600">Pay with cash when you pick up your order</div>
+                    {/* Product Details */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 text-base mb-1 truncate">{item.product_name}</h3>
+                      <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
+                        <span>{item.size || 'One Size'}</span>
+                        <span>Qty: {item.quantity}</span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900">
+                        ₱{(item.price * item.quantity).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Order Total */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-1xl font-medium text-gray-900">Total:</span>
+                  <span className="text-2xl font-bold text-gray-900">₱{totalAmount.toFixed(2)}</span>
                 </div>
               </div>
-              <input
-                type="radio"
-                name="payment"
-                value="pickup"
-                checked={selectedMethod === 'pickup'}
-                readOnly
-                className="h-5 w-5 text-[#000C50] accent-[#000C50] rounded-full"
-              />
             </div>
+          </div>
 
-            {/* GCASH ONLINE PAYMENT */}
-            <div 
-              className={`flex items-center justify-between cursor-pointer p-4 rounded-lg border-2 transition-colors ${
-                selectedMethod === 'gcash' 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-              onClick={() => handleSelect('gcash')}
-            >
-              <div className="flex items-center gap-4">
-                <DevicePhoneMobileIcon className="h-6 w-6 text-[#000C50]" />
-                <div>
-                  <div className="font-semibold text-lg">GCash Online Payment</div>
-                  <div className="text-sm text-gray-600">Secure online payment via GCash</div>
+          {/* Right Panel - Payment Method & Checkout */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Payment Method</h2>
+              
+              <div className="space-y-4 mb-8">
+                {/* Pay at Counter */}
+                <div 
+                  className={`p-4 rounded-lg cursor-pointer transition-all ${
+                    selectedMethod === 'pickup' 
+                      ? 'border-[#000C50] bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => handleSelect('pickup')}
+                >
+                  <div className="flex items-center gap-3">
+                    <BanknotesIcon className="h-5 w-5 text-[#000C50]" />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">Pay at Counter</div>
+                      <div className="text-sm text-gray-600">Cash payment upon pickup</div>
+                    </div>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="pickup"
+                      checked={selectedMethod === 'pickup'}
+                      readOnly
+                      className="h-4 w-4 text-[#000C50] accent-[#000C50]"
+                    />
+                  </div>
+                </div>
+
+                {/* GCash Online Payment */}
+                <div 
+                  className={`p-4 rounded-lg cursor-pointer transition-all ${
+                    selectedMethod === 'gcash' 
+                      ? 'border-[#000C50] bg-blue-50' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => handleSelect('gcash')}
+                >
+                  <div className="flex items-center gap-3">
+                    <DevicePhoneMobileIcon className="h-5 w-5 text-[#000C50]" />
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">GCash Online</div>
+                      <div className="text-sm text-gray-600">Secure online payment</div>
+                    </div>
+                    <input
+                      type="radio"
+                      name="payment"
+                      value="gcash"
+                      checked={selectedMethod === 'gcash'}
+                      readOnly
+                      className="h-4 w-4 text-[#000C50] accent-[#000C50]"
+                    />
+                  </div>
                 </div>
               </div>
-              <input
-                type="radio"
-                name="payment"
-                value="gcash"
-                checked={selectedMethod === 'gcash'}
-                readOnly
-                className="h-5 w-5 text-[#000C50] accent-[#000C50] rounded-full"
-              />
+
+              {/* Checkout Button */}
+              <button 
+                onClick={handleCheckout}
+                disabled={!selectedMethod || processingPayment}
+                className={`w-full h-12 py-2 rounded-lg font-medium text-base transition-all duration-200 ${
+                  !selectedMethod || processingPayment
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-[#000C50] text-white hover:bg-gray-800 shadow-sm hover:shadow-md'
+                }`}
+              >
+                {processingPayment ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Processing...
+                  </div>
+                ) : (
+                  'Complete Order'
+                )}
+              </button>
             </div>
           </div>
         </div>
-      
-
-                          {/* Total & Checkout */}
-         <div className="bg-white p-8 rounded-lg shadow-lg max-w-4xl mx-auto">
-           <div className="flex justify-between items-center">
-             <div className="flex items-center gap-2">
-               <span className="text-lg font-medium">Total ({cartItems.length} {cartItems.length === 1 ? 'Item' : 'Items'}):</span>
-               <span className="text-lg font-bold text-[#000C50]">{totalAmount.toFixed(2)}</span>
-             </div>
-             <button 
-               onClick={handleCheckout}
-               disabled={!selectedMethod || processingPayment}
-               className={`flex items-center justify-center py-3 px-8 rounded-lg text-sm transition-colors ${
-                 !selectedMethod || processingPayment
-                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                   : 'bg-[#000C50] text-white hover:bg-blue-900'
-               }`}
-             >
-               {processingPayment ? (
-                 <div className="flex items-center justify-center">
-                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                   Processing...
-                 </div>
-               ) : (
-                 'CHECKOUT'
-               )}
-             </button>
-           </div>
-         </div>
       </main>
 
       <Footer />

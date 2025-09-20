@@ -46,6 +46,7 @@ export default function UserProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -274,7 +275,13 @@ export default function UserProfilePage() {
         confirmButtonColor: '#10b981',
         cancelButtonColor: '#6b7280',
         confirmButtonText: 'Yes, I received it!',
-        cancelButtonText: 'Cancel'
+        cancelButtonText: 'Cancel',
+        customClass: {
+          title: 'text-lg font-medium',
+          content: 'text-sm font-normal',
+          confirmButton: 'text-sm font-medium',
+          cancelButton: 'text-sm font-medium'
+        }
       });
 
       if (result.isConfirmed) {
@@ -287,7 +294,12 @@ export default function UserProfilePage() {
             title: 'Order Confirmed!',
             text: 'Your order has been confirmed and a receipt has been sent to your email.',
             icon: 'success',
-            confirmButtonColor: '#10b981'
+            confirmButtonColor: '#10b981',
+            customClass: {
+              title: 'text-lg font-medium',
+              content: 'text-sm font-normal',
+              confirmButton: 'text-sm font-medium'
+            }
           });
 
           // Refresh orders to show updated status
@@ -302,24 +314,38 @@ export default function UserProfilePage() {
         title: 'Error',
         text: err?.response?.data?.error || 'Failed to confirm receipt. Please try again.',
         icon: 'error',
-        confirmButtonColor: '#ef4444'
+        confirmButtonColor: '#ef4444',
+        customClass: {
+          title: 'text-lg font-medium',
+          content: 'text-sm font-normal',
+          confirmButton: 'text-sm font-medium'
+        }
       });
     }
   };
 
+  const filteredOrders = orders.filter(order => {
+    if (statusFilter === 'all') return true;
+    return order.status === statusFilter;
+  });
+
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+  };
+
   const getStatusBadge = (status) => {
     const statusClasses = {
-      'pending': 'bg-yellow-100 text-yellow-800',
-      'processing': 'bg-blue-100 text-blue-800',
-      'ready_for_pickup': 'bg-purple-100 text-purple-800',
-      'delivered': 'bg-green-100 text-green-800',
-      'completed': 'bg-green-100 text-green-800',
-      'cancelled': 'bg-red-100 text-red-800',
-      'refunded': 'bg-gray-100 text-gray-800'
+      'pending': 'bg-yellow-50 text-yellow-700 border-yellow-200',
+      'processing': 'bg-blue-50 text-blue-700 border-blue-200',
+      'ready_for_pickup': 'bg-purple-50 text-purple-700 border-purple-200',
+      'delivered': 'bg-green-50 text-green-700 border-green-200',
+      'completed': 'bg-green-50 text-green-700 border-green-200',
+      'cancelled': 'bg-red-50 text-red-700 border-red-200',
+      'refunded': 'bg-gray-50 text-gray-700 border-gray-200'
     };
     
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusClasses[status] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`px-2 py-0.5 text-xs font-medium rounded border ${statusClasses[status] || 'bg-gray-50 text-gray-700 border-gray-200'}`}>
         {status?.charAt(0).toUpperCase() + status?.slice(1)}
       </span>
     );
@@ -355,8 +381,8 @@ export default function UserProfilePage() {
 
       <main className="flex-grow">
         {/* User Info Card */}
-        <div className="bg-[#000C50] to-blue-800 m-6 p-8 rounded-lg flex justify-between items-center relative mx-25 text-white shadow-xl">
-          <div className="flex gap-6 items-center">
+        <div className="bg-[#000C50] to-blue-800 mx-4 sm:mx-6 lg:mx-24 p-4 sm:p-6 lg:p-8 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center relative text-white shadow-xl">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center w-full sm:w-auto">
             <div className="relative">
               {profile.profile_image ? (
                 <Image
@@ -364,7 +390,7 @@ export default function UserProfilePage() {
                   alt="Profile"
                   width={100}
                   height={100}
-                  className="rounded-full object-cover border-4 border-white shadow-lg"
+                  className="rounded-full object-cover border-4 border-white shadow-lg w-16 h-16 sm:w-20 sm:h-20 lg:w-25 lg:h-25"
                   style={{ width: 'auto', height: 'auto' }}
                   onError={(e) => {
                     e.target.style.display = 'none';
@@ -373,7 +399,7 @@ export default function UserProfilePage() {
                 />
               ) : null}
               <div 
-                className={`bg-white text-[#000C50] w-25 h-25 rounded-full flex items-center justify-center text-2xl font-bold border-4 border-white shadow-lg ${
+                className={`bg-white text-[#000C50] w-16 h-16 sm:w-20 sm:h-20 lg:w-25 lg:h-25 rounded-full flex items-center justify-center text-lg sm:text-xl lg:text-2xl font-bold border-4 border-white shadow-lg ${
                   profile.profile_image ? 'hidden' : ''
                 }`}
               >
@@ -386,24 +412,24 @@ export default function UserProfilePage() {
               )}
             </div>
             <div>
-              <h1 className="text-3xl font-bold mb-2">{profile.name}</h1>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">{profile.name}</h1>
               <div className="flex items-center gap-2 mb-1">
-                <AcademicCapIcon className="h-5 w-5" />
-                <p className="text-lg opacity-90">Student ID: {profile.student_id}</p>
+                <AcademicCapIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                <p className="text-sm sm:text-base lg:text-lg opacity-90">Student ID: {profile.student_id}</p>
               </div>
               <div className="flex items-center gap-2 mb-1">
-                <EnvelopeIcon className="h-5 w-5" />
-                <p className="text-sm opacity-80">{profile.email}</p>
+                <EnvelopeIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                <p className="text-xs sm:text-sm opacity-80">{profile.email}</p>
               </div>
               {profile.contact_number && (
                 <div className="flex items-center gap-2 mb-2">
-                  <PhoneIcon className="h-5 w-5" />
-                  <p className="text-sm opacity-80">Contact: {profile.contact_number}</p>
+                  <PhoneIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <p className="text-xs sm:text-sm opacity-80">Contact: {profile.contact_number}</p>
                 </div>
               )}
               <div className="flex items-center gap-2 mt-2">
-                <ShieldCheckIcon className="h-4 w-4" />
-                <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                <ShieldCheckIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className={`px-2 sm:px-3 py-1 text-xs font-medium rounded-full ${
                   profile.is_active 
                     ? 'bg-green-100 text-green-800' 
                     : 'bg-red-100 text-red-800'
@@ -415,25 +441,25 @@ export default function UserProfilePage() {
           </div>
 
           {/* Hamburger Button */}
-          <div className="relative">
+          <div className="relative mt-4 sm:mt-0">
             <button 
               onClick={() => setMenuOpen(!menuOpen)}
-              className="bg-white bg-opacity-20 hover:bg-opacity-30 p-3 rounded-full transition-all"
+              className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 sm:p-3 rounded-full transition-all"
             >
-              <Bars3Icon className="h-6 w-6 text-[#000C50]" />
+              <Bars3Icon className="h-5 w-5 sm:h-6 sm:w-6 text-[#000C50]" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg z-10 border">
+              <div className="absolute right-0 mt-2 w-48 sm:w-56 bg-white rounded-lg shadow-lg z-10 border">
                 <div className="p-2">
                   <button
                     onClick={() => setEditing(!editing)}
-                    className="flex items-center gap-3 w-full text-[#000C50] px-4 py-3 hover:bg-gray-100 rounded-md transition-colors"
+                    className="flex items-center gap-3 w-full text-[#000C50] px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-100 rounded-md transition-colors text-sm sm:text-base"
                   >
-                    <PencilIcon className="h-5 w-5 text-[#000C50]" />
+                    <PencilIcon className="h-4 w-4 sm:h-5 sm:w-5 text-[#000C50]" />
                     {editing ? 'Cancel Edit' : 'Edit Profile'}
                   </button>
-                  <label className="flex items-center gap-3 w-full text-[#000C50] px-4 py-3 hover:bg-gray-100 rounded-md transition-colors cursor-pointer">
-                    <CameraIcon className="h-5 w-5 text-[#000C50]" />
+                  <label className="flex items-center gap-3 w-full text-[#000C50] px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-100 rounded-md transition-colors cursor-pointer text-sm sm:text-base">
+                    <CameraIcon className="h-4 w-4 sm:h-5 sm:w-5 text-[#000C50]" />
                     Change Photo
                     <input
                       type="file"
@@ -445,17 +471,17 @@ export default function UserProfilePage() {
                   </label>
                   <button
                     onClick={handleSendVerificationCode}
-                    className="flex items-center gap-2 w-full text-[#000C50] px-4 py-3 hover:bg-gray-100 rounded-md transition-colors"
+                    className="flex items-center gap-2 w-full text-[#000C50] px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-100 rounded-md transition-colors text-sm sm:text-base"
                   >
-                    <KeyIcon className="h-5 w-5 text-[#000C50]" />
+                    <KeyIcon className="h-4 w-4 sm:h-5 sm:w-5 text-[#000C50]" />
                     Change Password
                   </button>
                   <hr className="my-2" />
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full text-[#000C50] px-4 py-3 hover:bg-red-50 rounded-md transition-colors text-red-600"
+                    className="flex items-center gap-3 w-full text-[#000C50] px-3 sm:px-4 py-2 sm:py-3 hover:bg-red-50 rounded-md transition-colors text-red-600 text-sm sm:text-base"
                   >
-                    <ArrowRightIcon className="h-5 w-5" />
+                    <ArrowRightIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                     Logout
                   </button>
                 </div>
@@ -466,73 +492,73 @@ export default function UserProfilePage() {
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="mx-24 mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+          <div className="mx-4 sm:mx-6 lg:mx-24 mb-4 sm:mb-6 p-3 sm:p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm sm:text-base">
             {error}
           </div>
         )}
         {success && (
-          <div className="mx-24 mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+          <div className="mx-4 sm:mx-6 lg:mx-24 mb-4 sm:mb-6 p-3 sm:p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg text-sm sm:text-base">
             {success}
           </div>
         )}
 
         {/* Change Password Modal */}
         {showChangePassword && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-              <div className="flex items-center gap-3 mb-6">
-                <KeyIcon className="h-6 w-6 text-[#000C50]" />
-                <h3 className="text-xl font-bold">Change Password</h3>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-4 sm:p-6 lg:p-8 max-w-md w-full">
+              <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                <KeyIcon className="h-5 w-5 sm:h-6 sm:w-6 text-[#000C50]" />
+                <h3 className="text-lg sm:text-xl font-bold">Change Password</h3>
               </div>
               
-              <form onSubmit={handleChangePassword} className="space-y-4">
+              <form onSubmit={handleChangePassword} className="space-y-3 sm:space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     Verification Code
                   </label>
                   <input
                     type="text"
                     value={verificationCode}
                     onChange={(e) => setVerificationCode(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                    className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] text-sm sm:text-base"
                     placeholder="Enter 6-digit code"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     New Password
                   </label>
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                    className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] text-sm sm:text-base"
                     placeholder="Enter new password"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     Confirm Password
                   </label>
                   <input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                    className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] text-sm sm:text-base"
                     placeholder="Confirm new password"
                     required
                   />
                 </div>
                 
-                <div className="flex gap-4 pt-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-3 sm:pt-4">
                   <button
                     type="submit"
                     disabled={verifyingCode}
-                    className="flex-1 bg-[#000C50] text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium disabled:opacity-50"
+                    className="flex-1 bg-[#000C50] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium disabled:opacity-50 text-sm sm:text-base"
                   >
                     {verifyingCode ? 'Changing Password...' : 'Change Password'}
                   </button>
@@ -544,7 +570,7 @@ export default function UserProfilePage() {
                       setNewPassword('');
                       setConfirmPassword('');
                     }}
-                    className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                    className="flex-1 bg-gray-300 text-gray-700 px-4 sm:px-6 py-2 sm:py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium text-sm sm:text-base"
                   >
                     Cancel
                   </button>
@@ -556,15 +582,15 @@ export default function UserProfilePage() {
 
         {/* Profile Edit Form */}
         {editing && (
-          <div className="mx-24 mb-8 bg-white border rounded-lg p-8 shadow-md">
-            <div className="flex items-center gap-3 mb-6">
-              <UserIcon className="h-6 w-6 text-[#000C50]" />
-              <h3 className="text-xl font-bold">Edit Profile Information</h3>
+          <div className="mx-4 sm:mx-6 lg:mx-24 mb-6 sm:mb-8 bg-white border rounded-lg p-4 sm:p-6 lg:p-8 shadow-md">
+            <div className="flex items-center gap-3 mb-4 sm:mb-6">
+              <UserIcon className="h-5 w-5 sm:h-6 sm:w-6 text-[#000C50]" />
+              <h3 className="text-lg sm:text-xl font-bold">Edit Profile Information</h3>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+              <div className="grid grid-cols-1 gap-4 sm:gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     Full Name
                   </label>
                   <input
@@ -572,13 +598,13 @@ export default function UserProfilePage() {
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent text-sm sm:text-base"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     Email Address
                   </label>
                   <input
@@ -586,13 +612,13 @@ export default function UserProfilePage() {
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent text-sm sm:text-base"
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                     Contact Number
                   </label>
                   <input
@@ -600,16 +626,16 @@ export default function UserProfilePage() {
                     name="contact_number"
                     value={formData.contact_number}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent text-sm sm:text-base"
                     placeholder="Enter contact number"
                   />
                 </div>
               </div>
               
-              <div className="flex gap-4 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-3 sm:pt-4">
                 <button
                   type="submit"
-                  className="bg-[#000C50] text-white px-8 py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium"
+                  className="bg-[#000C50] text-white px-6 sm:px-8 py-2 sm:py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium text-sm sm:text-base"
                 >
                   Save Changes
                 </button>
@@ -623,7 +649,7 @@ export default function UserProfilePage() {
                       contact_number: profile.contact_number || ''
                     });
                   }}
-                  className="bg-gray-300 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                  className="bg-gray-300 text-gray-700 px-6 sm:px-8 py-2 sm:py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium text-sm sm:text-base"
                 >
                   Cancel
                 </button>
@@ -633,86 +659,99 @@ export default function UserProfilePage() {
         )}
 
         {/* Order History */}
-        <div className="mx-24 bg-white rounded-lg p-8 shadow-xl mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <ShoppingBagIcon className="h-6 w-6 text-[#000C50]" />
-            <h2 className="text-2xl font-bold">Order History</h2>
+        <div className="mx-4 sm:mx-6 lg:mx-24 bg-white rounded-lg shadow-sm border border-gray-200 mb-6 mt-5">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+              <div className="flex items-center gap-2">
+                <ShoppingBagIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900">Order History</h2>
+              </div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                <span className="text-xs sm:text-sm text-gray-500">{filteredOrders.length} of {orders.length} order{orders.length !== 1 ? 's' : ''}</span>
+                <div className="relative w-full sm:w-auto">
+                  <select 
+                    value={statusFilter}
+                    onChange={handleStatusFilterChange}
+                    className="appearance-none bg-white border border-gray-300 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent w-full sm:w-auto"
+                  >
+                    <option value="all">All Orders</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="ready_for_pickup">Ready for Pickup</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           
-          <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2">
+          <div className="p-4 sm:p-6 max-h-[400px] sm:max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400">
             {ordersLoading ? (
-              <div className="flex justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#000C50]"></div>
+              <div className="flex justify-center py-8 sm:py-12">
+                <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-[#000C50]"></div>
               </div>
-            ) : orders.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="text-gray-400 text-8xl mb-4">📦</div>
-                <h3 className="text-xl font-medium text-gray-900 mb-2">No Orders Yet</h3>
-                <p className="text-gray-500 mb-6">You haven't placed any orders yet.</p>
-                <button
-                  onClick={() => router.push('/dashboard')}
-                  className="bg-[#000C50] text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors"
-                >
-                  Start Shopping
-                </button>
+            ) : filteredOrders.length === 0 ? (
+              <div className="text-center py-8 sm:py-12">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <ShoppingBagIcon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
+                </div>
+                <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-1">
+                  {statusFilter === 'all' ? 'No orders yet' : `No ${statusFilter} orders`}
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
+                  {statusFilter === 'all' 
+                    ? "You haven't placed any orders yet." 
+                    : `You don't have any ${statusFilter} orders.`}
+                </p>
+                {statusFilter === 'all' && (
+                  <button
+                    onClick={() => router.push('/dashboard')}
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-[#000C50] bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Start Shopping
+                  </button>
+                )}
               </div>
             ) : (
-              orders.map((order) => (
-                <div key={order.id} className="flex gap-6 items-start border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
-                  {/* Image with alt fallback */}
-                  <div className="flex-shrink-0">
-                                          <Image
-                        src="/images/polo.png"
-                        alt={order.name || 'Order Image'}
-                        width={120}
-                        height={120}
-                        className="rounded-lg object-cover"
-                        style={{ width: 'auto', height: 'auto' }}
-                      />
-                  </div>
-
-                  {/* Order Info */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-900">Order #{order.id}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <CalendarIcon className="h-4 w-4 text-gray-500" />
-                          <p className="text-sm text-gray-600">
-                            {new Date(order.created_at).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </p>
+              <div className="space-y-2 sm:space-y-3 pr-1 sm:pr-2">
+                {filteredOrders.map((order) => (
+                  <div key={order.id} className="bg-gray-50 rounded-lg border border-gray-200 p-3 sm:p-4 hover:shadow-sm transition-shadow">
+                    <div className="flex items-start justify-between mb-2 sm:mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-xs sm:text-sm font-medium text-gray-900">Order #{order.id}</h3>
+                          {getStatusBadge(order.status)}
                         </div>
-                      </div>
-                      <div className="text-right">
-                        {getStatusBadge(order.status)}
-                        <p className="text-xl font-bold text-[#000C50] mt-1">
-                          ₱{order.total_amount}
+                        <p className="text-xs text-gray-500">
+                          {new Date(order.created_at).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
                         </p>
                       </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium text-gray-700">Payment Method:</span>
-                        <p className="text-gray-900">{order.payment_method}</p>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-700">Order Status:</span>
-                        <p className="text-gray-900 capitalize">{order.status}</p>
+                      <div className="text-right">
+                        <p className="text-xs sm:text-sm font-semibold text-gray-900">
+                          ₱{order.total_amount}
+                        </p>
+                        <p className="text-xs text-gray-500">{order.payment_method}</p>
                       </div>
                     </div>
                     
                     {/* Status Message */}
-                    <div className="mt-4 p-4 rounded-lg bg-gray-50 border-l-4 border-[#000C50]">
-                      <p className="text-sm text-gray-700">
+                    <div className="mb-2 sm:mb-3 p-2 sm:p-3 rounded-lg bg-white border border-gray-200">
+                      <p className="text-xs text-gray-700">
                         {order.status === 'delivered'
                           ? '📦 Your order has been delivered! Please confirm receipt to complete your order.'
                           : order.status === 'completed'
-                          ? '✅ You have successfully confirmed receipt of your order. We appreciate your support. Thank you for shopping with us!'
+                          ? '✅ You have successfully confirmed receipt of your order. Thank you for shopping with us!'
                           : order.status === 'ready_for_pickup'
                           ? '📦 Your order is ready for pickup! Please visit the store to collect your items.'
                           : '⏳ Your order is still being processed. Please wait for confirmation.'}
@@ -721,24 +760,19 @@ export default function UserProfilePage() {
 
                     {/* Receive Order Button */}
                     {order.status === 'delivered' && (
-                      <div className="mt-4">
-                        <button
-                          onClick={() => handleReceiveOrder(order.id)}
-                          className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Confirm Receipt & Get Receipt
-                        </button>
-                        <p className="text-xs text-gray-500 mt-2 text-center">
-                          Click to confirm you have received your order and get your receipt via email
-                        </p>
-                      </div>
+                      <button
+                        onClick={() => handleReceiveOrder(order.id)}
+                        className="w-full bg-green-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-green-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-2"
+                      >
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Confirm Receipt
+                      </button>
                     )}
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </div>

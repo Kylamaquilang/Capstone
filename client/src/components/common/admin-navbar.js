@@ -117,7 +117,7 @@ export default function AdminNavbar() {
       <div className="lg:hidden bg-[#000C50] text-white p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Image src="/images/cpc.png" alt="Logo" width={24} height={24} />
-          <span className="text-base font-bold">Admin</span>
+          <span className="text-base font-semibold">Admin</span>
         </div>
         <div className="flex gap-1 items-center">
           <button 

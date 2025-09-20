@@ -113,61 +113,50 @@ export default function UserDashboard() {
           ) : (
             Object.entries(products).map(([category, items]) => (
               <div key={category}>
-                <h3 className="text-4xl font-extrabold mb-6 mt-12 ml-10 text-[#000C50]">{category}</h3>
-                <div className="px-6 sm:px-12 md:px-20">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {items.map((item) => (
-                      <Link
-                        key={item.id}
-                        href={`/products/${encodeURIComponent(item.name)}`}
-                                                 className="block"
-                      >
-                                                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
-                           {/* Product Image */}
-                           <div className="relative h-60 bg-gray-100">
-                             <Image
-                               src={item.src}
-                               alt={item.name}
-                               fill
-                               className="object-cover"
-                               onError={(e) => {
-                                 e.target.src = '/images/polo.png';
-                               }}
-                             />
-                             {/* Stock Badge */}
-                             {item.stock <= 0 && (
-                               <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded">
-                                 Out of Stock
-                               </div>
-                             )}
-                             {item.stock > 0 && item.stock <= 5 && (
-                               <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded">
-                                 Low Stock
-                               </div>
-                             )}
-                           </div>
-                           
-                           {/* Product Info */}
-                           <div className="p-4">
-                             <h3 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-2">
-                               {item.name}
-                             </h3>
-                             <p className="text-lg font-bold text-[#000C50] mb-2">
-                               {item.price}
-                             </p>
-                             <div className="flex items-center justify-between">
-                               <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                 {item.label}
-                               </span>
-                               <span className="text-xs text-gray-500">
-                                 Stock: {item.stock}
-                               </span>
-                             </div>
-                           </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-0">
+                  {items.map((item) => (
+                    <Link
+                      key={item.id}
+                      href={`/products/${encodeURIComponent(item.name)}`}
+                      className="block group"
+                    >
+                      <div className="bg-white rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                        {/* Product Image */}
+                        <div className="relative h-65 mb-2 bg-white-50 rounded-lg overflow-hidden">
+                          <Image
+                            src={item.src}
+                            alt={item.name}
+                            fill
+                            className="object-contain p-4"
+                            onError={(e) => {
+                              e.target.src = '/images/polo.png';
+                            }}
+                          />
+                          {/* Stock Badge */}
+                          {item.stock <= 0 && (
+                            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                              Out of Stock
+                            </div>
+                          )}
+                          {item.stock > 0 && item.stock <= 5 && (
+                            <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
+                              Low Stock
+                            </div>
+                          )}
                         </div>
-                      </Link>
-                    ))}
-                  </div>
+                        
+                        {/* Product Info */}
+                        <div className="text-center">
+                          <h3 className="font-semibold text-gray-900 text-xl mb-2 line-clamp-2">
+                            {item.name}
+                          </h3>
+                          <p className="text-1lg font-medium text-[#000C50]">
+                            {item.price}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               </div>
             ))

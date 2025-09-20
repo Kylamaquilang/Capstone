@@ -10,9 +10,15 @@ const poppins = Poppins({
 });
 
 export const metadata = {
-  title: 'ESSEN Login',
+  title: 'CPC ESSEN',
   description: 'Login page for ESSEN system',
+  icons: {
+    icon: '/images/cpc.png', // favicon for browsers
+    apple: '/images/cpc.png', // iOS home screen
+  },
 };
+
+
 
 export default function RootLayout({ children }) {
   return (

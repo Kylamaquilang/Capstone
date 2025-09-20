@@ -41,15 +41,15 @@ export default function LoginPage() {
       className="flex justify-center items-center min-h-screen text-black"
       style={{ backgroundColor: '#000C50', margin: 0, padding: 0 }}
     >
-      <div className="bg-white w-full max-w-3xl h-auto rounded-xl shadow-lg flex overflow-hidden">
+      <div className="bg-white w-full max-w-3xl h-110 rounded-xl shadow-lg flex overflow-hidden">
         {/* Left Section */}
         <div
           className="w-1/2 p-8 border-r-4 flex flex-col justify-between"
           style={{ borderColor: '#000C50' }}
         >
-          <Image src="/images/cpc.png" alt="Logo" width={70} height={70} className="mb-4" />
-          <h4 className="text-xl font-bold">Log in to your <br />ESSEN account.</h4>
-          <p className="text-sm font-medium mt-3">
+          <Image src="/images/cpc.png" alt="Logo" width={60} height={60} className="mb-4" />
+          <h4 className="text-xl font-semibold">Log in to your <br />ESSEN account.</h4>
+          <p className="text-sm font-small mt-3">
             "Equip yourself for success, find everything you need to thrive in school, 
             from study tools to personal essentials, all in one place."
           </p>
@@ -61,11 +61,11 @@ export default function LoginPage() {
           <Image
             src="/images/logo.png"
             alt="ESSEN Logo"
-            width={200}
+            width={170}
             height={60}
             className="mb-6"
           />
-          <h4 className="text-lg font-bold mb-6">Sign in</h4>
+          <h4 className="text-lg font-semibold mb-8">Sign in</h4>
 
           {error && (
             <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">

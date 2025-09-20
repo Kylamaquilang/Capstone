@@ -53,8 +53,8 @@ export default function AdminProductPage() {
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Category Filter and Add Product Button */}
             <div className="p-3 sm:p-4 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap">
                   {categories.map((cat) => (
                     <button
                       key={cat.id}

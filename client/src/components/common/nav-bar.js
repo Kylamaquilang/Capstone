@@ -45,7 +45,7 @@ export default function Navbar() {
     return (
       <div className="relative">
         {children}
-        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+        <span className="absolute -top-2 -right-2 bg-gray-200 text-black text-xs font-normal px-1.5 py-0.5 rounded-full">
           {count > 99 ? '99+' : count}
         </span>
       </div>
@@ -62,7 +62,7 @@ export default function Navbar() {
         </Link>
       </div>
       <div className="flex justify-center items-center ml-23">
-        <Image src="/images/logo1.png" alt="Logo" width={100} height={100} priority />
+        <Image src="/images/logo1.png" alt="Logo" width={120} height={120} priority />
       </div>
       <div className="flex gap-4 items-center">
         
