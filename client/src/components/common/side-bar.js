@@ -40,14 +40,14 @@ export default function Sidebar() {
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-20 z-40"
+          className="lg:hidden fixed inset-0 bg-gray bg-opacity-20 z-40"
           onClick={toggleMobileMenu}
         />
       )}
 
       {/* Sidebar */}
       <div className={`
-         w-50 bg-white border-r border-gray-100 flex flex-col min-h-screen  
+         w-53 bg-white border-r border-gray-100 flex flex-col min-h-screen  
         fixed lg:relative transform transition-transform duration-300 ease-in-out z-30  
         shadow-md  
       ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}  

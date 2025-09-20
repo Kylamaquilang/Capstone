@@ -43,23 +43,23 @@ export default function AdminProductPage() {
 
       <div className="flex flex-1">
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-6 overflow-auto lg:ml-0 ml-0">
+        <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-0 ml-0">
           {/* Header Section */}
-          <div className="mb-6">
-            <h1 className="text-xl font-semibold text-gray-900 mb-4">Products</h1>
+          <div className="mb-3 ml-1 sm:ml-2">
+            <h1 className="text-xl sm:text-3xl font-semibold text-gray-900 mb-1">Products</h1>
           </div>
 
           {/* Main Container with Buttons and Table */}
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Category Filter and Add Product Button */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+            <div className="p-3 sm:p-4 border-b border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
                   {categories.map((cat) => (
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.name)}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${
                         selectedCategory === cat.name 
                           ? 'bg-[#000C50] text-white' 
                           : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
@@ -73,7 +73,7 @@ export default function AdminProductPage() {
                 {/* Add Product Button */}
                 <button 
                   onClick={() => setShowAddProductModal(true)}
-                  className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium"
+                  className="bg-[#000C50] text-white px-3 sm:px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium self-start sm:self-auto"
                 >
                   Add Product
                 </button>

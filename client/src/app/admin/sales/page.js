@@ -182,7 +182,7 @@ export default function AdminSalesPage() {
         <div className="flex-1 flex flex-col bg-gray-50 p-6 overflow-auto lg:ml-0 ml-0">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-xl font-semibold text-gray-900">Sales</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">Sales</h1>
             <p className="text-gray-600 text-sm">Comprehensive sales performance and reporting</p>
           </div>
 
@@ -245,32 +245,32 @@ export default function AdminSalesPage() {
           ) : (
             <>
               {/* Sales Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 h-25">
+                <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                   <div className="flex items-center">
-                    <div className="p-2 bg-blue-50 rounded-md">
-                      <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="p-2 bg-blue-50 rounded-md mt-2 ml-4">
+                      <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                       </svg>
                     </div>
                     <div className="ml-3">
-                      <p className="text-xs font-medium text-gray-600">Total Orders</p>
-                      <p className="text-lg font-bold text-gray-900">
+                      <p className="text-sm font-medium text-blue-600">Total Orders</p>
+                      <p className="text-lg font-bold text-blue-700">
                         {salesData.summary?.total_orders || 0}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                   <div className="flex items-center">
-                    <div className="p-2 bg-green-50 rounded-md">
-                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="p-2 bg-green-50 rounded-md mt-2 ml-4">
+                      <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                       </svg>
                     </div>
                     <div className="ml-3">
-                      <p className="text-xs font-medium text-gray-600">Total Revenue</p>
+                      <p className="text-sm font-medium text-green-600">Total Revenue</p>
                       <p className="text-lg font-bold text-green-600">
                         {formatCurrency(salesData.summary?.total_revenue || 0)}
                       </p>
@@ -278,15 +278,15 @@ export default function AdminSalesPage() {
                   </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                   <div className="flex items-center">
-                    <div className="p-2 bg-purple-50 rounded-md">
-                      <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="p-2 bg-purple-50 rounded-md mt-2 ml-4">
+                      <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </div>
                     <div className="ml-3">
-                      <p className="text-xs font-medium text-gray-600">Avg Order Value</p>
+                      <p className="text-sm font-medium text-purple-600">Avg Order Value</p>
                       <p className="text-lg font-bold text-purple-600">
                         {formatCurrency(salesData.summary?.avg_order_value || 0)}
                       </p>
@@ -294,15 +294,15 @@ export default function AdminSalesPage() {
                   </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                   <div className="flex items-center">
-                    <div className="p-2 bg-yellow-50 rounded-md">
-                      <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="p-2 bg-yellow-50 rounded-md mt-2 ml-4">
+                      <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                       </svg>
                     </div>
                     <div className="ml-3">
-                      <p className="text-xs font-medium text-gray-600">Growth</p>
+                      <p className="text-sm font-medium text-yellow-600">Growth</p>
                       <p className="text-lg font-bold text-yellow-600">
                         {salesData.salesData && salesData.salesData.length > 1 && salesData.salesData[1].revenue > 0 ? 
                           `${Math.round(((salesData.salesData[0].revenue - salesData.salesData[1].revenue) / salesData.salesData[1].revenue) * 100)}%` : 
@@ -316,7 +316,7 @@ export default function AdminSalesPage() {
 
               {/* Sales Tracking Section */}
               <div className="mb-6">
-                <h2 className="text-sm font-semibold text-gray-900 mb-3">Sales Tracking</h2>
+                <h2 className="text-md font-semibold text-gray-900 mb-3">Sales Tracking</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                     <div className="flex items-center">
@@ -385,9 +385,9 @@ export default function AdminSalesPage() {
               </div>
 
               {/* Sales Chart */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Sales Trend</h3>
+              <div className="bg-white border border-gray-200 rounded-lg shadow-md mb-6 flex align-center">
+                <div className="p-4">
+                  <h3 className="text-md font-semibold text-gray-900">Sales Trend</h3>
                 </div>
                 <div className="p-4">
                 {salesData.salesData && salesData.salesData.length > 0 ? (
@@ -405,19 +405,19 @@ export default function AdminSalesPage() {
 
               {/* Sales Data Table */}
               <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Detailed Sales Data</h3>
+                <div className="p-4">
+                  <h3 className="text-md font-semibold text-gray-900">Detailed Sales Data</h3>
                 </div>
                 <div className="p-4">
                   {salesData.salesData && salesData.salesData.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
-                      <thead className="bg-blue-50">
+                      <thead className="bg-blue-100">
                         <tr>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Period</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Orders</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Revenue</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-700">Avg Order</th>
+                          <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Period</th>
+                          <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Orders</th>
+                          <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Revenue</th>
+                          <th className="px-4 py-3 text-sm font-medium text-black-700">Avg Order</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -454,15 +454,15 @@ export default function AdminSalesPage() {
               </div>
 
               {/* Payment Method Breakdown */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Payment Method Breakdown</h3>
+              <div className="bg-white border border-gray-200 rounded-lg shadow-md mb-6">
+                <div className="p-4">
+                  <h3 className="text-md font-semibold text-gray-900">Payment Method Breakdown</h3>
                 </div>
                 <div className="p-4">
                 {salesData.paymentBreakdown && salesData.paymentBreakdown.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {salesData.paymentBreakdown.map((payment, index) => (
-                      <div key={index} className="border border-gray-200 rounded-md p-3">
+                      <div key={index} className="border border-gray-200 shadow-md rounded-md p-3">
                         <div className="flex items-center justify-between mb-2">
                           <h4 className="text-xs font-medium text-gray-900 capitalize">
                             {payment.payment_method === 'gcash' ? 'GCash' : 'Cash Payment'}
@@ -506,20 +506,20 @@ export default function AdminSalesPage() {
               </div>
 
               {/* Inventory Movement Summary */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Inventory Movement Summary</h3>
+              <div className="bg-white border border-gray-200 rounded-lg shadow-md mb-6">
+                <div className="p-4">
+                  <h3 className="text-md font-semibold text-gray-900">Inventory Movement Summary</h3>
                 </div>
                 <div className="p-4">
                   {salesData.inventorySummary && salesData.inventorySummary.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
-                      <thead className="bg-blue-50">
+                      <thead className="bg-blue-100">
                         <tr>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Movement Type</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Count</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Total Quantity</th>
-                          <th className="px-4 py-3 text-xs font-medium text-gray-700">Products Affected</th>
+                          <th className="px-4 py-3 text-sm font-medium text-gray-700 border-r border-gray-200">Movement Type</th>
+                          <th className="px-4 py-3 text-sm font-medium text-gray-700 border-r border-gray-200">Count</th>
+                          <th className="px-4 py-3 text-sm font-medium text-gray-700 border-r border-gray-200">Total Quantity</th>
+                          <th className="px-4 py-3 text-sm font-medium text-gray-700">Products Affected</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -555,8 +555,8 @@ export default function AdminSalesPage() {
 
               {/* Recent Orders Summary */}
               <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Recent Orders Summary</h3>
+                <div className="p-4">
+                  <h3 className="text-md font-semibold text-gray-900">Recent Orders Summary</h3>
                   <div className="text-xs text-gray-600 mt-1">
                     Showing orders from {formatDate(dateRange.start_date)} to {formatDate(dateRange.end_date)}
                   </div>
@@ -602,7 +602,7 @@ export default function AdminSalesPage() {
               {/* Top Products */}
               <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
                 <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Top Performing Products</h3>
+                  <h3 className="text-md font-semibold text-gray-900">Top Performing Products</h3>
                 </div>
                 <div className="p-4">
                 {salesData.topProducts && salesData.topProducts.length > 0 ? (

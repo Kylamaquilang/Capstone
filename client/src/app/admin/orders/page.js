@@ -15,6 +15,7 @@ import {
   PencilSquareIcon
 } from '@heroicons/react/24/outline';
 import ActionMenu from '@/components/common/ActionMenu';
+import OrderDetailsModal from '@/components/order/OrderDetailsModal';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -28,6 +29,8 @@ export default function AdminOrdersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
   const fetchOrders = async () => {
     try {
@@ -70,6 +73,11 @@ export default function AdminOrdersPage() {
 
     setFilteredOrders(filtered);
   }, [orders, searchTerm, statusFilter, paymentStatusFilter]);
+
+  const handleViewDetails = (orderId) => {
+    setSelectedOrderId(orderId);
+    setShowDetailsModal(true);
+  };
 
   const updateOrderStatus = async () => {
     if (!selectedOrder || !statusUpdate.status) return;
@@ -190,14 +198,14 @@ export default function AdminOrdersPage() {
         <Navbar />
         <div className="flex flex-1">
           <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-6 overflow-auto lg:ml-0 ml-0">
+        <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-0 ml-0">
           {/* Main Container with Controls and Table */}
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Header Section */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex justify-between items-center">
+            <div className="p-3 sm:p-4 border-b border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
-                  <h1 className="text-xl font-semibold text-gray-900">Orders</h1>
+                  <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Orders</h1>
                 </div>
                 <div className="text-sm text-gray-600">
                   Total Orders: {orders.length} | Showing: {filteredOrders.length}
@@ -206,8 +214,8 @@ export default function AdminOrdersPage() {
             </div>
 
             {/* Search and Filter Controls */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row gap-4">
+            <div className="p-3 sm:p-4 border-b border-gray-200">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <div className="flex-1">
                   <input
                     type="text"
@@ -264,17 +272,17 @@ export default function AdminOrdersPage() {
               <div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-blue-50">
+                  <thead className="bg-blue-100">
                     <tr>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Products</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Customer</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Items</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Amount</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Payment Method</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Payment Status</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Order Status</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Created</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Products</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Customer</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Quantity</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Amount</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Payment Method</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Payment Status</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Order Status</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Created</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -288,7 +296,7 @@ export default function AdminOrdersPage() {
                               <div className="space-y-1">
                                 {order.items.slice(0, 3).map((item, idx) => (
                                   <div key={idx} className="text-gray-900">
-                                    <span className="font-medium">{item.quantity}x</span> {item.product_name}
+                                    <span className="font-medium">{item.product_name}</span>
                                     {item.size_name && (
                                       <span className="text-gray-600"> ({item.size_name})</span>
                                     )}
@@ -315,7 +323,7 @@ export default function AdminOrdersPage() {
                         <td className="px-4 py-3 border-r border-gray-100">
                           <div className="text-center">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
-                              {order.item_count || 0} items
+                              {order.total_quantity || 0} qty
                             </span>
                           </div>
                         </td>
@@ -410,7 +418,7 @@ export default function AdminOrdersPage() {
                               {
                                 label: 'View Details',
                                 icon: EyeIcon,
-                                onClick: () => window.location.href = `/admin/orders/${order.id}`
+                                onClick: () => handleViewDetails(order.id)
                               }
                             ]}
                           />
@@ -510,6 +518,13 @@ export default function AdminOrdersPage() {
           </div>
         </div>
       )}
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        orderId={selectedOrderId}
+      />
     </ErrorBoundary>
   );
 }

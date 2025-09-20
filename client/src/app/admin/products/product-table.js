@@ -6,6 +6,7 @@ import { PencilSquareIcon, TrashIcon, MagnifyingGlassIcon, ChevronLeftIcon, Chev
 import { EyeIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import ActionMenu from '@/components/common/ActionMenu';
+import EditProductModal from '@/components/product/EditProductModal';
 
 export default function ProductTable({ category = '' }) {
   const [products, setProducts] = useState([]);
@@ -16,6 +17,8 @@ export default function ProductTable({ category = '' }) {
   const [itemsPerPage] = useState(10);
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState(null);
   const router = useRouter();
 
   const fetchProducts = async () => {
@@ -104,6 +107,15 @@ export default function ProductTable({ category = '' }) {
     }
   };
 
+  const handleEdit = (productId) => {
+    setSelectedProductId(productId);
+    setEditModalOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    fetchProducts(); // Refresh the products list
+  };
+
   const handleDelete = (id, name) => {
     Swal.fire({
       title: 'Are you sure?',
@@ -147,7 +159,7 @@ export default function ProductTable({ category = '' }) {
   return (
     <>
       {/* Table Header with Search and Filters */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-3 border-b border-gray-200">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="flex-1 max-w-md">
             <div className="relative">
@@ -171,10 +183,10 @@ export default function ProductTable({ category = '' }) {
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse mb-50">
-          <thead className="bg-blue-50">
+          <thead className="bg-blue-100">
             <tr>
               <th 
-                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-sm font-medium text-black-900 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
               >
                 <div className="flex items-center gap-1">
@@ -185,7 +197,7 @@ export default function ProductTable({ category = '' }) {
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('category_name')}
               >
                 <div className="flex items-center gap-1">
@@ -196,7 +208,7 @@ export default function ProductTable({ category = '' }) {
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('price')}
               >
                 <div className="flex items-center gap-1">
@@ -207,7 +219,7 @@ export default function ProductTable({ category = '' }) {
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('stock')}
               >
                 <div className="flex items-center gap-1">
@@ -217,9 +229,9 @@ export default function ProductTable({ category = '' }) {
                   )}
                 </div>
               </th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Size</th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stock</th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
+              <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Size</th>
+              <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Stock</th>
+              <th className="px-4 py-3 text-sm font-medium text-black-700">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -270,7 +282,7 @@ export default function ProductTable({ category = '' }) {
                       {
                         label: 'Edit Product',
                         icon: PencilSquareIcon,
-                        onClick: () => router.push(`/admin/products/edit/${product.id}`)
+                        onClick: () => handleEdit(product.id)
                       },
                       {
                         label: 'Delete Product',
@@ -327,6 +339,14 @@ export default function ProductTable({ category = '' }) {
           </p>
         </div>
         )}
+
+        {/* Edit Product Modal */}
+        <EditProductModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          productId={selectedProductId}
+          onSuccess={handleEditSuccess}
+        />
       </>
     );
   }

@@ -103,7 +103,7 @@ export default function AdminCategoriesPage() {
             <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-xl font-semibold text-gray-900">Categories</h1>
+                  <h1 className="text-2xl font-semibold text-black-900">Categories</h1>
                 </div>
                 <button
                   onClick={() => setShowAddForm(!showAddForm)}
@@ -116,7 +116,7 @@ export default function AdminCategoriesPage() {
 
             {/* Add Category Form */}
             {showAddForm && (
-              <div className="p-4 border-b border-gray-200 bg-blue-50">
+              <div className="p-4 border-b border-gray-200 bg-blue-10">
                 <h3 className="font-medium text-blue-800 mb-3">Add New Category</h3>
                 <form onSubmit={handleAddCategory} className="flex gap-3">
                   <input
@@ -152,11 +152,11 @@ export default function AdminCategoriesPage() {
               <div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-blue-50">
+                  <thead className="bg-blue-100">
                     <tr>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Category Name</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Created</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Category Name</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Created</th>
+                      <th className="px-4 py-3 text-sm font-medium text-black-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -193,10 +193,16 @@ export default function ProductPage() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-gray-50">
           <Navbar />
-          <div className="flex justify-center items-center min-h-screen">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#000C50]"></div>
+          <div className="container mx-auto px-4 py-12">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12">
+                <div className="flex justify-center items-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </ProtectedRoute>
@@ -206,17 +212,21 @@ export default function ProductPage() {
   if (error || !product) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-gray-50">
           <Navbar />
-          <div className="flex justify-center items-center min-h-screen">
-            <div className="text-center">
-              <p className="text-red-600 text-lg mb-4">{error || 'Product not found'}</p>
-              <Link 
-                href="/dashboard"
-                className="px-6 py-2 bg-[#000C50] text-white rounded hover:bg-[#1a237e] transition-colors"
-              >
-                Back to Dashboard
-              </Link>
+          <div className="container mx-auto px-4 py-12">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12">
+                <div className="text-center">
+                  <p className="text-red-600 text-sm mb-6">{error || 'Product not found'}</p>
+                  <Link 
+                    href="/dashboard"
+                    className="inline-block px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    Back to Dashboard
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -237,102 +247,118 @@ export default function ProductPage() {
         <Navbar />
 
         {/* Product Content */}
-        <div className="min-h-screen p-10 bg-white flex justify-center items-center">
-          <div className="flex flex-col md:flex-row gap-10">
-            {/* Product Image */}
-            <div className="border rounded-lg shadow-sm p-4">
-              <Image
-                src={imageUrl}
-                alt={product.name}
-                width={280}
-                height={280}
-                className="object-contain max-w-xs mx-auto"
-                onError={(e) => {
-                  e.target.src = '/images/polo.png';
-                }}
-              />
-            </div>
+        <div className="min-h-screen bg-gray-50">
+          <div className="container mx-auto px-4 py-12">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="grid md:grid-cols-2 gap-0">
+                  {/* Product Image Container */}
+                  <div className="bg-gray-50 p-8 flex items-center justify-center">
+                    <div className="w-full max-w-sm">
+                      <div className="aspect-square bg-white rounded-xl shadow-sm overflow-hidden">
+                        <Image
+                          src={imageUrl}
+                          alt={product.name}
+                          width={400}
+                          height={400}
+                          className="object-contain w-full h-full p-4"
+                          onError={(e) => {
+                            e.target.src = '/images/polo.png';
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Product Info */}
-            <div className="max-w-sm space-y-3">
-              <h1 className="text-xl font-bold">{product.name}</h1>
+                  {/* Product Info Container */}
+                  <div className="p-8 space-y-6">
+                    {/* Product Title */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full uppercase tracking-wide">
+                          {product.category || 'Product'}
+                        </span>
+                      </div>
+                      <h1 className="text-xl font-medium text-gray-900 leading-tight">{product.name}</h1>
+                      <div className="text-2xl font-medium text-gray-900">
+                        ₱{product.price?.toFixed(2) || '0.00'}
+                      </div>
+                    </div>
 
-              <span className="inline-block text-white bg-[#000C50] text-xs font-medium px-2 py-0.5 rounded-full">
-                {product.category || 'PRODUCT'}
-              </span>
+                    {/* Description */}
+                    {product.description && (
+                      <div className="text-sm text-gray-600 leading-relaxed">
+                        {product.description}
+                      </div>
+                    )}
 
-              <p className="text-lg font-semibold">₱{product.price?.toFixed(2) || '0.00'}</p>
+                    {/* Quantity Selector */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium text-gray-700">Quantity</label>
+                      <div className="flex items-center gap-3">
+                        <button
+                          className="w-8 h-8 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={handleDecrease}
+                          disabled={quantity <= 1}
+                        >
+                          −
+                        </button>
+                        <span className="w-12 text-center text-sm font-medium bg-gray-50 border border-gray-300 rounded-md py-1">{quantity}</span>
+                        <button
+                          className="w-8 h-8 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={handleIncrease}
+                          disabled={quantity >= product.stock}
+                        >
+                          +
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {product.stock} available in stock
+                      </p>
+                    </div>
 
-              {product.description && (
-                <p className="text-sm text-gray-600">{product.description}</p>
-              )}
+                    {/* Size Selector */}
+                    {sizes.length > 0 && (
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium text-gray-700">Size</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {sizes.map((size) => (
+                            <button
+                              key={size.id}
+                              className={`px-3 py-1 text-sm font-medium rounded-md border transition-colors ${
+                                selectedSize === size.id
+                                  ? 'bg-gray-900 text-white border-gray-900'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                              }`}
+                              onClick={() => setSelectedSize(size.id)}
+                            >
+                              {size.size}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-              {/* Quantity */}
-              <div className="mt-3">
-                <p className="font-medium text-sm mb-1">QUANTITY:</p>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="w-7 h-7 border text-base font-semibold hover:bg-gray-100"
-                    onClick={handleDecrease}
-                    disabled={quantity <= 1}
-                  >
-                    –
-                  </button>
-                  <span className="w-6 text-center text-sm">{quantity}</span>
-                  <button
-                    className="w-7 h-7 border text-base font-semibold hover:bg-gray-100"
-                    onClick={handleIncrease}
-                    disabled={quantity >= product.stock}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              {/* Stock */}
-              <p className="text-xs mt-1 text-gray-500">
-                AVAILABLE STOCK: <strong>{product.stock}</strong>
-              </p>
-
-              {/* Size Selector */}
-              {sizes.length > 0 && (
-                <div className="mt-3">
-                  <p className="font-medium text-sm mb-1">CHOOSE A SIZE:</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {sizes.map((size) => (
-                      <button
-                        key={size.id}
-                        className={`border px-3 py-0.5 text-sm font-medium rounded ${
-                          selectedSize === size.id
-                            ? 'bg-[#000C50] text-white'
-                            : 'bg-white text-black hover:bg-gray-100'
-                        }`}
-                        onClick={() => setSelectedSize(size.id)}
+                    {/* Action Buttons */}
+                    <div className="space-y-3 pt-6 border-t border-gray-200">
+                      <button 
+                        className="w-full bg-gray-900 text-white py-3 text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        onClick={handleAddToCart}
+                        disabled={product.stock <= 0}
                       >
-                        {size.size}
+                        {product.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
                       </button>
-                    ))}
+                      
+                      <button 
+                        className="w-full bg-white text-gray-900 py-3 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        onClick={handleBuyNow}
+                        disabled={product.stock <= 0}
+                      >
+                        {product.stock <= 0 ? 'Out of Stock' : 'Buy Now'}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="mt-5 space-y-2">
-                <button 
-                  className="bg-[#000C50] text-white w-40 py-2 text-sm font-medium rounded-md hover:bg-blue-900 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                  onClick={handleAddToCart}
-                  disabled={product.stock <= 0}
-                >
-                  {product.stock <= 0 ? 'OUT OF STOCK' : 'ADD TO CART'}
-                </button>
-                
-                <button 
-                  className="bg-green-600 text-white w-40 py-2 text-sm font-medium rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                  onClick={handleBuyNow}
-                  disabled={product.stock <= 0}
-                >
-                  {product.stock <= 0 ? 'OUT OF STOCK' : 'BUY NOW'}
-                </button>
               </div>
             </div>
           </div>

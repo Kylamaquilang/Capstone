@@ -263,12 +263,15 @@ export default function ProductDetailPage() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-gray-50">
           <Navbar />
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-[#000C50] mx-auto"></div>
-              <p className="mt-4 text-lg text-gray-600">Loading product...</p>
+          <div className="container mx-auto px-4 py-12">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12">
+                <div className="flex justify-center items-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -279,17 +282,21 @@ export default function ProductDetailPage() {
   if (error) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-gray-50">
           <Navbar />
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <p className="text-red-600 text-lg mb-4">{error}</p>
-              <button 
-                onClick={() => router.push('/dashboard')}
-                className="px-6 py-2 bg-[#000C50] text-white rounded hover:bg-[#1a237e] transition-colors"
-              >
-                Back to Dashboard
-              </button>
+          <div className="container mx-auto px-4 py-12">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12">
+                <div className="text-center">
+                  <p className="text-red-600 text-sm mb-6">{error}</p>
+                  <button 
+                    onClick={() => router.push('/dashboard')}
+                    className="inline-block px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    Back to Dashboard
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -303,118 +310,136 @@ export default function ProductDetailPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-gray-50">
         <Navbar />
 
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Product Image */}
-            <div className="relative">
-              <Image
-                src={product.image || '/images/polo.png'}
-                alt={product.name}
-                width={500}
-                height={500}
-                className="w-full h-auto rounded-lg border"
-              />
-            </div>
-
-            {/* Product Details */}
-            <div className="space-y-6">
-              <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
-              
-              <p className="text-2xl font-bold text-[#000C50]">
-                ₱{parseFloat(product.price).toFixed(2)}
-              </p>
-
-              {product.description && (
-                <p className="text-gray-600">{product.description}</p>
-              )}
-
-              {/* Size Selection */}
-              {product.sizes && product.sizes.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Select Size</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {product.sizes.map((size) => (
-                      <button
-                        key={size.id}
-                        onClick={() => setSelectedSize(size.size)}
-                        disabled={size.stock === 0}
-                        className={`px-4 py-2 border rounded ${
-                          selectedSize === size.size
-                            ? 'border-[#000C50] bg-[#000C50] text-white'
-                            : size.stock === 0
-                            ? 'border-gray-300 text-gray-400 cursor-not-allowed'
-                            : 'border-gray-300 hover:border-[#000C50]'
-                        }`}
-                      >
-                        {size.size}
-                      </button>
-                    ))}
+        <div className="container mx-auto px-2 py-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="grid md:grid-cols-2 gap-0">
+                {/* Product Image */}
+                <div className="bg-white-100 p-8 flex items-center justify-center">
+                  <div className="w-full max-w-sm">
+                    <div className="aspect-square bg-white rounded-xl overflow-hidden">
+                      <Image
+                        src={product.image || '/images/polo.png'}
+                        alt={product.name}
+                        width={400}
+                        height={400}
+                        className="object-contain w-full h-full p-4"
+                      />
+                    </div>
                   </div>
                 </div>
-              )}
 
-              {/* Quantity */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Quantity</h3>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-8 h-8 border border-gray-300 rounded flex items-center justify-center"
-                  >
-                    -
-                  </button>
-                  <span className="text-lg font-semibold w-12 text-center">{quantity}</span>
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="w-8 h-8 border border-gray-300 rounded flex items-center justify-center"
-                  >
-                    +
-                  </button>
+                {/* Product Details */}
+                <div className="p-8 space-y-6">
+                  {/* Product Title */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full uppercase tracking-wide">
+                        {product.category || 'Product'}
+                      </span>
+                    </div>
+                    <h1 className="text-xl font-medium text-gray-900 leading-tight">{product.name}</h1>
+                    <div className="text-2xl font-medium text-gray-900">
+                      ₱{parseFloat(product.price).toFixed(2)}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {product.description && (
+                    <div className="text-sm text-black-600 leading-relaxed">
+                      {product.description}
+                    </div>
+                  )}
+
+                  {/* Size Selection */}
+                  {product.sizes && product.sizes.length > 0 && (
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium text-gray-700">Size</label>
+                      <div className="flex gap-2 flex-wrap">
+                        {product.sizes.map((size) => (
+                          <button
+                            key={size.id}
+                            onClick={() => setSelectedSize(size.size)}
+                            disabled={size.stock === 0}
+                            className={`px-3 py-1 text-sm font-medium rounded-md border transition-colors ${
+                              selectedSize === size.size
+                                ? 'bg-gray-900 text-white border-gray-900'
+                                : size.stock === 0
+                                ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                            }`}
+                          >
+                            {size.size}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quantity */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-700">Quantity:</label>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="w-6 h-6 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+                      >
+                        −
+                      </button>
+                      <span className="w-10 text-center text-xs font-medium bg-gray-50 border border-gray-300 rounded-md py-1">{quantity}</span>
+                      <button
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="w-6 h-6 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="space-y-3 pt-6 border-t border-gray-200">
+                    <button
+                      onClick={handleAddToCart}
+                      disabled={addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)}
+                      className={`w-full py-3 text-sm font-medium rounded-lg transition-colors ${
+                        addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-[#000C50] text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      {addingToCart ? 'Adding to Cart...' : 'Add to Cart'}
+                    </button>
+                    
+                    <button
+                      onClick={handleBuyNow}
+                      disabled={addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)}
+                      className={`w-full py-3 text-sm font-medium rounded-lg transition-colors ${
+                        addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-white text-gray-900 border border-bg[#000C50] hover:bg-gray-100'
+                      }`}
+                    >
+                      {addingToCart ? 'Adding to Cart...' : 'Buy Now'}
+                    </button>
+                  </div>
+
+                  {/* Stock Info */}
+                  <div className="text-xs text-gray-500">
+                    {product.stock} available in stock
+                  </div>
                 </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-3">
-                <button
-                  onClick={handleAddToCart}
-                  disabled={addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)}
-                  className={`w-full py-3 px-6 rounded font-semibold ${
-                    addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-[#000C50] text-white hover:bg-[#1a237e]'
-                  }`}
-                >
-                  {addingToCart ? 'Adding to Cart...' : 'Add to Cart'}
-                </button>
-                
-                <button
-                  onClick={handleBuyNow}
-                  disabled={addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)}
-                  className={`w-full py-3 px-6 rounded font-semibold ${
-                    addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
-                >
-                  {addingToCart ? 'Adding to Cart...' : 'BUY NOW'}
-                </button>
-              </div>
-
-              {/* Stock Info */}
-              <div className="text-sm text-gray-600">
-                <p>Stock: {product.stock}</p>
               </div>
             </div>
           </div>
 
           {/* Back Button */}
-          <div className="mt-8">
+          <div className="mt-8 text-center">
             <button
               onClick={() => router.push('/dashboard')}
-              className="px-6 py-2 border border-[#000C50] text-[#000C50] rounded hover:bg-[#000C50] hover:text-white transition-colors"
+              className="inline-block px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
             >
               ← Back to Products
             </button>
@@ -426,5 +451,3 @@ export default function ProductDetailPage() {
     </ProtectedRoute>
   );
 }
-
-

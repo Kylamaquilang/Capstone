@@ -8,8 +8,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,11 +22,49 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Poppins', Arial, Helvetica, sans-serif;
   padding-top: 80px; /* Account for navbar height */
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+  body {
+    padding-top: 60px; /* Reduced padding for mobile navbar */
+  }
+  
+  /* Ensure admin pages work well on mobile */
+  .admin-page {
+    margin-top: -60px !important;
+  }
+}
+
+/* Ensure Poppins is applied to text elements */
+h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, label, th, td {
+  font-family: 'Poppins', ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Override body padding for admin pages */
 .admin-page {
   margin-top: -80px !important;
+}
+
+/* Mobile-friendly table scrolling */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile-friendly button sizing */
+@media (max-width: 640px) {
+  .btn-mobile {
+    min-height: 44px; /* iOS recommended touch target */
+    padding: 12px 16px;
+  }
+}
+
+/* Mobile-friendly form inputs */
+@media (max-width: 640px) {
+  input, select, textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
 }

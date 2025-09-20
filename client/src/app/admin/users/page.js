@@ -3,15 +3,18 @@ import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
-import Link from 'next/link';
 import ActionMenu from '@/components/common/ActionMenu';
 import { EyeIcon, PencilSquareIcon, UserMinusIcon, UserPlusIcon } from '@heroicons/react/24/outline';
+import AddStudentModal from '@/components/user/AddStudentModal';
+import BulkUploadModal from '@/components/user/BulkUploadModal';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(null);
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -45,6 +48,10 @@ export default function AdminUsersPage() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handleModalSuccess = () => {
+    fetchUsers(); // Refresh the users list
+  };
 
   const handleStatusToggle = async (userId, currentStatus) => {
     try {
@@ -167,26 +174,28 @@ export default function AdminUsersPage() {
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-6 overflow-auto lg:ml-0 ml-0">
+        <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-0 ml-0">
           {/* Main Container with Buttons and Table */}
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Header Section */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex justify-between items-center">
+            <div className="p-3 sm:p-4 border-b border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
-                  <h1 className="text-xl font-semibold text-gray-900">Users</h1>
+                  <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Users</h1>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Link href="/admin/users/add-student">
-                    <button className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium">
-                      Add Student
-                    </button>
-                  </Link>
-                  <Link href="/admin/users/bulk-upload">
-                    <button className="border border-[#000C50] text-[#000C50] px-4 py-2 rounded-md hover:bg-[#000C50] hover:text-white transition-colors text-sm font-medium">
-                      Bulk Upload
-                    </button>
-                  </Link>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <button 
+                    onClick={() => setShowAddStudentModal(true)}
+                    className="bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                  >
+                    Add Student
+                  </button>
+                  <button 
+                    onClick={() => setShowBulkUploadModal(true)}
+                    className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                  >
+                    Bulk Upload
+                  </button>
                 </div>
               </div>
             </div>
@@ -208,15 +217,15 @@ export default function AdminUsersPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-blue-50">
                     <tr>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stud ID</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Name</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Email</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Role</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Degree</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Status</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Active</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Created</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stud ID</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Name</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Email</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Role</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Degree</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Status</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Active</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Created</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -224,12 +233,12 @@ export default function AdminUsersPage() {
                       <tr key={user.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                         index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                       }`}>
-                        <td className="px-4 py-3 border-r border-gray-100">
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 font-mono">
                             {user.student_id || 'N/A'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 border-r border-gray-100">
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
                           <div>
                             <div className="text-xs font-medium text-gray-900">{user.name || 'N/A'}</div>
                             {user.first_name && user.last_name && (
@@ -239,24 +248,24 @@ export default function AdminUsersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 border-r border-gray-100">
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
                           <div className="text-xs text-gray-900">{user.email || 'N/A'}</div>
                         </td>
-                        <td className="px-4 py-3 border-r border-gray-100">{getRoleBadge(user.role)}</td>
-                        <td className="px-4 py-3 border-r border-gray-100">
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">{getRoleBadge(user.role)}</td>
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
                           <div className="text-xs">
                             <div className="font-medium text-gray-900">{user.degree || 'N/A'}</div>
                             <div className="text-xs text-gray-500">{getDegreeDisplayName(user.degree)}</div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 border-r border-gray-100">{getStatusBadge(user.status)}</td>
-                        <td className="px-4 py-3 border-r border-gray-100">{getActiveStatusBadge(user.is_active)}</td>
-                        <td className="px-4 py-3 border-r border-gray-100">
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">{getStatusBadge(user.status)}</td>
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">{getActiveStatusBadge(user.is_active)}</td>
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
                           <div className="text-xs text-gray-900">
                             {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-2 sm:px-4 py-3">
                           <ActionMenu
                             actions={[
                               {
@@ -291,6 +300,20 @@ export default function AdminUsersPage() {
           </div>
         </div>
       </div>
+
+      {/* Add Student Modal */}
+      <AddStudentModal
+        isOpen={showAddStudentModal}
+        onClose={() => setShowAddStudentModal(false)}
+        onSuccess={handleModalSuccess}
+      />
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        isOpen={showBulkUploadModal}
+        onClose={() => setShowBulkUploadModal(false)}
+        onSuccess={handleModalSuccess}
+      />
     </div>
   );
 }

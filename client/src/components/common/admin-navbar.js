@@ -114,21 +114,21 @@ export default function AdminNavbar() {
       </nav>
 
       {/* Mobile Header */}
-      <div className="lg:hidden bg-[#000C50] text-white p-4 flex items-center justify-between">
+      <div className="lg:hidden bg-[#000C50] text-white p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Image src="/images/cpc.png" alt="Logo" width={30} height={30} />
-          <span className="text-lg font-bold">Admin Panel</span>
+          <Image src="/images/cpc.png" alt="Logo" width={24} height={24} />
+          <span className="text-base font-bold">Admin</span>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-1 items-center">
           <button 
             onClick={handleNotificationClick}
-            className="relative"
+            className="relative p-2 rounded-lg hover:bg-blue-800 transition-colors"
             title={apiAvailable ? "Notifications" : "Notifications (API unavailable)"}
           >
-            <BellIcon className={`h-5 w-5 ${apiAvailable ? 'text-white' : 'text-gray-400'}`} />
+            <BellIcon className={`h-4 w-4 ${apiAvailable ? 'text-white' : 'text-gray-400'}`} />
             {unreadCount > 0 && apiAvailable && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                {unreadCount > 99 ? '99+' : unreadCount}
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-3 w-3 flex items-center justify-center text-[10px]">
+                {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
             {!apiAvailable && (
@@ -136,18 +136,17 @@ export default function AdminNavbar() {
             )}
           </button>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center">
             <div className="flex items-center space-x-1">
-              <UserCircleIcon className="h-5 w-5 text-white" />
-              <div className="text-right hidden sm:block">
-                <p className="text-xs font-medium text-white">{user?.name || 'Admin'}</p>
-                <p className="text-xs text-gray-300">{user?.email || 'admin@cpc.edu.ph'}</p>
+              <UserCircleIcon className="h-4 w-4 text-white" />
+              <div className="text-right hidden xs:block">
+                <p className="text-xs font-medium text-white truncate max-w-20">{user?.name || 'Admin'}</p>
               </div>
             </div>
             
             <button
               onClick={handleLogout}
-              className="text-white p-1 rounded hover:bg-blue-800 transition-colors"
+              className="text-white p-2 rounded-lg hover:bg-blue-800 transition-colors"
               title="Logout"
             >
               <ArrowRightOnRectangleIcon className="h-4 w-4" />

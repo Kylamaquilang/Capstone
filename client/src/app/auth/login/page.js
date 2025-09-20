@@ -3,7 +3,7 @@
 import useLogin from '@/hooks/useLogin';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function LoginPage() {
   const { login, error, loading } = useLogin();
@@ -21,10 +21,25 @@ export default function LoginPage() {
     await login(formData);
   };
 
+  // Ensure body styles are properly set for login page
+  useEffect(() => {
+    // Remove any padding/margin from body for login page
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.paddingTop = '0';
+    
+    // Cleanup function to restore styles when leaving
+    return () => {
+      document.body.style.margin = '';
+      document.body.style.padding = '';
+      document.body.style.paddingTop = '';
+    };
+  }, []);
+
   return (
     <div
-      className="flex justify-center items-center min-h-screen text-black py-4"
-      style={{ backgroundColor: '#000C50' }}
+      className="flex justify-center items-center min-h-screen text-black"
+      style={{ backgroundColor: '#000C50', margin: 0, padding: 0 }}
     >
       <div className="bg-white w-full max-w-3xl h-auto rounded-xl shadow-lg flex overflow-hidden">
         {/* Left Section */}
