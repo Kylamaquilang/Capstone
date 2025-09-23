@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useNotifications } from '@/context/NotificationContext';
 import API from '@/lib/axios';
 import Swal from 'sweetalert2';
+import { getImageUrl } from '@/utils/imageUtils';
 
 export default function CartPage() {
   const { updateCartCount } = useNotifications();
@@ -292,11 +293,14 @@ export default function CartPage() {
                     {/* Product Image */}
                     <div className="w-24 h-24 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
                       <Image
-                        src={item.product_image || '/images/polo.png'}
+                        src={getImageUrl(item.product_image) || '/images/polo.png'}
                         alt={item.product_name}
                         width={96}
                         height={96}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = '/images/polo.png';
+                        }}
                       />
                     </div>
 

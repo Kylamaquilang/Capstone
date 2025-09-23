@@ -30,22 +30,73 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true })
 }
 
-// Multer storage setup
+// Multer storage setup with better file handling
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadsDir)
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    const ext = path.extname(file.originalname)
-    cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`)
+    const ext = path.extname(file.originalname).toLowerCase()
+    cb(null, `product-${uniqueSuffix}${ext}`)
   }
 })
-const upload = multer({ storage })
+
+// File filter for image validation
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|gif|webp/
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase())
+  const mimetype = allowedTypes.test(file.mimetype)
+  
+  if (mimetype && extname) {
+    return cb(null, true)
+  } else {
+    cb(new Error('Only image files (JPEG, PNG, GIF, WebP) are allowed!'), false)
+  }
+}
+
+const upload = multer({ 
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 1 // Only one file at a time
+  }
+})
 
 // ✅ Public read routes first
 router.get('/', getAllProductsSimple) // Simple version for frontend
 router.get('/detailed', getAllProducts) // Detailed version with pagination
+
+// Debug endpoint to check image data
+router.get('/debug-images', async (req, res) => {
+  try {
+    const [products] = await pool.query(`
+      SELECT 
+        p.id,
+        p.name,
+        p.image,
+        c.name as category
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      ORDER BY p.created_at DESC
+      LIMIT 5
+    `);
+    
+    res.json({
+      message: 'Image debug data',
+      products: products.map(p => ({
+        id: p.id,
+        name: p.name,
+        raw_image: p.image,
+        image_url: p.image, // Return raw filename
+        category: p.category
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 router.get('/stats', verifyToken, isAdmin, getProductStats)
 router.get('/low-stock', verifyToken, isAdmin, getLowStockProducts)
 router.get('/name/:name', getProductByName) // Get product by name
@@ -54,12 +105,63 @@ router.get('/:id', getProductById) // Get product by ID (must be last to avoid c
 // ✅ Admin-only below
 router.post('/', verifyToken, isAdmin, createProduct)
 router.post('/upload-image', verifyToken, isAdmin, upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' })
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        error: 'No file uploaded',
+        message: 'Please select an image file to upload'
+      })
+    }
+
+    // Validate file size (additional check)
+    if (req.file.size > 5 * 1024 * 1024) {
+      // Delete the uploaded file if it's too large
+      fs.unlinkSync(req.file.path)
+      return res.status(400).json({ 
+        error: 'File too large',
+        message: 'Image size must be less than 5MB'
+      })
+    }
+
+    // Return a public URL to the uploaded file
+    const publicUrl = `/uploads/${req.file.filename}`
+    
+    console.log(`✅ Image uploaded successfully: ${req.file.filename}`)
+    
+    res.status(201).json({ 
+      success: true,
+      url: publicUrl,
+      filename: req.file.filename,
+      size: req.file.size,
+      message: 'Image uploaded successfully'
+    })
+  } catch (error) {
+    console.error('❌ Image upload error:', error)
+    
+    // Clean up file if it was uploaded but error occurred
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path)
+    }
+    
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        error: 'File too large',
+        message: 'Image size must be less than 5MB'
+      })
+    }
+    
+    if (error.message.includes('Only image files')) {
+      return res.status(400).json({ 
+        error: 'Invalid file type',
+        message: 'Only image files (JPEG, PNG, GIF, WebP) are allowed'
+      })
+    }
+    
+    res.status(500).json({ 
+      error: 'Upload failed',
+      message: 'Failed to upload image. Please try again.'
+    })
   }
-  // Return a public URL to the uploaded file
-  const publicUrl = `/uploads/${req.file.filename}`
-  res.status(201).json({ url: publicUrl })
 })
 router.put('/:id', verifyToken, isAdmin, updateProduct)
 router.delete('/:id', verifyToken, isAdmin, deleteProduct)

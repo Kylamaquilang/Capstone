@@ -44,7 +44,8 @@ export const getAllProductsSimple = async (req, res) => {
       description: product.description,
       price: parseFloat(product.price),
       stock: parseInt(product.stock),
-      image_url: product.image || '/images/polo.png',
+      image_url: product.image ? product.image : null, // Return raw filename, let frontend handle URL
+      image: product.image ? product.image : null, // Return raw filename, let frontend handle URL
       category: product.category || 'Other'
     }));
 

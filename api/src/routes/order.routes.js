@@ -29,4 +29,23 @@ router.get('/sales-performance', verifyToken, isAdmin, getSalesPerformance)
 // Public sales data endpoint for testing (remove in production)
 router.get('/sales-performance/public', getSalesPerformance)
 
+// Test endpoint to check database connection
+router.get('/test-db', async (req, res) => {
+  try {
+    const { pool } = await import('../database/db.js')
+    const [rows] = await pool.query('SELECT 1 as test')
+    res.json({ 
+      success: true, 
+      message: 'Database connected successfully',
+      test: rows[0]
+    })
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: 'Database connection failed',
+      message: error.message 
+    })
+  }
+})
+
 export default router

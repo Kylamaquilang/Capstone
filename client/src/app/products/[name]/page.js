@@ -9,6 +9,7 @@ import Footer from '@/components/common/footer';
 import API from '@/lib/axios';
 import Image from 'next/image';
 import Swal from 'sweetalert2';
+import { getImageUrl } from '@/utils/imageUtils';
 
 export default function ProductDetailPage() {
   const { name } = useParams();
@@ -229,7 +230,7 @@ export default function ProductDetailPage() {
           id: Date.now(), // Temporary ID for checkout
           product_id: product.id,
           product_name: product.name,
-          product_image: product.image || '/images/polo.png',
+          product_image: getImageUrl(product.image) || '/images/polo.png',
           price: parseFloat(product.price),
           quantity: quantity,
           size: selectedSize || null
@@ -322,11 +323,14 @@ export default function ProductDetailPage() {
                   <div className="w-full max-w-sm">
                     <div className="aspect-square bg-white rounded-xl overflow-hidden">
                       <Image
-                        src={product.image || '/images/polo.png'}
+                        src={getImageUrl(product.image) || '/images/polo.png'}
                         alt={product.name}
                         width={400}
                         height={400}
                         className="object-contain w-full h-full p-4"
+                        onError={(e) => {
+                          e.target.src = '/images/polo.png';
+                        }}
                       />
                     </div>
                   </div>

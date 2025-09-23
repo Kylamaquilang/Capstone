@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import API from '@/lib/axios';
+import ImageUpload from '@/components/product/ImageUpload';
 
 export default function AddProductForm() {
   const [name, setName] = useState('');
@@ -16,6 +17,16 @@ export default function AddProductForm() {
   const [sizes, setSizes] = useState([{ size: 'S', stock: '', price: '' }]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  // Check if sizes should be disabled based on category
+  const isSizeDisabled = () => {
+    if (!categoryId) return false;
+    const selectedCategory = categories.find(c => c.id === Number(categoryId));
+    if (!selectedCategory) return false;
+    
+    const categoryName = selectedCategory.name.toLowerCase();
+    return categoryName === 'lanyard' || categoryName === 'tela';
+  };
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -52,24 +63,24 @@ export default function AddProductForm() {
 
       let finalImageUrl = null;
       
-      // Upload image if provided
-      if (file) {
-        const formData = new FormData();
-        formData.append('image', file);
-        const uploadRes = await API.post('/products/upload-image', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        finalImageUrl = uploadRes.data.url;
+      // Handle image URL (already uploaded via ImageUpload component)
+      if (file && typeof file === 'object' && file.url) {
+        finalImageUrl = file.url;
+      } else if (file && typeof file === 'string') {
+        finalImageUrl = file;
       }
 
-      // Prepare sizes data
-      const sizesData = sizes.filter(sizeItem => 
-        sizeItem.size && sizeItem.stock && Number(sizeItem.stock) >= 0
-      ).map(sizeItem => ({
-        size: sizeItem.size,
-        stock: Number(sizeItem.stock),
-        price: sizeItem.price ? Number(sizeItem.price) : Number(price)
-      }));
+      // Prepare sizes data (only if sizes are not disabled)
+      let sizesData = [];
+      if (!isSizeDisabled()) {
+        sizesData = sizes.filter(sizeItem => 
+          sizeItem.size && sizeItem.stock && Number(sizeItem.stock) >= 0
+        ).map(sizeItem => ({
+          size: sizeItem.size,
+          stock: Number(sizeItem.stock),
+          price: sizeItem.price ? Number(sizeItem.price) : Number(price)
+        }));
+      }
 
       const productData = {
         name: name.trim(),
@@ -203,61 +214,75 @@ export default function AddProductForm() {
           </div>
 
           {/* PRODUCT SIZES */}
-          <div>
+          <div className={isSizeDisabled() ? 'opacity-50 pointer-events-none' : ''}>
             <div className="flex justify-between items-center mb-2">
               <label className="block text-sm">PRODUCT SIZES:</label>
-              <button
-                type="button"
-                onClick={addSize}
-                className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-              >
-                + Add Size
-              </button>
+              {!isSizeDisabled() && (
+                <button
+                  type="button"
+                  onClick={addSize}
+                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                >
+                  + Add Size
+                </button>
+              )}
             </div>
-            <div className="space-y-2">
-              {sizes.map((sizeItem, index) => (
-                <div key={index} className="flex space-x-2 items-center">
-                  <select
-                    value={sizeItem.size}
-                    onChange={(e) => updateSize(index, 'size', e.target.value)}
-                    className="border border-gray-400 px-2 py-1 rounded text-sm"
-                  >
-                    {['XS','S','M','L','XL','XXL'].map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    value={sizeItem.stock}
-                    onChange={(e) => updateSize(index, 'stock', e.target.value)}
-                    placeholder="Stock"
-                    min="0"
-                    className="border border-gray-400 px-2 py-1 rounded text-sm w-20"
-                  />
-                  <input
-                    type="number"
-                    value={sizeItem.price}
-                    onChange={(e) => updateSize(index, 'price', e.target.value)}
-                    placeholder="Price (optional)"
-                    min="0"
-                    step="0.01"
-                    className="border border-gray-400 px-2 py-1 rounded text-sm w-24"
-                  />
-                  {sizes.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeSize(index)}
-                      className="bg-red-600 text-white px-2 py-1 rounded text-sm hover:bg-red-700"
+            
+            {isSizeDisabled() ? (
+              <div className="p-3 bg-gray-100 rounded border border-gray-300">
+                <p className="text-sm text-gray-600 text-center">
+                  Sizes are not available for this category
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {sizes.map((sizeItem, index) => (
+                  <div key={index} className="flex space-x-2 items-center">
+                    <select
+                      value={sizeItem.size}
+                      onChange={(e) => updateSize(index, 'size', e.target.value)}
+                      className="border border-gray-400 px-2 py-1 rounded text-sm"
                     >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Leave price empty to use base price. Stock is required for each size.
-            </p>
+                      {['XS','S','M','L','XL','XXL'].map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={sizeItem.stock}
+                      onChange={(e) => updateSize(index, 'stock', e.target.value)}
+                      placeholder="Stock"
+                      min="0"
+                      className="border border-gray-400 px-2 py-1 rounded text-sm w-20"
+                    />
+                    <input
+                      type="number"
+                      value={sizeItem.price}
+                      onChange={(e) => updateSize(index, 'price', e.target.value)}
+                      placeholder="Price (optional)"
+                      min="0"
+                      step="0.01"
+                      className="border border-gray-400 px-2 py-1 rounded text-sm w-24"
+                    />
+                    {sizes.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeSize(index)}
+                        className="bg-red-600 text-white px-2 py-1 rounded text-sm hover:bg-red-700"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {!isSizeDisabled() && (
+              <p className="text-xs text-gray-500 mt-1">
+                Leave price empty to use base price. Stock is required for each size.
+              </p>
+            )}
           </div>
         </div>
 

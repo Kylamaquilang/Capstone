@@ -20,15 +20,37 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
       setError('Please select a CSV file');
       return;
     }
+
+    // Validate file type
+    const allowedExtensions = ['.csv', '.xlsx', '.xls'];
+    const hasValidExtension = allowedExtensions.some(ext => 
+      file.name.toLowerCase().endsWith(ext)
+    );
+    
+    if (!hasValidExtension) {
+      setError('Please select a valid CSV or Excel file (.csv, .xlsx, .xls)');
+      return;
+    }
+
+    // Validate file size (10MB limit for Excel files)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size must be less than 10MB');
+      return;
+    }
     
     try {
       setSubmitting(true);
       const formData = new FormData();
       formData.append('file', file);
       
+      console.log('📤 Uploading CSV file:', file.name, 'Size:', file.size);
+      
       const response = await API.post('/students/bulk-upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30000 // 30 second timeout for large files
       });
+      
+      console.log('📥 Upload response:', response.data);
       
       setSuccess('Bulk upload completed successfully');
       setUploadResult(response.data);
@@ -44,20 +66,52 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
       }, 2000);
       
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to upload CSV file');
-      if (err?.response?.data?.details) {
-        setError(prev => prev + ': ' + err.response.data.details);
+      console.error('❌ Upload error:', err);
+      console.error('❌ Error response:', err.response);
+      console.error('❌ Error status:', err.response?.status);
+      console.error('❌ Error data:', err.response?.data);
+      
+      let errorMessage = 'Failed to upload file';
+      
+      if (err?.response?.data?.error) {
+        errorMessage = err.response.data.error;
       }
+      
+      if (err?.response?.data?.message) {
+        errorMessage += ': ' + err.response.data.message;
+      }
+      
+      if (err?.response?.data?.details) {
+        errorMessage += ': ' + err.response.data.details;
+      }
+      
+      if (err?.code === 'ECONNABORTED') {
+        errorMessage = 'Upload timeout - file may be too large or server is slow';
+      }
+      
+      if (err?.response?.status === 413) {
+        errorMessage = 'File too large - please use a smaller file';
+      }
+      
+      if (err?.response?.status === 401) {
+        errorMessage = 'Authentication failed - please log in again';
+      }
+      
+      if (err?.response?.status === 403) {
+        errorMessage = 'Access denied - admin privileges required';
+      }
+      
+      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }
   };
 
   const downloadSampleCSV = () => {
-    const csvContent = `first_name,last_name,middle_name,suffix,email,degree,status
-John,Doe,Michael,Jr.,john.doe@example.com,BSIT,regular
-Jane,Smith,,,jane.smith@example.com,BSED,regular
-Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
+    const csvContent = `student_id,first_name,last_name,middle_name,suffix,email,degree,status
+20240001,John,Doe,Michael,Jr.,john.doe@example.com,BSIT,regular
+20240002,Jane,Smith,,,jane.smith@example.com,BSED,regular
+20240003,Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -125,9 +179,13 @@ Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-blue-900 mb-2">Instructions:</h3>
                 <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• Upload a CSV file with student information</li>
-                  <li>• Required columns: first_name, last_name, email, degree, status</li>
+                  <li>• Upload a CSV or Excel file with student information</li>
+                  <li>• Required columns: student_id, first_name, last_name, email, degree, status</li>
                   <li>• Optional columns: middle_name, suffix</li>
+                  <li>• Student ID must be numeric (4-8 digits)</li>
+                  <li>• Valid degrees: BEED, BSED, BSIT, BSHM</li>
+                  <li>• Valid status: regular, irregular</li>
+                  <li>• Supported formats: .csv, .xlsx, .xls</li>
                   <li>• Download the sample CSV template below</li>
                 </ul>
               </div>
@@ -135,12 +193,12 @@ Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
               {/* File Upload */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select CSV File
+                  Select CSV or Excel File
                 </label>
                 <input
                   id="csv-file"
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx,.xls"
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
                   disabled={submitting}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"

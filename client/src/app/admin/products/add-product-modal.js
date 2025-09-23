@@ -217,7 +217,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
                   <button
                     type="button"
                     onClick={addSize}
-                    className="bg-green-600 text-white px-3 py-1 rounded-md text-xs hover:bg-green-700 transition-colors"
+                    className="bg-[#000C50] text-white px-3 py-1 rounded-md text-xs hover:bg-green-700 transition-colors"
                   >
                     + Add Size
                   </button>

@@ -50,10 +50,10 @@ export default function BulkUploadStudentsPage() {
   };
 
   const downloadSampleCSV = () => {
-    const csvContent = `first_name,last_name,middle_name,suffix,email,degree,status
-John,Doe,Michael,Jr.,john.doe@example.com,BSIT,regular
-Jane,Smith,,,jane.smith@example.com,BSED,regular
-Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
+    const csvContent = `student_id,first_name,last_name,middle_name,suffix,email,degree,status
+20240001,John,Doe,Michael,Jr.,john.doe@example.com,BSIT,regular
+20240002,Jane,Smith,,,jane.smith@example.com,BSED,regular
+20240003,Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -80,11 +80,13 @@ Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
             <div className="bg-blue-50 p-4 rounded-lg mb-6">
               <h3 className="font-medium text-blue-800 mb-2">CSV Format Requirements</h3>
               <div className="text-sm text-blue-700 space-y-1">
-                <p><strong>Required columns:</strong> first_name, last_name, email, degree, status</p>
+                <p><strong>Required columns:</strong> student_id, first_name, last_name, email, degree, status</p>
                 <p><strong>Optional columns:</strong> middle_name, suffix</p>
+                <p><strong>Student ID:</strong> Must be numeric (4-8 digits)</p>
                 <p><strong>Valid degrees:</strong> BEED, BSED, BSIT, BSHM</p>
                 <p><strong>Valid status:</strong> regular, irregular</p>
-                <p><strong>File size limit:</strong> 5MB</p>
+                <p><strong>Supported formats:</strong> .csv, .xlsx, .xls</p>
+                <p><strong>File size limit:</strong> 10MB</p>
               </div>
             </div>
 
@@ -94,12 +96,12 @@ Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700">
-                  Select CSV File
+                  Select CSV or Excel File
                 </label>
                 <input 
                   id="csv-file"
                   type="file" 
-                  accept=".csv" 
+                  accept=".csv,.xlsx,.xls" 
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />

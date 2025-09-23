@@ -412,6 +412,8 @@ export const getOrderStats = async (req, res) => {
 // 📈 Get sales performance
 export const getSalesPerformance = async (req, res) => {
   try {
+    console.log('📊 Sales performance request received:', req.query)
+    
     const { start_date, end_date, group_by = 'day' } = req.query
     
     let groupClause = 'DATE(created_at)'
@@ -421,6 +423,7 @@ export const getSalesPerformance = async (req, res) => {
       groupClause = 'YEAR(created_at)'
     }
 
+    console.log('📊 Executing sales data query...')
     const [salesData] = await pool.query(`
       SELECT 
         ${groupClause} as period,
@@ -439,24 +442,37 @@ export const getSalesPerformance = async (req, res) => {
       ORDER BY period DESC
     `, [start_date, end_date].filter(Boolean))
 
-    const [topProducts] = await pool.query(`
-      SELECT 
-        p.name as product_name,
-        p.image as product_image,
-        SUM(oi.quantity) as total_sold,
-        SUM(oi.quantity * oi.price) as total_revenue
-      FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
-      JOIN orders o ON oi.order_id = o.id
-      WHERE o.status != 'cancelled'
-      ${start_date ? 'AND o.created_at >= ?' : ''}
-      ${end_date ? 'AND o.created_at <= ?' : ''}
-      GROUP BY p.id, p.name, p.image
-      ORDER BY total_sold DESC
-      LIMIT 10
-    `, [start_date, end_date].filter(Boolean))
+    console.log('📊 Sales data query completed, executing top products query...')
+    
+    // Check if we have any orders first
+    const [orderCount] = await pool.query('SELECT COUNT(*) as count FROM orders');
+    console.log('📊 Total orders in database:', orderCount[0].count);
+    
+    let topProducts = [];
+    if (orderCount[0].count > 0) {
+      const [topProductsResult] = await pool.query(`
+        SELECT 
+          p.name as product_name,
+          p.image as product_image,
+          SUM(oi.quantity) as total_sold,
+          SUM(oi.quantity * oi.price) as total_revenue
+        FROM order_items oi
+        JOIN products p ON oi.product_id = p.id
+        JOIN orders o ON oi.order_id = o.id
+        WHERE o.status != 'cancelled'
+        ${start_date ? 'AND o.created_at >= ?' : ''}
+        ${end_date ? 'AND o.created_at <= ?' : ''}
+        GROUP BY p.id, p.name, p.image
+        ORDER BY total_sold DESC
+        LIMIT 10
+      `, [start_date, end_date].filter(Boolean))
+      topProducts = topProductsResult;
+    } else {
+      console.log('📊 No orders found, returning empty top products');
+    }
 
     // Get payment method breakdown
+    console.log('📊 Executing payment breakdown query...')
     const [paymentBreakdown] = await pool.query(`
       SELECT 
         payment_method,
@@ -471,34 +487,50 @@ export const getSalesPerformance = async (req, res) => {
       ORDER BY total_revenue DESC
     `, [start_date, end_date].filter(Boolean))
 
-    // Get inventory movement summary
-    const [inventorySummary] = await pool.query(`
-      SELECT 
-        movement_type,
-        COUNT(*) as movement_count,
-        SUM(ABS(quantity_change)) as total_quantity,
-        COUNT(DISTINCT product_id) as products_affected
-      FROM inventory_movements
-      WHERE order_id IS NOT NULL
-      ${start_date ? 'AND created_at >= ?' : ''}
-      ${end_date ? 'AND created_at <= ?' : ''}
-      GROUP BY movement_type
-    `, [start_date, end_date].filter(Boolean))
+    // Get inventory movement summary (simplified)
+    console.log('📊 Executing inventory summary query...')
+    let inventorySummary = [];
+    try {
+      const [inventoryResult] = await pool.query(`
+        SELECT 
+          movement_type,
+          COUNT(*) as movement_count,
+          SUM(ABS(quantity_change)) as total_quantity,
+          COUNT(DISTINCT product_id) as products_affected
+        FROM inventory_movements
+        WHERE order_id IS NOT NULL
+        ${start_date ? 'AND created_at >= ?' : ''}
+        ${end_date ? 'AND created_at <= ?' : ''}
+        GROUP BY movement_type
+      `, [start_date, end_date].filter(Boolean))
+      inventorySummary = inventoryResult;
+    } catch (inventoryError) {
+      console.log('📊 Inventory movements table not available:', inventoryError.message);
+      inventorySummary = [];
+    }
 
-    // Get sales logs summary for additional tracking
-    const [salesLogsSummary] = await pool.query(`
-      SELECT 
-        COUNT(*) as total_sales_logs,
-        SUM(amount) as total_sales_revenue,
-        COUNT(CASE WHEN movement_type = 'sale' THEN 1 END) as completed_sales,
-        COUNT(CASE WHEN movement_type = 'reversal' THEN 1 END) as reversed_sales,
-        SUM(CASE WHEN movement_type = 'sale' THEN amount ELSE 0 END) as completed_revenue,
-        SUM(CASE WHEN movement_type = 'reversal' THEN amount ELSE 0 END) as reversed_revenue
-      FROM sales_logs
-      WHERE 1=1
-      ${start_date ? 'AND created_at >= ?' : ''}
-      ${end_date ? 'AND created_at <= ?' : ''}
-    `, [start_date, end_date].filter(Boolean));
+    // Get sales logs summary (simplified)
+    console.log('📊 Executing sales logs summary query...')
+    let salesLogsSummary = {};
+    try {
+      const [salesLogsResult] = await pool.query(`
+        SELECT 
+          COUNT(*) as total_sales_logs,
+          SUM(amount) as total_sales_revenue,
+          COUNT(CASE WHEN movement_type = 'sale' THEN 1 END) as completed_sales,
+          COUNT(CASE WHEN movement_type = 'reversal' THEN 1 END) as reversed_sales,
+          SUM(CASE WHEN movement_type = 'sale' THEN amount ELSE 0 END) as completed_revenue,
+          SUM(CASE WHEN movement_type = 'reversal' THEN amount ELSE 0 END) as reversed_revenue
+        FROM sales_logs
+        WHERE 1=1
+        ${start_date ? 'AND created_at >= ?' : ''}
+        ${end_date ? 'AND created_at <= ?' : ''}
+      `, [start_date, end_date].filter(Boolean));
+      salesLogsSummary = salesLogsResult[0] || {};
+    } catch (salesLogsError) {
+      console.log('📊 Sales logs table not available:', salesLogsError.message);
+      salesLogsSummary = {};
+    }
 
     // Always create summary data from orders (for accurate totals)
     const [summary] = await pool.query(`
@@ -529,7 +561,33 @@ export const getSalesPerformance = async (req, res) => {
     })
   } catch (err) {
     console.error('Get sales performance error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('Error details:', {
+      message: err.message,
+      code: err.code,
+      sqlState: err.sqlState,
+      sqlMessage: err.sqlMessage
+    })
+    
+    // Provide more specific error messages
+    if (err.code === 'ER_NO_SUCH_TABLE') {
+      res.status(500).json({ 
+        error: 'Database tables not found',
+        message: 'Required database tables are missing. Please run the database setup script.',
+        details: err.message
+      })
+    } else if (err.code === 'ER_BAD_DB_ERROR') {
+      res.status(500).json({ 
+        error: 'Database connection error',
+        message: 'Cannot connect to database. Please check your database configuration.',
+        details: err.message
+      })
+    } else {
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: 'Failed to fetch sales performance data',
+        details: err.message
+      })
+    }
   }
 }
 

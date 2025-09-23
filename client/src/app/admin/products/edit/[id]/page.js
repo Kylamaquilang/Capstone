@@ -23,6 +23,16 @@ export default function EditProductPage() {
   const [description, setDescription] = useState('');
   const [size, setSize] = useState('S');
 
+  // Check if sizes should be disabled based on category
+  const isSizeDisabled = () => {
+    if (!categoryId) return false;
+    const selectedCategory = categories.find(c => c.id === Number(categoryId));
+    if (!selectedCategory) return false;
+    
+    const categoryName = selectedCategory.name.toLowerCase();
+    return categoryName === 'lanyard' || categoryName === 'tela';
+  };
+
   useEffect(() => {
     loadProduct();
     loadCategories();
@@ -63,14 +73,20 @@ export default function EditProductPage() {
     setSaving(true);
     
     try {
-      await API.put(`/products/${productId}`, {
+      const updateData = {
         name: name.trim(),
         description: description.trim(),
         price: Number(price),
         stock: Number(stock),
-        category_id: categoryId ? Number(categoryId) : null,
-        size: size
-      });
+        category_id: categoryId ? Number(categoryId) : null
+      };
+
+      // Only include size if sizes are not disabled
+      if (!isSizeDisabled()) {
+        updateData.size = size;
+      }
+
+      await API.put(`/products/${productId}`, updateData);
       
       router.push('/admin/products');
     } catch (err) {
@@ -213,19 +229,25 @@ export default function EditProductPage() {
                   />
                 </div>
 
-                <div>
+                <div className={isSizeDisabled() ? 'opacity-50 pointer-events-none' : ''}>
                   <label className="block text-sm font-medium mb-2 text-gray-700">
                     Size
                   </label>
-                  <select
-                    value={size}
-                    onChange={(e) => setSize(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  {isSizeDisabled() ? (
+                    <div className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100 text-gray-500">
+                      Sizes not available for this category
+                    </div>
+                  ) : (
+                    <select
+                      value={size}
+                      onChange={(e) => setSize(e.target.value)}
+                      className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {['XS', 'S', 'M', 'L', 'XL', 'XXL'].map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
 

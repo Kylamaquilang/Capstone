@@ -9,6 +9,7 @@ import Swal from 'sweetalert2';
 import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
 import { BanknotesIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
+import { getImageUrl } from '@/utils/imageUtils';
 
 const CheckoutPage = () => {
   const { user } = useAuth();
@@ -265,11 +266,14 @@ const CheckoutPage = () => {
                     {/* Product Image */}
                     <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
                       <Image
-                        src={item.product_image || '/images/polo.png'}
+                        src={getImageUrl(item.product_image) || '/images/polo.png'}
                         alt={item.product_name}
                         width={64}
                         height={64}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.src = '/images/polo.png';
+                        }}
                       />
                     </div>
 

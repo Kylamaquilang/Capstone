@@ -29,29 +29,50 @@ export default function UserDashboard() {
       setProductsLoading(true);
       const { data } = await API.get('/products');
       
+      // Define the specific order for categories
+      const categoryOrder = ['POLO', 'LANYARD', 'TELA', 'PE', 'NSTP'];
+      
       // Group products by category
-      const groupedProducts = data.reduce((acc, product) => {
-        const category = product.category || 'Other';
-        if (!acc[category]) {
-          acc[category] = [];
-        }
-        
+      const groupedProducts = {};
+      
+      data.forEach(product => {
         // Ensure we have a valid image URL
-        const imageUrl = getProductImageUrl(product.image);
+        const imageUrl = getProductImageUrl(product.image || product.image_url);
         
-        acc[category].push({
+        const productData = {
           id: product.id,
           name: product.name,
           src: imageUrl,
-          label: category,
           price: `₱${product.price?.toFixed(2) || '0.00'}`,
           description: product.description,
           stock: product.stock
-        });
-        return acc;
-      }, {});
+        };
+        
+        const categoryName = product.category || 'Other';
+        
+        if (!groupedProducts[categoryName]) {
+          groupedProducts[categoryName] = [];
+        }
+        
+        groupedProducts[categoryName].push(productData);
+      });
       
-      setProducts(groupedProducts);
+      // Sort categories according to the specified order
+      const sortedCategories = {};
+      categoryOrder.forEach(category => {
+        if (groupedProducts[category]) {
+          sortedCategories[category] = groupedProducts[category];
+        }
+      });
+      
+      // Add any remaining categories that weren't in the specified order
+      Object.keys(groupedProducts).forEach(category => {
+        if (!categoryOrder.includes(category)) {
+          sortedCategories[category] = groupedProducts[category];
+        }
+      });
+      
+      setProducts(sortedCategories);
     } catch (err) {
       console.log('Error fetching products (server might be starting):', err.message);
       setError('Failed to load products. Please try again in a moment.');
@@ -111,55 +132,58 @@ export default function UserDashboard() {
               <p className="text-gray-600 text-lg">No products available at the moment.</p>
             </div>
           ) : (
-            Object.entries(products).map(([category, items]) => (
-              <div key={category}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-0">
-                  {items.map((item) => (
-                    <Link
-                      key={item.id}
-                      href={`/products/${encodeURIComponent(item.name)}`}
-                      className="block group"
-                    >
-                      <div className="bg-white rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                        {/* Product Image */}
-                        <div className="relative h-65 mb-2 bg-white-50 rounded-lg overflow-hidden">
-                          <Image
-                            src={item.src}
-                            alt={item.name}
-                            fill
-                            className="object-contain p-4"
-                            onError={(e) => {
-                              e.target.src = '/images/polo.png';
-                            }}
-                          />
-                          {/* Stock Badge */}
-                          {item.stock <= 0 && (
-                            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                              Out of Stock
-                            </div>
-                          )}
-                          {item.stock > 0 && item.stock <= 5 && (
-                            <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
-                              Low Stock
-                            </div>
-                          )}
+            <div className="space-y-12">
+              {Object.entries(products).map(([categoryName, categoryProducts]) => (
+                <div key={categoryName} className="space-y-6">
+                  {/* Products Row for this Category */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mt-15">
+                    {categoryProducts.map((item) => (
+                      <Link
+                        key={item.id}
+                        href={`/products/${encodeURIComponent(item.name)}`}
+                        className="block group"
+                      >
+                        <div className="bg-white rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                          {/* Product Image - Rectangular */}
+                          <div className="relative h-63 mb-8 rounded-lg overflow-hidden">
+                            <Image
+                              src={item.src}
+                              alt={item.name}
+                              fill
+                              className="object-contain p-3"
+                              onError={(e) => {
+                                e.target.src = '/images/polo.png';
+                              }}
+                            />
+                            {/* Stock Badge */}
+                            {item.stock <= 0 && (
+                              <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                                Out of Stock
+                              </div>
+                            )}
+                            {item.stock > 0 && item.stock <= 5 && (
+                              <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
+                                Low Stock
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Product Info */}
+                          <div className="text-center">
+                            <h3 className="font-semibold text-gray-900 text-lg mb-2 line-clamp-2">
+                              {item.name}
+                            </h3>
+                            <p className="text-lg font-medium text-[#000C50]">
+                              {item.price}
+                            </p>
+                          </div>
                         </div>
-                        
-                        {/* Product Info */}
-                        <div className="text-center">
-                          <h3 className="font-semibold text-gray-900 text-xl mb-2 line-clamp-2">
-                            {item.name}
-                          </h3>
-                          <p className="text-1lg font-medium text-[#000C50]">
-                            {item.price}
-                          </p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
 
