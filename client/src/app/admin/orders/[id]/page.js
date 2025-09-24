@@ -207,7 +207,7 @@ export default function OrderDetailPage() {
 
             {/* Order Items */}
             <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-3">Order Items</h3>
+              <h3 className="text-xs font-semibold mb-3">Order Items</h3>
               <div className="bg-white border rounded-lg overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-gray-100">
@@ -305,7 +305,7 @@ export default function OrderDetailPage() {
               <select
                 value={statusUpdate.status}
                 onChange={(e) => setStatusUpdate({ ...statusUpdate, status: e.target.value })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="pending">Pending</option>
                 <option value="processing">Processing</option>

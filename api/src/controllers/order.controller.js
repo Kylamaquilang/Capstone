@@ -87,8 +87,8 @@ export const getAllOrders = async (req, res) => {
       const [items] = await pool.query(`
         SELECT 
           oi.quantity, 
-          oi.price as unit_price,
-          (oi.quantity * oi.price) as total_price,
+          oi.unit_price,
+          oi.total_price,
           p.name as product_name, 
           p.image, 
           p.id as product_id,
@@ -115,7 +115,7 @@ export const getOrderItems = async (req, res) => {
 
   try {
     const [items] = await pool.query(`
-      SELECT oi.quantity, oi.size, oi.price, p.name, p.image, p.id as product_id
+      SELECT oi.quantity, oi.size, oi.unit_price, oi.total_price, p.name, p.image, p.id as product_id
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = ?
@@ -160,7 +160,7 @@ export const getOrderById = async (req, res) => {
 
     // Get order items
     const [items] = await pool.query(`
-      SELECT oi.quantity, oi.price, p.name as product_name, p.image, p.id as product_id, ps.size as size_name
+      SELECT oi.quantity, oi.unit_price, oi.total_price, p.name as product_name, p.image, p.id as product_id, ps.size as size_name
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
       LEFT JOIN product_sizes ps ON oi.size_id = ps.id
@@ -455,7 +455,7 @@ export const getSalesPerformance = async (req, res) => {
           p.name as product_name,
           p.image as product_image,
           SUM(oi.quantity) as total_sold,
-          SUM(oi.quantity * oi.price) as total_revenue
+          SUM(oi.total_price) as total_revenue
         FROM order_items oi
         JOIN products p ON oi.product_id = p.id
         JOIN orders o ON oi.order_id = o.id
@@ -789,7 +789,7 @@ export const userConfirmOrderReceipt = async (req, res) => {
         
         // Get order items with prices for email
         const [orderItemsWithPrices] = await pool.query(`
-          SELECT oi.quantity, oi.price, p.name as product_name
+          SELECT oi.quantity, oi.unit_price, oi.total_price, p.name as product_name
           FROM order_items oi
           JOIN products p ON oi.product_id = p.id
           WHERE oi.order_id = ?

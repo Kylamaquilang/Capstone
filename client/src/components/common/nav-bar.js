@@ -1,6 +1,5 @@
 'use client';
 import {
-    BellIcon,
     MagnifyingGlassIcon,
     ShoppingCartIcon,
     UserCircleIcon,
@@ -9,6 +8,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useNotifications } from '@/context/NotificationContext';
 import { useEffect, useState } from 'react';
+import NotificationBell from '@/components/notifications/NotificationBell';
 
 export default function Navbar() {
   const { cartCount, notificationCount } = useNotifications();
@@ -66,11 +66,7 @@ export default function Navbar() {
       </div>
       <div className="flex gap-4 items-center">
         
-        <Link href="/notification">
-          <Badge count={notificationCount}>
-            <BellIcon className="h-6 w-6 text-white" />
-          </Badge>
-        </Link>
+        <NotificationBell userType="user" userId="1" />
         
         <Link href="/cart">
           <Badge count={cartCount}>

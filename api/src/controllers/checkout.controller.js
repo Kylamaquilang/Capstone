@@ -161,18 +161,31 @@ export const checkout = async (req, res) => {
       return sum + price * item.quantity
     }, 0)
 
+    // Generate unique order number
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const [existingOrders] = await pool.query(`
+      SELECT COUNT(*) as count FROM orders WHERE order_number LIKE ?
+    `, [`ORD${dateStr}%`]);
+    
+    const orderNumber = `ORD${dateStr}${String(existingOrders[0].count + 1).padStart(4, '0')}`;
+
     const [orderResult] = await pool.query(`
-      INSERT INTO orders (user_id, total_amount, payment_method, payment_status, status, pay_at_counter)
-      VALUES (?, ?, ?, 'unpaid', 'pending', ?)
-    `, [user_id, total_amount, payment_method, pay_at_counter || false])
+      INSERT INTO orders (user_id, order_number, total_amount, payment_method, payment_status, status, pay_at_counter)
+      VALUES (?, ?, ?, ?, 'unpaid', 'pending', ?)
+    `, [user_id, orderNumber, total_amount, payment_method, pay_at_counter || false])
 
     const orderId = orderResult.insertId
 
     for (const item of cartItems) {
+      // Get product name
+      const [productInfo] = await pool.query(`SELECT name FROM products WHERE id = ?`, [item.product_id]);
+      const productName = productInfo[0]?.name || 'Unknown Product';
+      
       await pool.query(
-        `INSERT INTO order_items (order_id, product_id, size_id, quantity, price)
-         VALUES (?, ?, ?, ?, ?)`,
-        [orderId, item.product_id, item.size_id || null, item.quantity, item.size_price || item.price]
+        `INSERT INTO order_items (order_id, product_id, size_id, product_name, quantity, unit_price, total_price)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [orderId, item.product_id, item.size_id || null, productName, item.quantity, item.size_price || item.price, (item.size_price || item.price) * item.quantity]
       )
 
       // Update stock and log inventory movement

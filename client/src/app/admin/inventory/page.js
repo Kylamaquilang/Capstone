@@ -225,18 +225,18 @@ export default function AdminInventoryPage() {
           {/* Category Statistics */}
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
             <div className="p-4 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-900">Category Breakdown</h3>
+              <h3 className="text-xs font-semibold text-gray-900">Category Breakdown</h3>
             </div>
             <div className="p-4">
               {inventoryData.categoryStats && inventoryData.categoryStats.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
-                  <thead className="bg-blue-100">
+                  <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Category</th>
-                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Products</th>
-                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Total Stock</th>
-                      <th className="px-4 py-3 text-sm font-medium text-black-700">Avg Price</th>
+                      <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Category</th>
+                      <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Products</th>
+                      <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Total Stock</th>
+                      <th className="px-4 py-3 text-xs font-medium text-black-700">Avg Price</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -276,7 +276,7 @@ export default function AdminInventoryPage() {
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6">
             <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-gray-900">Low Stock Alerts</h3>
+                <h3 className="text-xs font-semibold text-gray-900">Low Stock Alerts</h3>
                 <span className="text-xs text-gray-500">
                   Threshold: {inventoryData.summary.lowStockThreshold || 5} units
                 </span>

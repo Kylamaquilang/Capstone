@@ -6,7 +6,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { 
   CubeIcon, ClipboardDocumentListIcon, BanknotesIcon, 
   UserCircleIcon, ArrowLeftOnRectangleIcon, 
-  ArchiveBoxIcon, TagIcon, Bars3Icon, XMarkIcon
+  ArchiveBoxIcon, TagIcon, Bars3Icon, XMarkIcon,
+  BellIcon
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
@@ -46,7 +47,7 @@ export default function Sidebar() {
       {/* Mobile Hamburger Button */}
       <button
         onClick={toggleMobileMenu}
-        className="lg:hidden fixed top-3 left-3 z-50 bg-white text-gray-700 p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
+        className="lg:hidden fixed top-20 left-3 z-50 bg-white text-gray-700 p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
       >
         {isMobileMenuOpen ? (
           <XMarkIcon className="h-4 w-4" />
@@ -65,9 +66,9 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <div className={`
-         w-50 bg-white border-r border-gray-100 flex flex-col min-h-screen  
-        fixed lg:relative transform transition-transform duration-300 ease-in-out z-30  
-        shadow-md  
+         w-64 bg-white border-r border-gray-100 flex flex-col min-h-screen  
+        fixed top-20 left-0 transform transition-transform duration-300 ease-in-out z-30  
+        shadow-md
       ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}  
       `}>
         {/* Mobile Header */}
@@ -90,6 +91,7 @@ export default function Sidebar() {
             <SidebarItem href="/admin/categories" icon={TagIcon} label="Categories" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/orders" icon={ClipboardDocumentListIcon} label="Orders" onClick={toggleMobileMenu} pathname={pathname} />
+            <SidebarItem href="/admin/notification" icon={BellIcon} label="Notifications" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/sales" icon={BanknotesIcon} label="Sales" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/users" icon={UserCircleIcon} label="Users" onClick={toggleMobileMenu} pathname={pathname} />
           </nav>

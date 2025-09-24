@@ -152,11 +152,11 @@ export default function AdminCategoriesPage() {
               <div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-blue-100">
+                  <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Category Name</th>
-                      <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Created</th>
-                      <th className="px-4 py-3 text-sm font-medium text-black-700">Actions</th>
+                      <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Category Name</th>
+                      <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Created</th>
+                      <th className="px-4 py-3 text-xs font-medium text-black-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>

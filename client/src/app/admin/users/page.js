@@ -174,7 +174,7 @@ export default function AdminUsersPage() {
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-0 ml-0">
+        <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-64">
           {/* Main Container with Buttons and Table */}
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Header Section */}
@@ -186,7 +186,7 @@ export default function AdminUsersPage() {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <button 
                     onClick={() => setShowAddStudentModal(true)}
-                    className="bg-gray-900 text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
+                    className="bg-[#000C50] text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
                   >
                     Add Student
                   </button>
@@ -215,7 +215,7 @@ export default function AdminUsersPage() {
               <div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-blue-50">
+                  <thead className="bg-gray-50">
                     <tr>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stud ID</th>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Name</th>

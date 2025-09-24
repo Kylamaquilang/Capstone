@@ -1,9 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import ProductTable from './product-table';
 import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
-import ErrorBoundary from '@/components/common/ErrorBoundary';
 import AddProductModal from './add-product-modal';
 import API from '@/lib/axios';
 
@@ -11,6 +10,16 @@ export default function AdminProductPage() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categories, setCategories] = useState([]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+
+  const handleAddProductSuccess = useCallback(() => {
+    setShowAddProductModal(false);
+    // The ProductTable component will handle refreshing its own data
+    console.log('Product added - table will refresh automatically');
+  }, []);
+
+  const handleCloseAddProductModal = useCallback(() => {
+    setShowAddProductModal(false);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -36,25 +45,32 @@ export default function AdminProductPage() {
   }, []);
 
   return (
-    <ErrorBoundary>
-      <div className="flex flex-col min-h-screen text-black admin-page">
-        {/* ✅ Top Navbar */}
-        <Navbar />
-
-      <div className="flex flex-1">
+    <div className="min-h-screen text-black admin-page">
+      <Navbar />
+      <div className="flex">
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-0 ml-0">
+        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64 pt-20">
           {/* Header Section */}
-          <div className="mb-3 ml-1 sm:ml-2">
-            <h1 className="text-xl sm:text-3xl font-semibold text-gray-900 mb-1">Products</h1>
+          <div className="mb-2 ml-1 sm:ml-2">
+            <h1 className="text-lg sm:text-2xl font-semibold text-gray-900 mb-1">Products</h1>
           </div>
 
           {/* Main Container with Buttons and Table */}
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Category Filter and Add Product Button */}
-            <div className="p-3 sm:p-4 border-b border-gray-200">
+            <div className="p-2 sm:p-3 border-b border-gray-200">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setSelectedCategory('')}
+                    className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${
+                      selectedCategory === ''
+                        ? 'bg-[#000C50] text-white'
+                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                    }`}
+                  >
+                    ALL
+                  </button>
                   {categories.map((cat) => (
                     <button
                       key={cat.id}
@@ -73,7 +89,7 @@ export default function AdminProductPage() {
                 {/* Add Product Button */}
                 <button 
                   onClick={() => setShowAddProductModal(true)}
-                  className="bg-[#000C50] text-white px-3 sm:px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium self-start sm:self-auto"
+                  className="bg-[#000C50] text-white px-3 sm:px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium self-start sm:self-auto mt-3 sm:mt-0"
                 >
                   Add Product
                 </button>
@@ -89,15 +105,10 @@ export default function AdminProductPage() {
       {/* Add Product Modal */}
       {showAddProductModal && (
         <AddProductModal 
-          onClose={() => setShowAddProductModal(false)}
-          onSuccess={() => {
-            setShowAddProductModal(false);
-            // Refresh the product table by triggering a re-render
-            window.location.reload();
-          }}
+          onClose={handleCloseAddProductModal}
+          onSuccess={handleAddProductSuccess}
         />
       )}
     </div>
-    </ErrorBoundary>
   );
 }

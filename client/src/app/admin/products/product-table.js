@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
 import { PencilSquareIcon, TrashIcon, MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
@@ -14,25 +14,50 @@ export default function ProductTable({ category = '' }) {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(null);
   const router = useRouter();
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
+      setError('');
+      
       const params = new URLSearchParams();
       if (category) {
         params.set('category', category);
       }
       const query = params.toString();
       const url = query ? `/products/detailed?${query}` : '/products/detailed';
+      
       try {
         const { data } = await API.get(url);
-        setProducts((data && data.products) ? data.products : []);
+        let products = (data && data.products) ? data.products : [];
+        
+        // Since the detailed endpoint doesn't return sizes, fetch individual product details
+        // to get the actual sizes data
+        const productsWithSizes = await Promise.all(
+          products.map(async (product) => {
+            try {
+              const { data: productDetail } = await API.get(`/products/${product.id}`);
+              return {
+                ...product,
+                sizes: productDetail.sizes || []
+              };
+            } catch (err) {
+              // If individual fetch fails, return product without sizes
+              return {
+                ...product,
+                sizes: []
+              };
+            }
+          })
+        );
+        
+        setProducts(productsWithSizes);
         setError('');
       } catch (errDetailed) {
         // Fallback to simple endpoint
@@ -45,7 +70,7 @@ export default function ProductTable({ category = '' }) {
             price: p.price,
             stock: p.stock,
             category_name: p.category,
-            sizes: []
+            sizes: p.sizes || [] // Use actual sizes if available
           }));
           setProducts(mapped);
           setError('');
@@ -57,7 +82,7 @@ export default function ProductTable({ category = '' }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [category]);
 
   useEffect(() => {
     fetchProducts();
@@ -96,6 +121,16 @@ export default function ProductTable({ category = '' }) {
   const endIndex = startIndex + itemsPerPage;
   const paginatedProducts = filteredAndSortedProducts.slice(startIndex, endIndex);
 
+  // Reset to first page when items per page changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
 
   // Handle sorting
   const handleSort = (field) => {
@@ -112,9 +147,14 @@ export default function ProductTable({ category = '' }) {
     setEditModalOpen(true);
   };
 
-  const handleEditSuccess = () => {
-    fetchProducts(); // Refresh the products list
-  };
+  const handleEditSuccess = useCallback(() => {
+    // Reset pagination to first page to ensure updated product is visible
+    setCurrentPage(1);
+    // Refresh the products list to get latest data
+    fetchProducts();
+    // Show success message
+    console.log('Product updated successfully - table refreshed');
+  }, [fetchProducts]);
 
   const handleDelete = (id, name) => {
     Swal.fire({
@@ -175,29 +215,40 @@ export default function ProductTable({ category = '' }) {
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <FunnelIcon className="h-4 w-4" />
-            <span>{filteredAndSortedProducts.length} products</span>
+            <span>Total: {filteredAndSortedProducts.length} Records</span>
+            <span className="text-gray-400">|</span>
+            <span>Rows per page:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => setItemsPerPage(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
           </div>
         </div>
       </div>
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse mb-50">
-          <thead className="bg-blue-100">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-gray-100">
             <tr>
               <th 
-                className="px-4 py-3 text-sm font-medium text-black-900 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-xs font-medium text-gray-900 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
               >
                 <div className="flex items-center gap-1">
                   Product Name
                   {sortField === 'name' && (
-                    <span className="text-blue-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    <span className="text-gray-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                   )}
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('category_name')}
               >
                 <div className="flex items-center gap-1">
@@ -208,7 +259,7 @@ export default function ProductTable({ category = '' }) {
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('price')}
               >
                 <div className="flex items-center gap-1">
@@ -219,7 +270,7 @@ export default function ProductTable({ category = '' }) {
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('stock')}
               >
                 <div className="flex items-center gap-1">
@@ -229,72 +280,151 @@ export default function ProductTable({ category = '' }) {
                   )}
                 </div>
               </th>
-              <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Size</th>
-              <th className="px-4 py-3 text-sm font-medium text-black-700 border-r border-gray-200">Stock</th>
-              <th className="px-4 py-3 text-sm font-medium text-black-700">Actions</th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Size</th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stock</th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {paginatedProducts.map((product, index) => (
-              <tr 
-                key={product.id} 
-                className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                  index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                }`}
-              >
-                <td className="px-4 py-3 border-r border-gray-100">
-                  <div className="text-xs font-medium text-gray-900">{product.name}</div>
-                </td>
-                <td className="px-4 py-3 border-r border-gray-100">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
-                    {product.category_name || product.category || 'Uncategorized'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 border-r border-gray-100">
-                  <div className="text-xs font-medium text-gray-900">
-                    ₱{Number(product.price).toFixed(2)}
-                  </div>
-                </td>
-                <td className="px-4 py-3 border-r border-gray-100">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    Number(product.stock) === 0 
-                      ? 'bg-red-50 text-red-700' 
-                      : Number(product.stock) <= 5 
-                      ? 'bg-yellow-50 text-yellow-700' 
-                      : 'bg-green-50 text-green-700'
-                  }`}>
-                    {product.stock}
-                  </span>
-                </td>
-                <td className="px-4 py-3 border-r border-gray-100">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
-                    N/A
-                  </span>
-                </td>
-                <td className="px-4 py-3 border-r border-gray-100">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
-                    N/A
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <ActionMenu
-                    actions={[
-                      {
-                        label: 'Edit Product',
-                        icon: PencilSquareIcon,
-                        onClick: () => handleEdit(product.id)
-                      },
-                      {
-                        label: 'Delete Product',
-                        icon: TrashIcon,
-                        onClick: () => handleDelete(product.id, product.name),
-                        danger: true
-                      }
-                    ]}
-                  />
-                </td>
-              </tr>
-            ))}
+            {paginatedProducts.map((product, productIndex) => {
+              // If product has sizes, create a row for each size
+              if (product.sizes && product.sizes.length > 0) {
+                return product.sizes.map((size, sizeIndex) => (
+                  <tr 
+                    key={`${product.id}-${size.size}`} 
+                    className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                      (productIndex + sizeIndex) % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                    }`}
+                  >
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <div className="text-xs font-medium text-gray-900">{product.name}</div>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                        {product.category_name || product.category || 'Uncategorized'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <div className="text-xs font-medium text-gray-900">
+                        ₱{Number(product.price).toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        Number(product.stock) === 0 
+                          ? 'bg-red-50 text-red-700' 
+                          : Number(product.stock) <= 5 
+                          ? 'bg-yellow-50 text-yellow-700' 
+                          : 'bg-green-50 text-green-700'
+                      }`}>
+                        {product.stock}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                        {size.size}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        Number(size.stock) === 0 
+                          ? 'bg-red-50 text-red-700' 
+                          : Number(size.stock) <= 5 
+                          ? 'bg-yellow-50 text-yellow-700' 
+                          : 'bg-green-50 text-green-700'
+                      }`}>
+                        {size.stock}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <ActionMenu
+                        actions={[
+                          {
+                            label: 'Edit Product',
+                            icon: PencilSquareIcon,
+                            onClick: () => handleEdit(product.id)
+                          },
+                          {
+                            label: 'Delete Product',
+                            icon: TrashIcon,
+                            onClick: () => handleDelete(product.id, product.name),
+                            danger: true
+                          }
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                ));
+              } else {
+                // If product has no sizes, show base product info
+                return (
+                  <tr 
+                    key={product.id} 
+                    className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                      productIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                    }`}
+                  >
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <div className="text-xs font-medium text-gray-900">{product.name}</div>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                        {product.category_name || product.category || 'Uncategorized'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <div className="text-xs font-medium text-gray-900">
+                        ₱{Number(product.price).toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        Number(product.stock) === 0 
+                          ? 'bg-red-50 text-red-700' 
+                          : Number(product.stock) <= 5 
+                          ? 'bg-yellow-50 text-yellow-700' 
+                          : 'bg-green-50 text-green-700'
+                      }`}>
+                        {product.stock}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-500">
+                        No sizes
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        Number(product.stock) === 0 
+                          ? 'bg-red-50 text-red-700' 
+                          : Number(product.stock) <= 5 
+                          ? 'bg-yellow-50 text-yellow-700' 
+                          : 'bg-green-50 text-green-700'
+                      }`}>
+                        {product.stock || 0}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <ActionMenu
+                        actions={[
+                          {
+                            label: 'Edit Product',
+                            icon: PencilSquareIcon,
+                            onClick: () => handleEdit(product.id)
+                          },
+                          {
+                            label: 'Delete Product',
+                            icon: TrashIcon,
+                            onClick: () => handleDelete(product.id, product.name),
+                            danger: true
+                          }
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                );
+              }
+            })}
           </tbody>
         </table>
       </div>
