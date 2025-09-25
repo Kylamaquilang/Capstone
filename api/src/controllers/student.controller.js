@@ -4,7 +4,8 @@ import { validateEmail, validateStudentId } from '../utils/validation.js';
 import { sendWelcomeEmail } from '../utils/emailService.js';
 import csv from 'csv-parser';
 import fs from 'fs';
-import * as XLSX from 'xlsx';
+import pkg from 'xlsx';
+const { readFile, utils } = pkg;
 
 const SALT_ROUNDS = 12;
 const DEFAULT_STUDENT_PASSWORD = process.env.DEFAULT_STUDENT_PASSWORD || 'cpc123';
@@ -163,33 +164,231 @@ export const addStudentsBulk = async (req, res) => {
       // Handle Excel files
       try {
         console.log('📊 Processing Excel file...');
-        const workbook = XLSX.readFile(req.file.path);
+        const workbook = readFile(req.file.path);
         const sheetName = workbook.SheetNames[0]; // Use first sheet
         const worksheet = workbook.Sheets[sheetName];
         
         // Convert Excel to JSON
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const jsonData = utils.sheet_to_json(worksheet, { header: 1 });
         
         if (jsonData.length < 2) {
           throw new Error('Excel file must have at least a header row and one data row');
         }
         
-        // Get headers from first row
-        const headers = jsonData[0].map(h => h ? h.toString().trim().toLowerCase() : '');
+        // Debug: Show raw Excel data before processing
+        console.log('🔍 Raw Excel data (first 3 rows):', jsonData.slice(0, 3));
+        console.log('🔍 Headers from raw data:', jsonData[0]);
+        
+        // Check if this is the special format with 4a/4b columns
+        const isSpecialFormat = jsonData[0].some(header => 
+          header && (header.toString().toLowerCase().includes('4a') || header.toString().toLowerCase().includes('4b'))
+        );
+        
+        if (isSpecialFormat) {
+          console.log('🔍 Detected special Excel format (4a/4b columns)');
+          console.log(`📊 Processing ${jsonData.length - 1} rows...`);
+          
+          // Process special format with batch processing
+          const batchSize = 10; // Process 10 rows at a time
+          for (let i = 1; i < jsonData.length; i += batchSize) {
+            const batch = jsonData.slice(i, i + batchSize);
+            
+            for (const row of batch) {
+              // Extract student from 4a column (columns 0-6)
+              if (row[0] && row[0].toString().trim()) {
+                const studentA = {
+                  student_id: row[0].toString().trim(),
+                  first_name: row[1] ? row[1].toString().trim().split(',')[0].trim() : '',
+                  last_name: row[2] ? row[2].toString().trim() : '',
+                  email: `${row[0].toString().trim().toLowerCase()}@student.cpc.edu.ph`,
+                  degree: 'BSIT',
+                  status: 'regular'
+                };
+                results.push(studentA);
+              }
+              
+              // Extract student from 4b column (columns 7-11)
+              if (row[7] && row[7].toString().trim()) {
+                const studentB = {
+                  student_id: row[7].toString().trim(),
+                  first_name: row[8] ? row[8].toString().trim().split(',')[0].trim() : '',
+                  last_name: row[9] ? row[9].toString().trim() : '',
+                  email: `${row[7].toString().trim().toLowerCase()}@student.cpc.edu.ph`,
+                  degree: 'BSIT',
+                  status: 'regular'
+                };
+                results.push(studentB);
+              }
+            }
+            
+            // Log progress every batch
+            if (i % (batchSize * 5) === 1) {
+              console.log(`📊 Processed ${Math.min(i + batchSize - 1, jsonData.length - 1)}/${jsonData.length - 1} rows...`);
+            }
+          }
+          
+          console.log(`📊 Processed ${results.length} students from special format`);
+          console.log('🔍 Sample processed students:', results.slice(0, 3));
+        } else {
+          // Normal processing
+          // Get headers from first row
+          const headers = jsonData[0].map(h => h ? h.toString().trim().toLowerCase() : '');
+          console.log('🔍 Excel Headers:', headers);
+        
+        // Enhanced header mapping with more variations
+        const headerMapping = {
+          'student id': 'student_id',
+          'studentid': 'student_id',
+          'id': 'student_id',
+          'student number': 'student_id',
+          'student_no': 'student_id',
+          'student_no.': 'student_id',
+          'stud_id': 'student_id',
+          'first name': 'first_name',
+          'firstname': 'first_name',
+          'fname': 'first_name',
+          'given name': 'first_name',
+          'last name': 'last_name',
+          'lastname': 'last_name',
+          'lname': 'last_name',
+          'surname': 'last_name',
+          'family name': 'last_name',
+          'middle name': 'middle_name',
+          'middlename': 'middle_name',
+          'mname': 'middle_name',
+          'middle initial': 'middle_name',
+          'email address': 'email',
+          'emailaddress': 'email',
+          'e-mail': 'email',
+          'email_addr': 'email',
+          'course': 'degree',
+          'program': 'degree',
+          'course/program': 'degree',
+          'year level': 'status',
+          'yearlevel': 'status',
+          'level': 'status',
+          'year': 'status',
+          'grade level': 'status',
+          'class': 'status'
+        };
+        
+        // Auto-detect columns if mapping fails
+        const autoDetectColumns = (headers, sampleRow) => {
+          const detected = {};
+          
+          headers.forEach((header, index) => {
+            const value = sampleRow[index];
+            const headerLower = header.toLowerCase();
+            
+            // Auto-detect student_id
+            if (!detected.student_id && (
+              headerLower.includes('student') || 
+              headerLower.includes('id') ||
+              (value && /^\d{4,8}$/.test(value.toString().trim()))
+            )) {
+              detected.student_id = index;
+            }
+            
+            // Auto-detect first_name
+            if (!detected.first_name && (
+              headerLower.includes('first') || 
+              headerLower.includes('given') ||
+              headerLower.includes('fname')
+            )) {
+              detected.first_name = index;
+            }
+            
+            // Auto-detect last_name
+            if (!detected.last_name && (
+              headerLower.includes('last') || 
+              headerLower.includes('surname') ||
+              headerLower.includes('family') ||
+              headerLower.includes('lname')
+            )) {
+              detected.last_name = index;
+            }
+            
+            // Auto-detect email
+            if (!detected.email && (
+              headerLower.includes('email') || 
+              headerLower.includes('e-mail') ||
+              (value && /@/.test(value.toString()))
+            )) {
+              detected.email = index;
+            }
+            
+            // Auto-detect degree
+            if (!detected.degree && (
+              headerLower.includes('course') || 
+              headerLower.includes('program') ||
+              headerLower.includes('degree') ||
+              headerLower.includes('major')
+            )) {
+              detected.degree = index;
+            }
+            
+            // Auto-detect status
+            if (!detected.status && (
+              headerLower.includes('year') || 
+              headerLower.includes('level') ||
+              headerLower.includes('grade') ||
+              headerLower.includes('class')
+            )) {
+              detected.status = index;
+            }
+          });
+          
+          return detected;
+        };
+        
+        // Try auto-detection if we have a sample row
+        let autoDetectedColumns = {};
+        if (jsonData.length > 1) {
+          autoDetectedColumns = autoDetectColumns(headers, jsonData[1]);
+          console.log('🔍 Auto-detected columns:', autoDetectedColumns);
+        }
         
         // Process data rows
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i];
           const cleanedData = {};
           
+          // First try header mapping
           headers.forEach((header, index) => {
-            cleanedData[header] = row[index] ? row[index].toString().trim() : '';
+            const cleanHeader = headerMapping[header] || header;
+            cleanedData[cleanHeader] = row[index] ? row[index].toString().trim() : '';
           });
+          
+          // If auto-detection found columns, use them as fallback
+          Object.keys(autoDetectedColumns).forEach(field => {
+            const columnIndex = autoDetectedColumns[field];
+            if (columnIndex !== undefined && row[columnIndex]) {
+              cleanedData[field] = row[columnIndex].toString().trim();
+            }
+          });
+          
+          // Debug: Show first few processed rows
+          if (i <= 3) {
+            console.log(`🔍 Processing row ${i}:`, {
+              originalHeaders: headers,
+              originalData: row,
+              cleanedData: cleanedData,
+              autoDetected: autoDetectedColumns
+            });
+          }
           
           results.push(cleanedData);
         }
         
-        console.log(`📊 Found ${results.length} rows in Excel file`);
+        console.log('🔍 Header mapping applied:', headers.map(h => `${h} -> ${headerMapping[h] || h}`));
+        
+          console.log(`📊 Found ${results.length} rows in Excel file`);
+          
+          // Debug: Show first processed row
+          if (results.length > 0) {
+            console.log('🔍 First processed row:', JSON.stringify(results[0], null, 2));
+          }
+        }
         
       } catch (excelError) {
         console.error('❌ Error reading Excel file:', excelError);
@@ -254,13 +453,66 @@ export const addStudentsBulk = async (req, res) => {
       });
     }
 
+    // Check if we have any data to process
+    if (results.length === 0) {
+      console.log('❌ No data found in file');
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(400).json({ 
+        error: 'No data found in file', 
+        details: 'The file appears to be empty or contains no valid data rows' 
+      });
+    }
+
     // Process each row
     try {
       console.log(`📊 Processing ${results.length} rows from file`);
+      console.log('🔍 Sample of results:', results.slice(0, 2));
+      
+      // Batch check for existing students to avoid individual queries
+      console.log('🔍 Batch checking for existing students...');
+      const allStudentIds = results.map(row => row.student_id?.trim()).filter(id => id);
+      const allEmails = results.map(row => row.email?.trim()).filter(email => email);
+      
+      // Get all existing student IDs and emails in one query
+      const existingStudents = new Set();
+      const existingEmails = new Set();
+      
+      if (allStudentIds.length > 0) {
+        const placeholders = allStudentIds.map(() => '?').join(',');
+        const [existingIds] = await pool.query(`SELECT student_id FROM users WHERE student_id IN (${placeholders})`, allStudentIds);
+        existingIds.forEach(student => existingStudents.add(student.student_id));
+      }
+      
+      if (allEmails.length > 0) {
+        const placeholders = allEmails.map(() => '?').join(',');
+        const [existingEmailsResult] = await pool.query(`SELECT email FROM users WHERE email IN (${placeholders})`, allEmails);
+        existingEmailsResult.forEach(user => existingEmails.add(user.email));
+      }
+      
+      console.log(`🔍 Found ${existingStudents.size} existing student IDs and ${existingEmails.size} existing emails`);
+      
+      // Prepare batch insert data
+      const batchInsertData = [];
       
       for (let i = 0; i < results.length; i++) {
         const row = results[i];
         const rowNumber = i + 2; // +2 because file starts at row 2 (row 1 is header)
+
+        // Debug: Log first few rows to see data structure
+        if (i < 3) {
+          console.log(`🔍 Debug Row ${rowNumber}:`, JSON.stringify(row, null, 2));
+          console.log(`🔍 Available fields in row:`, Object.keys(row));
+          console.log(`🔍 Required fields check:`, {
+            student_id: !!row.student_id,
+            first_name: !!row.first_name,
+            last_name: !!row.last_name,
+            email: !!row.email,
+            degree: !!row.degree,
+            status: !!row.status
+          });
+        }
 
         try {
           // Validate required fields with better error messages
@@ -299,9 +551,28 @@ export const addStudentsBulk = async (req, res) => {
             continue;
           }
 
-          // Validate degree
+          // Validate degree (more flexible)
           const validDegrees = ['BEED', 'BSED', 'BSIT', 'BSHM'];
-          if (!validDegrees.includes(row.degree.toUpperCase())) {
+          const degreeValue = row.degree.toUpperCase().trim();
+          let mappedDegree = degreeValue;
+          
+          // Map common degree variations
+          const degreeMapping = {
+            'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY': 'BSIT',
+            'BACHELOR OF SCIENCE IN EDUCATION': 'BSED',
+            'BACHELOR OF ELEMENTARY EDUCATION': 'BEED',
+            'BACHELOR OF SCIENCE IN HOSPITALITY MANAGEMENT': 'BSHM',
+            'INFORMATION TECHNOLOGY': 'BSIT',
+            'EDUCATION': 'BSED',
+            'ELEMENTARY EDUCATION': 'BEED',
+            'HOSPITALITY MANAGEMENT': 'BSHM'
+          };
+          
+          if (degreeMapping[degreeValue]) {
+            mappedDegree = degreeMapping[degreeValue];
+          }
+          
+          if (!validDegrees.includes(mappedDegree)) {
             errors.push({
               row: rowNumber,
               error: `Invalid degree: "${row.degree}". Must be one of: ${validDegrees.join(', ')}`,
@@ -311,9 +582,32 @@ export const addStudentsBulk = async (req, res) => {
             continue;
           }
 
-          // Validate status
+          // Validate status (more flexible)
           const validStatuses = ['regular', 'irregular'];
-          if (!validStatuses.includes(row.status.toLowerCase())) {
+          const statusValue = row.status.toLowerCase().trim();
+          let mappedStatus = statusValue;
+          
+          // Map common status variations
+          const statusMapping = {
+            '1st year': 'regular',
+            '2nd year': 'regular',
+            '3rd year': 'regular',
+            '4th year': 'regular',
+            'first year': 'regular',
+            'second year': 'regular',
+            'third year': 'regular',
+            'fourth year': 'regular',
+            'freshman': 'regular',
+            'sophomore': 'regular',
+            'junior': 'regular',
+            'senior': 'regular'
+          };
+          
+          if (statusMapping[statusValue]) {
+            mappedStatus = statusMapping[statusValue];
+          }
+          
+          if (!validStatuses.includes(mappedStatus)) {
             errors.push({
               row: rowNumber,
               error: `Invalid status: "${row.status}". Must be either "regular" or "irregular"`,
@@ -323,9 +617,8 @@ export const addStudentsBulk = async (req, res) => {
             continue;
           }
 
-          // Check if student already exists with this email
-          const [existingEmail] = await pool.query('SELECT * FROM users WHERE email = ?', [row.email.trim()]);
-          if (existingEmail.length > 0) {
+          // Check if student already exists using batch results
+          if (existingEmails.has(row.email.trim())) {
             errors.push({
               row: rowNumber,
               error: `Student already exists with email: ${row.email}`,
@@ -335,9 +628,7 @@ export const addStudentsBulk = async (req, res) => {
             continue;
           }
 
-          // Check if student already exists with this student_id
-          const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ?', [row.student_id.trim()]);
-          if (existingStudentId.length > 0) {
+          if (existingStudents.has(row.student_id.trim())) {
             errors.push({
               row: rowNumber,
               error: `Student ID already exists: ${row.student_id}`,
@@ -353,7 +644,39 @@ export const addStudentsBulk = async (req, res) => {
           // Hash default password
           const hashedPassword = await bcrypt.hash(DEFAULT_STUDENT_PASSWORD, SALT_ROUNDS);
 
-          // Insert new student
+          // Add to batch insert data instead of individual insert
+          batchInsertData.push([
+            row.student_id.trim(),
+            row.email.trim(),
+            fullName,
+            hashedPassword,
+            'student',
+            row.first_name.trim(),
+            row.last_name.trim(),
+            row.middle_name?.trim() || null,
+            row.suffix?.trim() || null,
+            mappedDegree,
+            mappedStatus,
+          ]);
+
+          successCount++;
+          console.log(`✅ Prepared student for batch insert: ${row.student_id} - ${fullName}`);
+
+        } catch (rowError) {
+          console.error(`❌ Error processing row ${rowNumber}:`, rowError.message);
+          errors.push({
+            row: rowNumber,
+            error: `Database error: ${rowError.message}`,
+            data: row
+          });
+          errorCount++;
+        }
+      }
+
+      // Perform batch insert if we have valid data
+      if (batchInsertData.length > 0) {
+        console.log(`📊 Performing batch insert for ${batchInsertData.length} students...`);
+        try {
           await pool.query(
             `INSERT INTO users (
               student_id, 
@@ -370,40 +693,39 @@ export const addStudentsBulk = async (req, res) => {
               created_at, 
               is_active, 
               must_change_password
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, 1)`,
-            [
-              row.student_id.trim(),
-              row.email.trim(),
-              fullName,
-              hashedPassword,
-              'student',
-              row.first_name.trim(),
-              row.last_name.trim(),
-              row.middle_name?.trim() || null,
-              row.suffix?.trim() || null,
-              row.degree.toUpperCase(),
-              row.status.toLowerCase(),
-            ]
+            ) VALUES ?`,
+            [batchInsertData]
           );
-
-          // Send welcome email (optional - don't fail if email fails)
-          try {
-            await sendWelcomeEmail(row.email.trim(), fullName, row.student_id.trim(), DEFAULT_STUDENT_PASSWORD);
-          } catch (emailError) {
-            console.warn(`Failed to send welcome email for ${row.email}:`, emailError.message);
+          console.log(`✅ Batch insert completed: ${batchInsertData.length} students added`);
+        } catch (batchError) {
+          console.error('❌ Batch insert failed:', batchError);
+          // If batch insert fails, try individual inserts as fallback
+          console.log('🔄 Falling back to individual inserts...');
+          for (const studentData of batchInsertData) {
+            try {
+              await pool.query(
+                `INSERT INTO users (
+                  student_id, 
+                  email, 
+                  name, 
+                  password, 
+                  role, 
+                  first_name,
+                  last_name,
+                  middle_name,
+                  suffix,
+                  degree,
+                  status,
+                  created_at, 
+                  is_active, 
+                  must_change_password
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, 1)`,
+                studentData
+              );
+            } catch (individualError) {
+              console.error(`❌ Failed to insert individual student ${studentData[0]}:`, individualError.message);
+            }
           }
-
-          successCount++;
-          console.log(`✅ Successfully added student: ${row.student_id} - ${fullName}`);
-
-        } catch (rowError) {
-          console.error(`❌ Error processing row ${rowNumber}:`, rowError.message);
-          errors.push({
-            row: rowNumber,
-            error: `Database error: ${rowError.message}`,
-            data: row
-          });
-          errorCount++;
         }
       }
 

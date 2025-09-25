@@ -424,23 +424,36 @@ export const getSalesPerformance = async (req, res) => {
     }
 
     console.log('📊 Executing sales data query...')
+    
+    // Simple date filtering - use DATE() function to avoid timezone issues
+    let dateFilter = '';
+    let dateParams = [];
+    
+    if (start_date) {
+      dateFilter += 'AND DATE(o.created_at) >= ? ';
+      dateParams.push(start_date);
+    }
+    if (end_date) {
+      dateFilter += 'AND DATE(o.created_at) <= ? ';
+      dateParams.push(end_date);
+    }
+    
     const [salesData] = await pool.query(`
       SELECT 
-        ${groupClause} as period,
+        ${groupClause.replace('created_at', 'o.created_at')} as period,
         COUNT(*) as orders,
-        SUM(total_amount) as revenue,
-        AVG(total_amount) as avg_order_value,
-        COUNT(CASE WHEN payment_method = 'gcash' THEN 1 END) as gcash_orders,
-        COUNT(CASE WHEN payment_method = 'cash' THEN 1 END) as cash_orders,
-        SUM(CASE WHEN payment_method = 'gcash' THEN total_amount ELSE 0 END) as gcash_revenue,
-        SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as cash_revenue
-      FROM orders
-      WHERE status != 'cancelled'
-      ${start_date ? 'AND created_at >= ?' : ''}
-      ${end_date ? 'AND created_at <= ?' : ''}
-      GROUP BY ${groupClause}
+        SUM(o.total_amount) as revenue,
+        AVG(o.total_amount) as avg_order_value,
+        COUNT(CASE WHEN o.payment_method = 'gcash' THEN 1 END) as gcash_orders,
+        COUNT(CASE WHEN o.payment_method = 'cash' THEN 1 END) as cash_orders,
+        SUM(CASE WHEN o.payment_method = 'gcash' THEN o.total_amount ELSE 0 END) as gcash_revenue,
+        SUM(CASE WHEN o.payment_method = 'cash' THEN o.total_amount ELSE 0 END) as cash_revenue
+      FROM orders o
+      WHERE o.status != 'cancelled'
+      ${dateFilter}
+      GROUP BY ${groupClause.replace('created_at', 'o.created_at')}
       ORDER BY period DESC
-    `, [start_date, end_date].filter(Boolean))
+    `, dateParams)
 
     console.log('📊 Sales data query completed, executing top products query...')
     
@@ -460,12 +473,11 @@ export const getSalesPerformance = async (req, res) => {
         JOIN products p ON oi.product_id = p.id
         JOIN orders o ON oi.order_id = o.id
         WHERE o.status != 'cancelled'
-        ${start_date ? 'AND o.created_at >= ?' : ''}
-        ${end_date ? 'AND o.created_at <= ?' : ''}
+        ${dateFilter}
         GROUP BY p.id, p.name, p.image
         ORDER BY total_sold DESC
         LIMIT 10
-      `, [start_date, end_date].filter(Boolean))
+      `, dateParams)
       topProducts = topProductsResult;
     } else {
       console.log('📊 No orders found, returning empty top products');
@@ -475,17 +487,16 @@ export const getSalesPerformance = async (req, res) => {
     console.log('📊 Executing payment breakdown query...')
     const [paymentBreakdown] = await pool.query(`
       SELECT 
-        payment_method,
+        o.payment_method,
         COUNT(*) as order_count,
-        SUM(total_amount) as total_revenue,
-        AVG(total_amount) as avg_order_value
-      FROM orders
-      WHERE status != 'cancelled'
-      ${start_date ? 'AND created_at >= ?' : ''}
-      ${end_date ? 'AND created_at <= ?' : ''}
-      GROUP BY payment_method
+        SUM(o.total_amount) as total_revenue,
+        AVG(o.total_amount) as avg_order_value
+      FROM orders o
+      WHERE o.status != 'cancelled'
+      ${dateFilter}
+      GROUP BY o.payment_method
       ORDER BY total_revenue DESC
-    `, [start_date, end_date].filter(Boolean))
+    `, dateParams)
 
     // Get inventory movement summary (simplified)
     console.log('📊 Executing inventory summary query...')
@@ -497,12 +508,11 @@ export const getSalesPerformance = async (req, res) => {
           COUNT(*) as movement_count,
           SUM(ABS(quantity_change)) as total_quantity,
           COUNT(DISTINCT product_id) as products_affected
-        FROM inventory_movements
-        WHERE order_id IS NOT NULL
-        ${start_date ? 'AND created_at >= ?' : ''}
-        ${end_date ? 'AND created_at <= ?' : ''}
+        FROM inventory_movements im
+        WHERE im.order_id IS NOT NULL
+        ${dateFilter.replace('created_at', 'im.created_at')}
         GROUP BY movement_type
-      `, [start_date, end_date].filter(Boolean))
+      `, dateParams)
       inventorySummary = inventoryResult;
     } catch (inventoryError) {
       console.log('📊 Inventory movements table not available:', inventoryError.message);
@@ -521,11 +531,10 @@ export const getSalesPerformance = async (req, res) => {
           COUNT(CASE WHEN movement_type = 'reversal' THEN 1 END) as reversed_sales,
           SUM(CASE WHEN movement_type = 'sale' THEN amount ELSE 0 END) as completed_revenue,
           SUM(CASE WHEN movement_type = 'reversal' THEN amount ELSE 0 END) as reversed_revenue
-        FROM sales_logs
+        FROM sales_logs sl
         WHERE 1=1
-        ${start_date ? 'AND created_at >= ?' : ''}
-        ${end_date ? 'AND created_at <= ?' : ''}
-      `, [start_date, end_date].filter(Boolean));
+        ${dateFilter.replace('created_at', 'sl.created_at')}
+      `, dateParams);
       salesLogsSummary = salesLogsResult[0] || {};
     } catch (salesLogsError) {
       console.log('📊 Sales logs table not available:', salesLogsError.message);
@@ -536,17 +545,16 @@ export const getSalesPerformance = async (req, res) => {
     const [summary] = await pool.query(`
       SELECT 
         COUNT(*) as total_orders,
-        SUM(total_amount) as total_revenue,
-        AVG(total_amount) as avg_order_value,
-        COUNT(CASE WHEN payment_method = 'gcash' THEN 1 END) as gcash_orders,
-        COUNT(CASE WHEN payment_method = 'cash' THEN 1 END) as cash_orders,
-        SUM(CASE WHEN payment_method = 'gcash' THEN total_amount ELSE 0 END) as gcash_revenue,
-        SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END) as cash_revenue
-      FROM orders
-      WHERE status != 'cancelled'
-      ${start_date ? 'AND created_at >= ?' : ''}
-      ${end_date ? 'AND created_at <= ?' : ''}
-    `, [start_date, end_date].filter(Boolean));
+        SUM(o.total_amount) as total_revenue,
+        AVG(o.total_amount) as avg_order_value,
+        COUNT(CASE WHEN o.payment_method = 'gcash' THEN 1 END) as gcash_orders,
+        COUNT(CASE WHEN o.payment_method = 'cash' THEN 1 END) as cash_orders,
+        SUM(CASE WHEN o.payment_method = 'gcash' THEN o.total_amount ELSE 0 END) as gcash_revenue,
+        SUM(CASE WHEN o.payment_method = 'cash' THEN o.total_amount ELSE 0 END) as cash_revenue
+      FROM orders o
+      WHERE o.status != 'cancelled'
+      ${dateFilter}
+    `, dateParams);
     
     const summaryData = summary[0];
 

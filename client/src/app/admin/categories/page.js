@@ -92,18 +92,18 @@ export default function AdminCategoriesPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen text-black admin-page">
+    <div className="min-h-screen text-black admin-page">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex">
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-6 overflow-auto lg:ml-0 ml-0">
+        <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64">
           {/* Main Container with Buttons and Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-20">
             {/* Header Section */}
             <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-2xl font-semibold text-black-900">Categories</h1>
+                  <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Categories</h1>
                 </div>
                 <button
                   onClick={() => setShowAddForm(!showAddForm)}
@@ -154,9 +154,9 @@ export default function AdminCategoriesPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Category Name</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Created</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Actions</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Category Name</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Created</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>

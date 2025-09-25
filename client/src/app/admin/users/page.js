@@ -15,6 +15,8 @@ export default function AdminUsersPage() {
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -51,6 +53,150 @@ export default function AdminUsersPage() {
 
   const handleModalSuccess = () => {
     fetchUsers(); // Refresh the users list
+    setSelectedUsers(new Set()); // Clear selections
+  };
+
+  // Checkbox handlers
+  const handleSelectUser = (userId) => {
+    console.log('🔄 Individual checkbox clicked:', {
+      userId,
+      currentlySelected: selectedUsers.has(userId),
+      totalSelected: selectedUsers.size
+    });
+    
+    setSelectedUsers(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+        console.log('📝 User deselected:', userId);
+      } else {
+        newSet.add(userId);
+        console.log('📝 User selected:', userId);
+      }
+      console.log('📊 New selection count:', newSet.size);
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    console.log('🔄 Select All clicked:', {
+      currentSelected: selectedUsers.size,
+      totalUsers: users.length,
+      allSelected: selectedUsers.size === users.length
+    });
+    
+    if (selectedUsers.size === users.length) {
+      // If all are selected, deselect all
+      console.log('📝 Deselecting all users');
+      setSelectedUsers(new Set());
+    } else {
+      // If not all are selected, select all
+      console.log('📝 Selecting all users');
+      const allUserIds = users.map(user => user.id);
+      setSelectedUsers(new Set(allUserIds));
+    }
+  };
+
+  // Bulk action handlers
+  const handleBulkActivate = async () => {
+    if (selectedUsers.size === 0) return;
+    
+    if (!confirm(`Are you sure you want to activate ${selectedUsers.size} user(s)?`)) {
+      return;
+    }
+
+    try {
+      setBulkActionLoading(true);
+      const promises = Array.from(selectedUsers).map(userId => 
+        API.patch(`/users/${userId}/status`, { is_active: true })
+      );
+      
+      await Promise.all(promises);
+      
+      // Update local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          selectedUsers.has(user.id) 
+            ? { ...user, is_active: true }
+            : user
+        )
+      );
+      
+      setSelectedUsers(new Set());
+      alert(`Successfully activated ${selectedUsers.size} user(s)`);
+    } catch (err) {
+      console.error('Failed to activate users:', err);
+      alert(err?.response?.data?.error || 'Failed to activate users');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (selectedUsers.size === 0) return;
+    
+    if (!confirm(`Are you sure you want to deactivate ${selectedUsers.size} user(s)?`)) {
+      return;
+    }
+
+    try {
+      setBulkActionLoading(true);
+      const promises = Array.from(selectedUsers).map(userId => 
+        API.patch(`/users/${userId}/status`, { is_active: false })
+      );
+      
+      await Promise.all(promises);
+      
+      // Update local state
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          selectedUsers.has(user.id) 
+            ? { ...user, is_active: false }
+            : user
+        )
+      );
+      
+      setSelectedUsers(new Set());
+      alert(`Successfully deactivated ${selectedUsers.size} user(s)`);
+    } catch (err) {
+      console.error('Failed to deactivate users:', err);
+      alert(err?.response?.data?.error || 'Failed to deactivate users');
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedUsers.size === 0) return;
+    
+    const deleteCount = selectedUsers.size;
+    
+    if (!confirm(`Are you sure you want to delete ${deleteCount} user(s)? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setBulkActionLoading(true);
+      const promises = Array.from(selectedUsers).map(userId => 
+        API.delete(`/users/${userId}`)
+      );
+      
+      await Promise.all(promises);
+      
+      // Remove deleted users from local state completely
+      setUsers(prevUsers => 
+        prevUsers.filter(user => !selectedUsers.has(user.id))
+      );
+      
+      // Clear selections
+      setSelectedUsers(new Set());
+      alert(`Successfully deleted ${deleteCount} user(s)`);
+    } catch (err) {
+      console.error('Failed to delete users:', err);
+      alert(err?.response?.data?.error || 'Failed to delete users');
+    } finally {
+      setBulkActionLoading(false);
+    }
   };
 
   const handleStatusToggle = async (userId, currentStatus) => {
@@ -84,14 +230,17 @@ export default function AdminUsersPage() {
     try {
       await API.delete(`/users/${userId}`);
       
-      // Update local state
+      // Remove user from local state completely
       setUsers(prevUsers => 
-        prevUsers.map(user => 
-          user.id === userId 
-            ? { ...user, is_active: false }
-            : user
-        )
+        prevUsers.filter(user => user.id !== userId)
       );
+      
+      // Also remove from selected users if it was selected
+      setSelectedUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(userId);
+        return newSet;
+      });
       
       alert('User deleted successfully');
     } catch (err) {
@@ -170,20 +319,54 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen text-black admin-page">
+    <div className="min-h-screen text-black admin-page">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex">
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-64">
+        <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64">
           {/* Main Container with Buttons and Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-20">
             {/* Header Section */}
             <div className="p-3 sm:p-4 border-b border-gray-200">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
                   <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Users</h1>
+                  {selectedUsers.size > 0 && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      {selectedUsers.size} user(s) selected
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  {/* Bulk Actions */}
+                  {selectedUsers.size > 0 && (
+                    <div className="flex items-center gap-2 mr-2">
+                      <button 
+                        onClick={handleBulkActivate}
+                        disabled={bulkActionLoading}
+                        className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        {bulkActionLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                        Activate Selected
+                      </button>
+                      <button 
+                        onClick={handleBulkDeactivate}
+                        disabled={bulkActionLoading}
+                        className="bg-yellow-600 text-white px-3 py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        {bulkActionLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                        Deactivate Selected
+                      </button>
+                      <button 
+                        onClick={handleBulkDelete}
+                        disabled={bulkActionLoading}
+                        className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors text-sm font-medium flex items-center gap-2"
+                      >
+                        {bulkActionLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                        Delete Selected
+                      </button>
+                    </div>
+                  )}
                   <button 
                     onClick={() => setShowAddStudentModal(true)}
                     className="bg-[#000C50] text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
@@ -217,6 +400,25 @@ export default function AdminUsersPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={users.length > 0 && selectedUsers.size === users.length}
+                            ref={(input) => {
+                              if (input) {
+                                input.indeterminate = selectedUsers.size > 0 && selectedUsers.size < users.length;
+                              }
+                            }}
+                            onChange={handleSelectAll}
+                            className="rounded border-gray-300 text-[#000C50] focus:ring-[#000C50] focus:ring-2"
+                            title={selectedUsers.size === users.length ? "Deselect all users" : "Select all users"}
+                          />
+                          <span className="text-xs text-gray-500 hidden sm:inline">
+                            {selectedUsers.size === users.length ? 'All' : 'Select All'}
+                          </span>
+                        </div>
+                      </th>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stud ID</th>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Name</th>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Email</th>
@@ -232,7 +434,15 @@ export default function AdminUsersPage() {
                     {users.map((user, index) => (
                       <tr key={user.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                         index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                      }`}>
+                      } ${selectedUsers.has(user.id) ? 'bg-blue-50' : ''}`}>
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.has(user.id)}
+                            onChange={() => handleSelectUser(user.id)}
+                            className="rounded border-gray-300 text-[#000C50] focus:ring-[#000C50] focus:ring-2"
+                          />
+                        </td>
                         <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 font-mono">
                             {user.student_id || 'N/A'}

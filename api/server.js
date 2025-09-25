@@ -19,6 +19,7 @@ import profileRoutes from './src/routes/profile.routes.js';
 import studentRoutes from './src/routes/student.routes.js';
 import userManagementRoutes from './src/routes/user-management.routes.js';
 import paymentRoutes from './src/routes/payment.routes.js';
+import debugRoutes from './src/routes/debug.routes.js';
 import notificationRoutes from './src/routes/notification.routes.js';
 
 // Import error handling middleware
@@ -38,7 +39,8 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
     },
   },
@@ -89,6 +91,11 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Serve debug HTML file
+app.get('/debug.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'debug.html'));
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -101,6 +108,7 @@ app.use('/api/students', studentRoutes);
 app.use('/api/users', userManagementRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/debug', debugRoutes);
 
 // Error handling middleware
 app.use(notFound);

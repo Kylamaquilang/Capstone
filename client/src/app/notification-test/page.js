@@ -6,3 +6,4 @@ import NotificationDropdownDemo from '@/components/notifications/NotificationDro
 export default function NotificationTestPage() {
   return <NotificationDropdownDemo />;
 }
+

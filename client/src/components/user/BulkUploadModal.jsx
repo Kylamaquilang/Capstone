@@ -45,9 +45,14 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
       
       console.log('📤 Uploading CSV file:', file.name, 'Size:', file.size);
       
+      // Show processing message for large files
+      if (file.size > 50000) { // 50KB
+        setSuccess('Processing large file... This may take a few minutes.');
+      }
+      
       const response = await API.post('/students/bulk-upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 30000 // 30 second timeout for large files
+        timeout: 120000 // 2 minute timeout for large files
       });
       
       console.log('📥 Upload response:', response.data);
@@ -180,11 +185,11 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                 <h3 className="text-sm font-medium text-blue-900 mb-2">Instructions:</h3>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>• Upload a CSV or Excel file with student information</li>
-                  <li>• Required columns: student_id, first_name, last_name, email, degree, status</li>
-                  <li>• Optional columns: middle_name, suffix</li>
+                  <li>• Required columns: student_id (or Student ID), first_name (or First Name), last_name (or Last Name), email (or Email), degree (or Course/Program), status (or Year Level)</li>
+                  <li>• Optional columns: middle_name (or Middle Name), suffix (or Suffix)</li>
                   <li>• Student ID must be numeric (4-8 digits)</li>
-                  <li>• Valid degrees: BEED, BSED, BSIT, BSHM</li>
-                  <li>• Valid status: regular, irregular</li>
+                  <li>• Valid degrees: BEED, BSED, BSIT, BSHM (or full names like "Bachelor of Science in Information Technology")</li>
+                  <li>• Valid status: regular, irregular (or year levels like "1st year", "2nd year", etc.)</li>
                   <li>• Supported formats: .csv, .xlsx, .xls</li>
                   <li>• Download the sample CSV template below</li>
                 </ul>
@@ -232,8 +237,12 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                       <div className="mt-2">
                         <p className="font-medium">Errors:</p>
                         <ul className="list-disc list-inside text-xs text-red-600">
-                          {uploadResult.errors.map((error, index) => (
-                            <li key={index}>{error}</li>
+                          {uploadResult.errors.map((errorItem, index) => (
+                            <li key={index}>
+                              {typeof errorItem === 'string' ? errorItem : 
+                               typeof errorItem === 'object' && errorItem.error ? errorItem.error :
+                               `Row ${errorItem.row || index + 1}: ${errorItem.error || 'Unknown error'}`}
+                            </li>
                           ))}
                         </ul>
                       </div>

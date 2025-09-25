@@ -270,3 +270,4 @@ For issues or questions about the notification system:
 2. Review the API integration section
 3. Verify all required props are passed
 4. Check browser console for errors
+

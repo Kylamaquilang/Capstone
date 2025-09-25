@@ -14,7 +14,7 @@ export default function ProductTable({ category = '' }) {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -216,17 +216,6 @@ export default function ProductTable({ category = '' }) {
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <FunnelIcon className="h-4 w-4" />
             <span>Total: {filteredAndSortedProducts.length} Records</span>
-            <span className="text-gray-400">|</span>
-            <span>Rows per page:</span>
-            <select
-              value={itemsPerPage}
-              onChange={(e) => setItemsPerPage(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
           </div>
         </div>
       </div>
@@ -429,30 +418,95 @@ export default function ProductTable({ category = '' }) {
         </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="px-4 py-3 border-t border-gray-200 bg-blue-50">
-          <div className="flex items-center justify-between">
+      {/* Enhanced Pagination */}
+      {filteredAndSortedProducts.length > 0 && (
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            {/* Records Info */}
             <div className="text-xs text-gray-600">
               Showing {startIndex + 1} to {Math.min(endIndex, filteredAndSortedProducts.length)} of {filteredAndSortedProducts.length} products
             </div>
+            
+            {/* Pagination Controls */}
             <div className="flex items-center gap-2">
+              {/* Previous Button */}
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="p-1 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+                disabled={currentPage === 1 || totalPages <= 1}
+                className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
               >
-                <ChevronLeftIcon className="h-4 w-4" />
+                Previous
               </button>
-              <span className="text-xs text-gray-600 px-2">
-                Page {currentPage} of {totalPages}
-              </span>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center gap-1">
+                {/* First page */}
+                {currentPage > 3 && (
+                  <>
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                    >
+                      1
+                    </button>
+                    {currentPage > 4 && <span className="text-xs text-gray-400">...</span>}
+                  </>
+                )}
+                
+                {/* Page numbers around current page */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  if (pageNum < 1 || pageNum > totalPages) return null;
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-2 py-1 text-xs border rounded-md transition-colors ${
+                        currentPage === pageNum
+                          ? 'bg-[#000C50] text-white border-[#000C50]'
+                          : 'border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                
+                {/* Last page */}
+                {currentPage < totalPages - 2 && (
+                  <>
+                    {currentPage < totalPages - 3 && <span className="text-xs text-gray-400">...</span>}
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+              </div>
+              
+              {/* Next Button */}
               <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className="p-1 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200"
+                onClick={() => {
+                  console.log('Next clicked, currentPage:', currentPage, 'totalPages:', totalPages, 'newPage:', Math.min(totalPages, currentPage + 1));
+                  setCurrentPage(Math.min(totalPages, currentPage + 1));
+                }}
+                disabled={currentPage === totalPages || totalPages <= 1}
+                className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
               >
-                <ChevronRightIcon className="h-4 w-4" />
+                Next
               </button>
             </div>
           </div>

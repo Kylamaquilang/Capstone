@@ -194,13 +194,13 @@ export default function AdminOrdersPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex flex-col min-h-screen text-black admin-page">
+      <div className="min-h-screen text-black admin-page">
         <Navbar />
-        <div className="flex flex-1">
+        <div className="flex">
           <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-64">
+        <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64">
           {/* Main Container with Controls and Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-20">
             {/* Header Section */}
             <div className="p-3 sm:p-4 border-b border-gray-200">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">

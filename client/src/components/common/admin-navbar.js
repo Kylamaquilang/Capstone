@@ -9,6 +9,8 @@ import API from '@/lib/axios';
 export default function AdminNavbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [apiAvailable, setApiAvailable] = useState(true);
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
   const router = useRouter();
   const { user, logout } = useAuth();
 
@@ -44,14 +46,36 @@ export default function AdminNavbar() {
         fetchUnreadCount();
       };
       
+      // Scroll behavior for navbar
+      const handleScroll = () => {
+        const currentScrollY = window.scrollY;
+        
+        // Always show navbar at the very top
+        if (currentScrollY <= 10) {
+          setIsVisible(true);
+        }
+        // Hide navbar when scrolling down past threshold
+        else if (currentScrollY > lastScrollY && currentScrollY > 100) {
+          setIsVisible(false);
+        }
+        // Show navbar when scrolling up
+        else if (currentScrollY < lastScrollY) {
+          setIsVisible(true);
+        }
+        
+        setLastScrollY(currentScrollY);
+      };
+      
       window.addEventListener('notificationsMarkedAsRead', handleNotificationsMarkedAsRead);
+      window.addEventListener('scroll', handleScroll, { passive: true });
       
       return () => {
         clearInterval(interval);
         window.removeEventListener('notificationsMarkedAsRead', handleNotificationsMarkedAsRead);
+        window.removeEventListener('scroll', handleScroll);
       };
     }
-  }, []);
+  }, [lastScrollY]);
 
   const handleNotificationClick = () => {
     try {
@@ -71,7 +95,9 @@ export default function AdminNavbar() {
   return (
     <>
       {/* Desktop Header */}
-      <nav className="hidden lg:flex bg-[#000C50] text-white p-4 items-center justify-between">
+      <nav className={`hidden lg:flex bg-[#000C50] text-white p-4 items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg transition-transform duration-300 ease-in-out ${
+        isVisible ? 'translate-y-0' : '-translate-y-full'
+      }`} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}>
         <div className="flex items-center gap-2">
           <Image src="/images/cpc.png" alt="Logo" width={30} height={30} />
           <span className="text-lg font-bold">Admin Panel</span>
@@ -96,10 +122,6 @@ export default function AdminNavbar() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <UserCircleIcon className="h-6 w-6 text-white" />
-              <div className="text-right">
-                <p className="text-sm font-medium text-white">{user?.name || 'Administrator'}</p>
-                <p className="text-xs text-gray-300">{user?.email || 'admin@cpc.edu.ph'}</p>
-              </div>
             </div>
             
             <button
@@ -114,7 +136,9 @@ export default function AdminNavbar() {
       </nav>
 
       {/* Mobile Header */}
-      <div className="lg:hidden bg-[#000C50] text-white p-3 flex items-center justify-between">
+      <div className={`lg:hidden bg-[#000C50] text-white p-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg transition-transform duration-300 ease-in-out ${
+        isVisible ? 'translate-y-0' : '-translate-y-full'
+      }`} style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}>
         <div className="flex items-center gap-2">
           <Image src="/images/cpc.png" alt="Logo" width={24} height={24} />
           <span className="text-base font-semibold">Admin</span>
