@@ -1,6 +1,6 @@
 import { pool } from '../database/db.js';
 
-// ✅ Create notification utility
+//  Create notification utility
 export const createNotification = async (user_id, message, title = null, type = 'system') => {
   try {
     await pool.query(`
@@ -8,13 +8,13 @@ export const createNotification = async (user_id, message, title = null, type = 
       VALUES (?, ?, ?, ?)
     `, [user_id, title, message, type]);
     
-    console.log(`✅ Notification created for user ${user_id}: ${message}`);
+    console.log(` Notification created for user ${user_id}: ${message}`);
   } catch (error) {
-    console.error('❌ Error creating notification:', error);
+    console.error(' Error creating notification:', error);
   }
 };
 
-// ✅ Create order status notification with product details
+//  Create order status notification with product details
 export const createOrderStatusNotification = async (user_id, orderId, status) => {
   try {
     // Get product details for the order with size information
@@ -52,29 +52,29 @@ export const createOrderStatusNotification = async (user_id, orderId, status) =>
     
     const statusData = {
       'pending': {
-        title: '📝 Order Placed',
+        title: ' Order Placed',
         message: `Your order for ${productSummary} has been placed and is pending confirmation.`
       },
       'processing': {
-        title: '✅ Order Received',
+        title: ' Order Received',
         message: `Thank you! Your order for ${productSummary} has been received and is being processed.`
       },
       'ready_for_pickup': {
-        title: '📦 Ready for Pickup',
+        title: ' Ready for Pickup',
         message: `Your order for ${productSummary} is ready for pickup at the accounting office!`
       },
       'delivered': {
-        title: '🎉 Order Delivered',
+        title: ' Order Delivered',
         message: `Your order for ${productSummary} has been delivered successfully!`
       },
       'cancelled': {
-        title: '❌ Order Cancelled',
+        title: ' Order Cancelled',
         message: `Your order for ${productSummary} has been cancelled.`
       }
     };
     
     const data = statusData[status] || {
-      title: '📋 Order Update',
+      title: ' Order Update',
       message: `Your order for ${productSummary} status has been updated to ${status}.`
     };
     
@@ -84,13 +84,13 @@ export const createOrderStatusNotification = async (user_id, orderId, status) =>
       VALUES (?, ?, ?, ?, ?, NOW())
     `, [user_id, data.title, data.message, 'system', orderId]);
   } catch (error) {
-    console.error('❌ Error creating order status notification:', error);
+    console.error(' Error creating order status notification:', error);
     // Fallback to simple notification
-    await createNotification(user_id, `Your order #${orderId} status has been updated to ${status}.`, '📋 Order Update', 'system');
+    await createNotification(user_id, `Your order #${orderId} status has been updated to ${status}.`, ' Order Update', 'system');
   }
 };
 
-// ✅ Create payment notification
+// Create payment notification
 export const createPaymentNotification = async (user_id, orderId, paymentStatus) => {
   const paymentMessages = {
     'paid': `Payment for order #${orderId} has been received successfully.`,
@@ -103,7 +103,7 @@ export const createPaymentNotification = async (user_id, orderId, paymentStatus)
   await createNotification(user_id, message);
 };
 
-// ✅ Create low stock notification (for admins)
+//  Create low stock notification (for admins)
 export const createLowStockNotification = async (productName, currentStock) => {
   try {
     // Get all admin users
@@ -118,17 +118,17 @@ export const createLowStockNotification = async (productName, currentStock) => {
       await createNotification(admin.id, message);
     }
   } catch (error) {
-    console.error('❌ Error creating low stock notification:', error);
+    console.error(' Error creating low stock notification:', error);
   }
 };
 
-// ✅ Create welcome notification
+//  Create welcome notification
 export const createWelcomeNotification = async (user_id, userName) => {
   const message = `Welcome to CPC Store, ${userName}! Thank you for joining us. Start shopping now!`;
   await createNotification(user_id, message);
 };
 
-// ✅ Create promotional notification
+//  Create promotional notification
 export const createPromotionalNotification = async (user_id, promoMessage) => {
   await createNotification(user_id, promoMessage);
 };

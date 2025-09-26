@@ -7,6 +7,8 @@ import compression from 'compression';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 // Import routes
 import authRoutes from './src/routes/auth.routes.js';
@@ -19,7 +21,6 @@ import profileRoutes from './src/routes/profile.routes.js';
 import studentRoutes from './src/routes/student.routes.js';
 import userManagementRoutes from './src/routes/user-management.routes.js';
 import paymentRoutes from './src/routes/payment.routes.js';
-import debugRoutes from './src/routes/debug.routes.js';
 import notificationRoutes from './src/routes/notification.routes.js';
 
 // Import error handling middleware
@@ -27,6 +28,19 @@ import { errorHandler, notFound } from './src/middleware/error.middleware.js';
 
 dotenv.config();
 const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001', 
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001'
+    ],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
 
 // Static uploads directory
 const __filename = fileURLToPath(import.meta.url);
@@ -91,11 +105,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Serve debug HTML file
-app.get('/debug.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'debug.html'));
-});
-
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -108,7 +117,6 @@ app.use('/api/students', studentRoutes);
 app.use('/api/users', userManagementRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/debug', debugRoutes);
 
 // Error handling middleware
 app.use(notFound);
@@ -117,9 +125,53 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-app.listen(PORT, () => {
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log(`🔌 User connected: ${socket.id}`);
+
+  // Join user to their personal room for notifications
+  socket.on('join-user-room', (userId) => {
+    socket.join(`user-${userId}`);
+    console.log(`👤 User ${userId} joined their room`);
+  });
+
+  // Join admin to admin room for admin notifications
+  socket.on('join-admin-room', () => {
+    socket.join('admin-room');
+    console.log(`👨‍💼 Admin joined admin room`);
+  });
+
+  // Handle cart updates
+  socket.on('cart-updated', (data) => {
+    socket.to(`user-${data.userId}`).emit('cart-updated', data);
+  });
+
+  // Handle order status updates
+  socket.on('order-status-updated', (data) => {
+    socket.to(`user-${data.userId}`).emit('order-status-updated', data);
+    socket.to('admin-room').emit('admin-order-updated', data);
+  });
+
+  // Handle new notifications
+  socket.on('new-notification', (data) => {
+    socket.to(`user-${data.userId}`).emit('new-notification', data);
+    if (data.type === 'admin_order') {
+      socket.to('admin-room').emit('admin-notification', data);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`🔌 User disconnected: ${socket.id}`);
+  });
+});
+
+// Make io available to other modules
+app.set('io', io);
+
+server.listen(PORT, () => {
   console.log(`🚀 Server running in ${NODE_ENV} mode on port ${PORT}`);
   console.log(`📊 Health check available at http://localhost:${PORT}/health`);
+  console.log(`🔌 Socket.io server ready for real-time connections`);
 });
 
 // Graceful shutdown

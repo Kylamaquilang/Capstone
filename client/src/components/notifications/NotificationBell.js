@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import UserNotificationDropdown from './UserNotificationDropdown';
 import { generateSampleNotifications } from '@/utils/notificationTemplates';
+import { useSocket } from '@/context/SocketContext';
 
 const NotificationBell = ({ userType = 'user', userId }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const intervalRef = useRef(null);
+  const { socket, isConnected, joinUserRoom } = useSocket();
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
@@ -49,17 +50,44 @@ const NotificationBell = ({ userType = 'user', userId }) => {
   useEffect(() => {
     loadNotifications();
     
-    // Set up auto-refresh using ref to avoid dependency issues
-    intervalRef.current = setInterval(() => {
-      loadNotifications();
-    }, 30000);
+    // Join user room for real-time notifications
+    if (userId && isConnected) {
+      joinUserRoom(userId);
+    }
     
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [userId]);
+    // Set up Socket.io event listeners for real-time updates
+    if (socket) {
+      const handleNewNotification = (notification) => {
+        console.log('🔔 Real-time notification received:', notification);
+        setNotifications(prev => [notification, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      };
+
+      const handleOrderUpdate = (orderData) => {
+        console.log('📦 Real-time order update received:', orderData);
+        // Create notification for order update
+        const orderNotification = {
+          id: `order_update_${orderData.orderId}_${Date.now()}`,
+          type: 'order',
+          title: `Order #${orderData.orderId} Updated`,
+          message: `Your order status has been updated to: ${orderData.status}`,
+          timestamp: orderData.timestamp,
+          read: false,
+          priority: 'high'
+        };
+        setNotifications(prev => [orderNotification, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      };
+
+      socket.on('new-notification', handleNewNotification);
+      socket.on('order-status-updated', handleOrderUpdate);
+
+      return () => {
+        socket.off('new-notification', handleNewNotification);
+        socket.off('order-status-updated', handleOrderUpdate);
+      };
+    }
+  }, [userId, socket, isConnected, joinUserRoom, loadNotifications]);
 
   // Update unread count when notifications change
   useEffect(() => {

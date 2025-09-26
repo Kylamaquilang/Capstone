@@ -1,6 +1,7 @@
 'use client';
 import { createContext, useContext, useState, useEffect } from 'react';
 import API from '@/lib/axios';
+import { useSocket } from './SocketContext';
 
 const NotificationContext = createContext();
 
@@ -8,6 +9,7 @@ export function NotificationProvider({ children }) {
   const [cartCount, setCartCount] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const { socket, isConnected } = useSocket();
 
   const fetchCounts = async () => {
     try {
@@ -65,7 +67,36 @@ export function NotificationProvider({ children }) {
 
   useEffect(() => {
     fetchCounts();
-  }, []);
+    
+    // Set up Socket.io event listeners for real-time updates
+    if (socket) {
+      const handleCartUpdate = (data) => {
+        console.log('🛒 Real-time cart update received:', data);
+        // Update cart count based on action
+        if (data.action === 'added') {
+          setCartCount(prev => prev + data.quantity);
+        } else if (data.action === 'removed') {
+          setCartCount(prev => Math.max(0, prev - data.quantity));
+        } else if (data.action === 'updated') {
+          // For updates, we might need to refetch to get accurate count
+          fetchCounts();
+        }
+      };
+
+      const handleNewNotification = () => {
+        console.log('🔔 Real-time notification received');
+        setNotificationCount(prev => prev + 1);
+      };
+
+      socket.on('cart-updated', handleCartUpdate);
+      socket.on('new-notification', handleNewNotification);
+
+      return () => {
+        socket.off('cart-updated', handleCartUpdate);
+        socket.off('new-notification', handleNewNotification);
+      };
+    }
+  }, [socket, isConnected]);
 
   return (
     <NotificationContext.Provider

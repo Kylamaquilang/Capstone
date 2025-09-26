@@ -1,4 +1,5 @@
 import { pool } from '../database/db.js';
+import { emitUserNotification, emitAdminNotification } from '../utils/socket-helper.js';
 
 // ✅ Get unread notification count
 export const getUnreadCount = async (req, res) => {
@@ -178,7 +179,8 @@ export const getAdminNotifications = async (req, res) => {
 
 // ✅ Create notification (for system use)
 export const createNotification = async (req, res) => {
-  const { user_id, message } = req.body;
+  const { user_id, message, title, type } = req.body;
+  const io = req.app.get('io'); // Get Socket.io instance
 
   if (!user_id || !message) {
     return res.status(400).json({
@@ -188,14 +190,39 @@ export const createNotification = async (req, res) => {
   }
 
   try {
-    await pool.query(`
-      INSERT INTO notifications (user_id, message) 
-      VALUES (?, ?)
-    `, [user_id, message]);
+    const [result] = await pool.query(`
+      INSERT INTO notifications (user_id, title, message, type) 
+      VALUES (?, ?, ?, ?)
+    `, [user_id, title || 'New Notification', message, type || 'system']);
+
+    const notificationId = result.insertId;
+
+    // Emit real-time notification
+    if (io) {
+      emitUserNotification(io, user_id, {
+        id: notificationId,
+        title: title || 'New Notification',
+        message,
+        type: type || 'system',
+        read: false
+      });
+
+      // If it's an admin notification, also emit to admin room
+      if (type === 'admin_order' || type === 'system') {
+        emitAdminNotification(io, {
+          id: notificationId,
+          title: title || 'New Notification',
+          message,
+          type: type || 'system',
+          userId: user_id
+        });
+      }
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Notification created successfully'
+      message: 'Notification created successfully',
+      notificationId
     });
   } catch (err) {
     console.error('Create notification error:', err);

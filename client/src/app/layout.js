@@ -1,6 +1,7 @@
 import { CartProvider } from '@/context/CartContext';
 import { AuthProvider } from '@/context/auth-context';
 import { NotificationProvider } from '@/context/NotificationContext';
+import { SocketProvider } from '@/context/SocketContext';
 import { Poppins } from 'next/font/google';
 import './globals.css';
 
@@ -24,13 +25,15 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={poppins.className}>
-        <AuthProvider>
-          <CartProvider>
-            <NotificationProvider>
-              {children}
-            </NotificationProvider>
-          </CartProvider>
-        </AuthProvider>
+        <SocketProvider>
+          <AuthProvider>
+            <CartProvider>
+              <NotificationProvider>
+                {children}
+              </NotificationProvider>
+            </CartProvider>
+          </AuthProvider>
+        </SocketProvider>
       </body>
     </html>
   );

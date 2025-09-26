@@ -1,6 +1,7 @@
 import { pool } from '../database/db.js'
 import { sendOrderReceiptEmail } from '../utils/emailService.js'
 import { createOrderStatusNotification } from '../utils/notification-helper.js'
+import { emitOrderUpdate, emitNewOrderAlert, createAndEmitNotification } from '../utils/socket-helper.js'
 
 // Helper function to create delivered order notification for admin confirmation
 const createDeliveredOrderNotification = async (orderId, userId) => {
@@ -281,6 +282,17 @@ export const updateOrderStatus = async (req, res) => {
 
     // Create notification for user
     await createOrderStatusNotification(userId, id, status)
+    
+    // Emit real-time order update
+    const io = req.app.get('io')
+    if (io) {
+      emitOrderUpdate(io, userId, {
+        orderId: id,
+        status,
+        previousStatus: oldStatus,
+        timestamp: new Date().toISOString()
+      })
+    }
     
     // If order is marked as delivered, create special notification for admin confirmation
     if (status === 'delivered') {

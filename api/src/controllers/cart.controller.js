@@ -1,5 +1,6 @@
 import { pool } from '../database/db.js';
 import { validateId, validateQuantity } from '../utils/validation.js';
+import { emitCartUpdate } from '../utils/socket-helper.js';
 
 // ✅ Add to Cart
 export const addToCart = async (req, res) => {
@@ -94,6 +95,18 @@ export const addToCart = async (req, res) => {
         `UPDATE cart_items SET quantity = ? WHERE id = ?`,
         [newQty, existing[0].id]
       );
+      
+      // Emit real-time cart update
+      const io = req.app.get('io')
+      if (io) {
+        emitCartUpdate(io, user_id, {
+          action: 'updated',
+          productId: product_id,
+          quantity: newQty,
+          sizeId: size_id
+        })
+      }
+      
       return res.json({ 
         success: true,
         message: 'Cart item quantity updated',
@@ -105,6 +118,17 @@ export const addToCart = async (req, res) => {
       `INSERT INTO cart_items (user_id, product_id, size_id, quantity) VALUES (?, ?, ?, ?)`,
       [user_id, product_id, size_id || null, quantity]
     );
+
+    // Emit real-time cart update
+    const io = req.app.get('io')
+    if (io) {
+      emitCartUpdate(io, user_id, {
+        action: 'added',
+        productId: product_id,
+        quantity,
+        sizeId: size_id
+      })
+    }
 
     res.status(201).json({ 
       success: true,
@@ -258,15 +282,34 @@ export const updateCart = async (req, res) => {
 // ✅ Delete Cart Item
 export const deleteCartItem = async (req, res) => {
   const { id } = req.params;
+  const user_id = req.user.id;
 
   try {
-    const [result] = await pool.query(`DELETE FROM cart_items WHERE id = ?`, [id]);
+    // Get cart item details before deletion for Socket.io emission
+    const [cartItem] = await pool.query(`
+      SELECT product_id, size_id, quantity 
+      FROM cart_items 
+      WHERE id = ? AND user_id = ?
+    `, [id, user_id]);
 
-    if (result.affectedRows === 0) {
+    if (cartItem.length === 0) {
       return res.status(404).json({ 
         error: 'Cart item not found',
         message: 'The cart item you are trying to remove does not exist'
       });
+    }
+
+    const [result] = await pool.query(`DELETE FROM cart_items WHERE id = ?`, [id]);
+
+    // Emit real-time cart update
+    const io = req.app.get('io')
+    if (io) {
+      emitCartUpdate(io, user_id, {
+        action: 'removed',
+        productId: cartItem[0].product_id,
+        quantity: cartItem[0].quantity,
+        sizeId: cartItem[0].size_id
+      })
     }
 
     res.json({ 

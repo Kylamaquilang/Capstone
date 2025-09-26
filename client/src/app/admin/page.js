@@ -1,6 +1,7 @@
 'use client';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
+import AdminNotificationPanel from '@/components/admin/AdminNotificationPanel';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
 import { 
@@ -231,6 +232,11 @@ export default function AdminDashboardPage() {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Real-time Notifications */}
+          <div className="mt-6">
+            <AdminNotificationPanel />
           </div>
 
           {/* Quick Actions */}
