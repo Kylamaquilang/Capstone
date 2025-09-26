@@ -1,13 +1,7 @@
 import { pool } from '../database/db.js';
-import axios from 'axios';
 
-// PayMongo configuration
-const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
-const PAYMONGO_PUBLIC_KEY = process.env.PAYMONGO_PUBLIC_KEY;
-const PAYMONGO_BASE_URL = 'https://api.paymongo.com/v1';
-
-// Create PayMongo payment intent for GCash
-export const createGCashPayment = async (req, res) => {
+// Track GCash payment selection (no actual payment processing)
+export const selectGCashPayment = async (req, res) => {
   const { orderId, amount, description } = req.body;
   const userId = req.user.id;
 
@@ -36,20 +30,18 @@ export const createGCashPayment = async (req, res) => {
       return res.status(400).json({ error: 'Order is already paid' });
     }
 
-    // Check if PayMongo is configured
-    if (!PAYMONGO_SECRET_KEY || !PAYMONGO_PUBLIC_KEY) {
-      console.log('PayMongo not configured, creating mock payment for development');
+    console.log(`💳 GCash payment selected for order ${orderId} by user ${userId}`);
       
-      // Create a mock payment for development
-      const mockPaymentIntentId = `pi_mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate a tracking ID for GCash selection
+    const gcashTrackingId = `gcash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Update order with mock payment intent ID
+    // Update order with GCash selection and set as unpaid
       await pool.query(
-        'UPDATE orders SET payment_intent_id = ?, payment_status = ? WHERE id = ?',
-        [mockPaymentIntentId, 'pending', orderId]
+      'UPDATE orders SET payment_intent_id = ?, payment_status = ?, payment_method = ? WHERE id = ?',
+      [gcashTrackingId, 'unpaid', 'gcash', orderId]
       );
 
-      // Store payment transaction
+    // Store payment transaction for tracking
       await pool.query(`
         INSERT INTO payment_transactions (
           order_id, 
@@ -61,223 +53,34 @@ export const createGCashPayment = async (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?)
       `, [
         orderId,
-        mockPaymentIntentId,
+      gcashTrackingId,
         amount,
         'gcash',
-        'pending',
-        JSON.stringify({ mock: true, message: 'Development mode - PayMongo not configured' })
-      ]);
-
-      return res.json({
-        success: true,
-        payment_intent_id: mockPaymentIntentId,
-        client_key: 'mock_key',
-        payment_url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/payment/success?order_id=${orderId}&mock=true`,
-        payment_data: {
-          attributes: {
-            next_action: {
-              redirect: {
-                url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/payment/success?order_id=${orderId}&mock=true`
-              }
-            }
-          }
-        },
-        mock: true,
-        message: 'Development mode - PayMongo not configured. Payment will be marked as successful.'
-      });
-    }
-
-    // Create PayMongo payment intent
-    const paymentIntentData = {
-      data: {
-        attributes: {
-          amount: Math.round(amount * 100), // Convert to cents
-          currency: 'PHP',
-          capture_method: 'automatic',
-          statement_descriptor: 'CPC Store',
-          description: description,
-          payment_method_allowed: ['gcash']
-        }
-      }
-    };
-
-    const paymentIntentResponse = await axios.post(
-      `${PAYMONGO_BASE_URL}/payment_intents`,
-      paymentIntentData,
-      {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ':').toString('base64')}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    const paymentIntent = paymentIntentResponse.data.data;
-
-    // Create payment method for GCash
-    const paymentMethodData = {
-      data: {
-        attributes: {
-          type: 'gcash',
-          details: {
-            email: req.user.email || 'customer@example.com'
-          }
-        }
-      }
-    };
-
-    const paymentMethodResponse = await axios.post(
-      `${PAYMONGO_BASE_URL}/payment_methods`,
-      paymentMethodData,
-      {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ':').toString('base64')}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    const paymentMethod = paymentMethodResponse.data.data;
-
-    // Attach payment method to payment intent
-    const attachData = {
-      data: {
-        attributes: {
-          payment_method: paymentMethod.id,
-          return_url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/payment/success?order_id=${orderId}`,
-          cancel_url: `${process.env.CLIENT_URL || 'http://localhost:3000'}/payment/cancel?order_id=${orderId}`
-        }
-      }
-    };
-
-    const attachResponse = await axios.post(
-      `${PAYMONGO_BASE_URL}/payment_intents/${paymentIntent.id}/attach`,
-      attachData,
-      {
-        headers: {
-          'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ':').toString('base64')}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    const attachedPayment = attachResponse.data.data;
-
-    // Update order with payment intent ID
-    await pool.query(
-      'UPDATE orders SET payment_intent_id = ?, payment_status = ? WHERE id = ?',
-      [paymentIntent.id, 'pending', orderId]
-    );
-
-    // Store payment transaction
-    await pool.query(`
-      INSERT INTO payment_transactions (
-        order_id, 
-        transaction_id, 
-        amount, 
-        payment_method, 
-        status, 
-        gateway_response
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `, [
-      orderId,
-      paymentIntent.id,
-      amount,
-      'gcash',
-      'pending',
-      JSON.stringify(attachedPayment)
+      'unpaid',
+      JSON.stringify({ 
+        method: 'gcash_selection', 
+        message: 'GCash payment method selected - payment status set to unpaid',
+        selected_at: new Date().toISOString()
+      })
     ]);
 
-    res.json({
-      success: true,
-      payment_intent_id: paymentIntent.id,
-      client_key: PAYMONGO_PUBLIC_KEY,
-      payment_url: attachedPayment.attributes.next_action?.redirect?.url,
-      payment_data: attachedPayment
-    });
-
-  } catch (error) {
-    console.error('PayMongo payment error:', error.response?.data || error.message);
-    res.status(500).json({ 
-      error: 'Payment processing failed',
-      details: error.response?.data || error.message
-    });
-  }
-};
-
-// Mock payment success for development
-export const mockPaymentSuccess = async (req, res) => {
-  const { orderId } = req.query;
-  
-  try {
-    if (!orderId) {
-      return res.status(400).json({ error: 'Order ID is required' });
-    }
-
-    // Update order status to paid
-    await pool.query(
-      'UPDATE orders SET payment_status = ?, status = ? WHERE id = ?',
-      ['paid', 'processing', orderId]
-    );
-
-    // Update payment transaction
-    await pool.query(
-      'UPDATE payment_transactions SET status = ? WHERE order_id = ?',
-      ['completed', orderId]
-    );
-
-    console.log(`Mock payment completed for order ${orderId}`);
+    console.log(`✅ GCash payment selection tracked for order ${orderId}`);
 
     res.json({
       success: true,
-      message: 'Payment completed successfully (mock)',
+      payment_intent_id: gcashTrackingId,
+      payment_status: 'unpaid',
+      payment_method: 'gcash',
+      message: 'GCash payment method selected. Order status set to unpaid.',
       orderId: orderId
     });
 
   } catch (error) {
-    console.error('Mock payment success error:', error);
-    res.status(500).json({ error: 'Failed to process mock payment' });
-  }
-};
-
-// Handle PayMongo webhook
-export const handlePayMongoWebhook = async (req, res) => {
-  const signature = req.headers['paymongo-signature'];
-  
-  try {
-    // Verify webhook signature (implement signature verification)
-    // For now, we'll process the webhook directly
-    
-    const event = req.body;
-    
-    if (event.type === 'payment_intent.succeeded') {
-      const paymentIntent = event.data.attributes;
-      // Extract order ID from description since metadata is not working
-      const description = paymentIntent.description || '';
-      const orderIdMatch = description.match(/Order #(\d+)/);
-      const orderId = orderIdMatch ? orderIdMatch[1] : null;
-      
-      if (orderId) {
-        // Update order status
-        await pool.query(
-          'UPDATE orders SET payment_status = ?, status = ? WHERE id = ?',
-          ['paid', 'processing', orderId]
-        );
-
-        // Update payment transaction
-        await pool.query(
-          'UPDATE payment_transactions SET status = ?, gateway_response = ? WHERE transaction_id = ?',
-          ['completed', JSON.stringify(event), paymentIntent.id]
-        );
-
-        console.log(`Payment completed for order ${orderId}`);
-      }
-    }
-
-    res.json({ received: true });
-  } catch (error) {
-    console.error('Webhook processing error:', error);
-    res.status(500).json({ error: 'Webhook processing failed' });
+    console.error('GCash payment selection error:', error);
+    res.status(500).json({ 
+      error: 'Failed to process GCash selection',
+      details: error.message
+    });
   }
 };
 
@@ -288,7 +91,7 @@ export const getPaymentStatus = async (req, res) => {
 
   try {
     const [orders] = await pool.query(
-      'SELECT payment_status, payment_intent_id FROM orders WHERE id = ? AND user_id = ?',
+      'SELECT payment_status, payment_intent_id, payment_method FROM orders WHERE id = ? AND user_id = ?',
       [orderId, userId]
     );
 
@@ -297,33 +100,13 @@ export const getPaymentStatus = async (req, res) => {
     }
 
     const order = orders[0];
-
-    if (order.payment_intent_id) {
-      // Get payment status from PayMongo
-      const paymentResponse = await axios.get(
-        `${PAYMONGO_BASE_URL}/payment_intents/${order.payment_intent_id}`,
-        {
-          headers: {
-            'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ':').toString('base64')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      const paymentData = paymentResponse.data.data;
       
       res.json({
         order_id: orderId,
         payment_status: order.payment_status,
-        paymongo_status: paymentData.attributes.status,
-        payment_data: paymentData
-      });
-    } else {
-      res.json({
-        order_id: orderId,
-        payment_status: order.payment_status
-      });
-    }
+      payment_method: order.payment_method,
+      payment_intent_id: order.payment_intent_id
+    });
 
   } catch (error) {
     console.error('Get payment status error:', error);
@@ -331,53 +114,42 @@ export const getPaymentStatus = async (req, res) => {
   }
 };
 
-// Cancel payment
-export const cancelPayment = async (req, res) => {
-  const { orderId } = req.params;
-  const userId = req.user.id;
-
+// Get GCash payment statistics (for admin tracking)
+export const getGCashStats = async (req, res) => {
   try {
-    const [orders] = await pool.query(
-      'SELECT payment_intent_id FROM orders WHERE id = ? AND user_id = ?',
-      [orderId, userId]
-    );
+    // Get total GCash selections
+    const [gcashStats] = await pool.query(`
+      SELECT 
+        COUNT(*) as total_gcash_selections,
+        COUNT(CASE WHEN payment_status = 'unpaid' THEN 1 END) as unpaid_gcash_orders,
+        COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) as paid_gcash_orders,
+        SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) as total_gcash_revenue
+      FROM orders 
+      WHERE payment_method = 'gcash'
+    `);
 
-    if (orders.length === 0) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
+    // Get GCash selections by date
+    const [gcashByDate] = await pool.query(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as selections,
+        COUNT(CASE WHEN payment_status = 'unpaid' THEN 1 END) as unpaid,
+        COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) as paid
+      FROM orders 
+      WHERE payment_method = 'gcash'
+      GROUP BY DATE(created_at)
+      ORDER BY date DESC
+      LIMIT 30
+    `);
 
-    const order = orders[0];
-
-    if (order.payment_intent_id) {
-      // Cancel payment intent in PayMongo
-      await axios.post(
-        `${PAYMONGO_BASE_URL}/payment_intents/${order.payment_intent_id}/cancel`,
-        {},
-        {
-          headers: {
-            'Authorization': `Basic ${Buffer.from(PAYMONGO_SECRET_KEY + ':').toString('base64')}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      // Update order status
-      await pool.query(
-        'UPDATE orders SET payment_status = ?, status = ? WHERE id = ?',
-        ['cancelled', 'cancelled', orderId]
-      );
-
-      // Update payment transaction
-      await pool.query(
-        'UPDATE payment_transactions SET status = ? WHERE transaction_id = ?',
-        ['cancelled', order.payment_intent_id]
-      );
-    }
-
-    res.json({ message: 'Payment cancelled successfully' });
+    res.json({
+      success: true,
+      stats: gcashStats[0],
+      daily_breakdown: gcashByDate
+    });
 
   } catch (error) {
-    console.error('Cancel payment error:', error);
-    res.status(500).json({ error: 'Failed to cancel payment' });
+    console.error('Get GCash stats error:', error);
+    res.status(500).json({ error: 'Failed to get GCash statistics' });
   }
 };

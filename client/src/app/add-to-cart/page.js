@@ -147,37 +147,26 @@ export default function ProductPage() {
     }
 
     try {
-      const cartData = {
+      // For BUY NOW, don't add to cart - go directly to checkout
+      // Create product data for direct checkout
+      const productItem = {
+        id: Date.now(), // Temporary ID for checkout
         product_id: product.id,
-        quantity: quantity
+        product_name: product.name,
+        product_image: product.image || '/images/polo.png',
+        price: parseFloat(product.price),
+        quantity: quantity,
+        size: selectedSize || null,
+        size_id: sizes.length > 0 && selectedSize ? selectedSize : null
       };
-
-      if (sizes.length > 0 && selectedSize) {
-        cartData.size_id = selectedSize;
-      }
-
-      const response = await API.post('/cart', cartData);
-
-      if (response.data.success) {
-        incrementCartCount();
-
-        const cartItem = {
-          id: Date.now(),
-          product_id: product.id,
-          product_name: product.name,
-          product_image: product.image || '/images/polo.png',
-          price: parseFloat(product.price),
-          quantity: quantity,
-          size: selectedSize || null
-        };
-        
-        const queryString = new URLSearchParams({
-          items: JSON.stringify([cartItem])
-        }).toString();
-        
-        router.push(`/checkout?${queryString}`);
-        return true;
-      }
+      
+      // Pass the product item to checkout page
+      const queryString = new URLSearchParams({
+        items: JSON.stringify([productItem])
+      }).toString();
+      
+      router.push(`/checkout?${queryString}`);
+      return true;
     } catch (err) {
       console.error('Error adding to cart:', err);
       Swal.fire({

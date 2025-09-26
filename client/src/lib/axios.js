@@ -30,13 +30,22 @@ API.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401 || error.response?.status === 403) {
-      // Clear token and redirect to login
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      // Don't auto-logout for certain endpoints that might legitimately return auth errors
+      const currentPath = window.location.pathname;
+      const isThankYouPage = currentPath.includes('/thank-you');
+      const isPaymentPage = currentPath.includes('/payment');
+      const isCheckoutPage = currentPath.includes('/checkout');
       
-      // Only redirect if not already on login page
-      if (window.location.pathname !== '/auth/login') {
-        window.location.href = '/auth/login';
+      // Only auto-logout if not on critical pages where auth errors might be expected
+      if (!isThankYouPage && !isPaymentPage && !isCheckoutPage) {
+        // Clear token and redirect to login
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Only redirect if not already on login page
+        if (window.location.pathname !== '/auth/login') {
+          window.location.href = '/auth/login';
+        }
       }
     }
     return Promise.reject(error);

@@ -69,14 +69,27 @@ export const getNotifications = async (req, res) => {
 // ✅ Mark notification as read
 export const markAsRead = async (req, res) => {
   const user_id = req.user.id;
+  const user_role = req.user.role;
   const { id } = req.params;
 
   try {
-    const [result] = await pool.query(`
-      UPDATE notifications 
-      SET is_read = 1 
-      WHERE id = ? AND user_id = ?
-    `, [id, user_id]);
+    let result;
+    
+    if (user_role === 'admin') {
+      // Admin can mark any notification as read
+      [result] = await pool.query(`
+        UPDATE notifications 
+        SET is_read = 1 
+        WHERE id = ?
+      `, [id]);
+    } else {
+      // Regular users can only mark their own notifications as read
+      [result] = await pool.query(`
+        UPDATE notifications 
+        SET is_read = 1 
+        WHERE id = ? AND user_id = ?
+      `, [id, user_id]);
+    }
 
     if (result.affectedRows === 0) {
       return res.status(404).json({
@@ -101,13 +114,25 @@ export const markAsRead = async (req, res) => {
 // ✅ Mark all notifications as read
 export const markAllAsRead = async (req, res) => {
   const user_id = req.user.id;
+  const user_role = req.user.role;
 
   try {
-    await pool.query(`
-      UPDATE notifications 
-      SET is_read = 1 
-      WHERE user_id = ?
-    `, [user_id]);
+    if (user_role === 'admin') {
+      // Admin can mark all admin notifications as read
+      await pool.query(`
+        UPDATE notifications n
+        JOIN users u ON n.user_id = u.id
+        SET n.is_read = 1 
+        WHERE u.role = 'admin'
+      `);
+    } else {
+      // Regular users can only mark their own notifications as read
+      await pool.query(`
+        UPDATE notifications 
+        SET is_read = 1 
+        WHERE user_id = ?
+      `, [user_id]);
+    }
 
     res.json({
       success: true,

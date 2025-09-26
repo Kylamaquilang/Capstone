@@ -1,6 +1,7 @@
 import express from 'express'
 import {
   getUserOrders,
+  getUserOrderDetails,
   getAllOrders,
   getOrderItems,
   getOrderById,
@@ -8,12 +9,14 @@ import {
   getOrderStats,
   getSalesPerformance,
   confirmOrderReceipt,
-  userConfirmOrderReceipt
+  userConfirmOrderReceipt,
+  confirmOrderReceiptNotification
 } from '../controllers/order.controller.js'
 import { verifyToken, isAdmin } from '../middleware/verifyToken.js'
 
 const router = express.Router()
 router.get('/student', verifyToken, getUserOrders)
+router.get('/user/:id', verifyToken, getUserOrderDetails)
 router.get('/admin', verifyToken, isAdmin, getAllOrders)
 router.get('/:id', verifyToken, isAdmin, getOrderById)
 
@@ -21,6 +24,7 @@ router.get('/:id/items', verifyToken, getOrderItems)
 router.patch('/:id/status', verifyToken, isAdmin, updateOrderStatus)
 router.post('/:id/confirm-receipt', verifyToken, isAdmin, confirmOrderReceipt)
 router.post('/:id/user-confirm', verifyToken, userConfirmOrderReceipt)
+router.post('/:orderId/confirm-notification', verifyToken, confirmOrderReceiptNotification)
 
 // Analytics and reporting routes
 router.get('/stats', verifyToken, isAdmin, getOrderStats)

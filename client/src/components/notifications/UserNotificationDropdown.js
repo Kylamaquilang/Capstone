@@ -12,17 +12,21 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
   useEffect(() => {
     if (notifications.length > 0) {
       setLocalNotifications(notifications);
-    } else if (isOpen) {
+    } else if (isOpen && userId) {
       loadNotifications();
     }
-  }, [isOpen, notifications, userId]);
+  }, [isOpen, userId]); // Removed notifications from dependencies to prevent loops
 
-  // Sync local notifications with parent when they change
+  // Sync local notifications with parent when they change (only if different)
   useEffect(() => {
     if (onUpdateNotifications && localNotifications.length > 0) {
-      onUpdateNotifications(localNotifications);
+      // Only update if the notifications are actually different
+      const hasChanges = JSON.stringify(localNotifications) !== JSON.stringify(notifications);
+      if (hasChanges) {
+        onUpdateNotifications(localNotifications);
+      }
     }
-  }, [localNotifications, onUpdateNotifications]);
+  }, [localNotifications]); // Removed onUpdateNotifications from dependencies
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -46,11 +50,12 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
     try {
       // Try to load from API first
       try {
-        const response = await fetch('/api/notifications', {
+        const response = await fetch('http://localhost:5000/api/notifications', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache',
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
           },
         });
         if (response.ok) {
@@ -87,7 +92,8 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
         });
         if (response.ok) {
           // Update local state
-          const updatedNotifications = localNotifications.map(notification =>
+          const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
+          const updatedNotifications = notificationsArray.map(notification =>
             notification.id === notificationId
               ? { ...notification, read: true }
               : notification
@@ -100,7 +106,8 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
       }
       
       // Fallback to local update
-      const updatedNotifications = localNotifications.map(notification =>
+      const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
+      const updatedNotifications = notificationsArray.map(notification =>
         notification.id === notificationId
           ? { ...notification, read: true }
           : notification
@@ -123,7 +130,8 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
         });
         if (response.ok) {
           // Update local state
-          const updatedNotifications = localNotifications.map(notification =>
+          const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
+          const updatedNotifications = notificationsArray.map(notification =>
             notification.id === notificationId
               ? { ...notification, read: false }
               : notification
@@ -136,7 +144,8 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
       }
       
       // Fallback to local update
-      const updatedNotifications = localNotifications.map(notification =>
+      const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
+      const updatedNotifications = notificationsArray.map(notification =>
         notification.id === notificationId
           ? { ...notification, read: false }
           : notification
@@ -156,7 +165,8 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
         });
         if (response.ok) {
           // Update local state
-          const updatedNotifications = localNotifications.filter(notification => notification.id !== notificationId);
+          const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
+          const updatedNotifications = notificationsArray.filter(notification => notification.id !== notificationId);
           setLocalNotifications(updatedNotifications);
           return;
         }
@@ -165,7 +175,8 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
       }
       
       // Fallback to local update
-      const updatedNotifications = localNotifications.filter(notification => notification.id !== notificationId);
+      const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
+      const updatedNotifications = notificationsArray.filter(notification => notification.id !== notificationId);
       setLocalNotifications(updatedNotifications);
     } catch (error) {
       console.error('Error deleting notification:', error);
@@ -188,7 +199,9 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
 
   if (!isOpen) return null;
 
-  const unreadCount = localNotifications.filter(n => !n.read).length;
+  // Ensure localNotifications is an array before filtering
+  const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
+  const unreadCount = notificationsArray.filter(n => !n.read).length;
 
   return (
     <div 
@@ -233,7 +246,7 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
           </div>
         ) : (
           <div>
-            {localNotifications.map((notification) => (
+            {notificationsArray.map((notification) => (
               <div
                 key={notification.id}
                 className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${

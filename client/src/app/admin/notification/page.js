@@ -153,11 +153,11 @@ export default function AdminNotificationPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen text-black admin-page">
       <Navbar />
-      <div className="flex">
+      <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-100 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64">
+        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">NOTIFICATIONS</h2>

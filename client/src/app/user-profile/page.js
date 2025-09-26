@@ -264,65 +264,6 @@ export default function UserProfilePage() {
     router.push('/auth/login');
   };
 
-  const handleReceiveOrder = async (orderId) => {
-    try {
-      // Show confirmation dialog
-      const result = await Swal.fire({
-        title: 'Confirm Receipt',
-        text: 'Are you sure you have received your order? This will complete your order and send you a receipt via email.',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#10b981',
-        cancelButtonColor: '#6b7280',
-        confirmButtonText: 'Yes, I received it!',
-        cancelButtonText: 'Cancel',
-        customClass: {
-          title: 'text-lg font-medium',
-          content: 'text-sm font-normal',
-          confirmButton: 'text-sm font-medium',
-          cancelButton: 'text-sm font-medium'
-        }
-      });
-
-      if (result.isConfirmed) {
-        // Call API to confirm receipt
-        const response = await API.post(`/orders/${orderId}/user-confirm`);
-        
-        if (response.data.success) {
-          // Show success message
-          await Swal.fire({
-            title: 'Order Confirmed!',
-            text: 'Your order has been confirmed and a receipt has been sent to your email.',
-            icon: 'success',
-            confirmButtonColor: '#10b981',
-            customClass: {
-              title: 'text-lg font-medium',
-              content: 'text-sm font-normal',
-              confirmButton: 'text-sm font-medium'
-            }
-          });
-
-          // Refresh orders to show updated status
-          await fetchData();
-        } else {
-          throw new Error(response.data.message || 'Failed to confirm receipt');
-        }
-      }
-    } catch (err) {
-      console.error('Confirm receipt error:', err);
-      await Swal.fire({
-        title: 'Error',
-        text: err?.response?.data?.error || 'Failed to confirm receipt. Please try again.',
-        icon: 'error',
-        confirmButtonColor: '#ef4444',
-        customClass: {
-          title: 'text-lg font-medium',
-          content: 'text-sm font-normal',
-          confirmButton: 'text-sm font-medium'
-        }
-      });
-    }
-  };
 
   const filteredOrders = orders.filter(order => {
     if (statusFilter === 'all') return true;
@@ -748,28 +689,13 @@ export default function UserProfilePage() {
                     {/* Status Message */}
                     <div className="mb-2 sm:mb-3 p-2 sm:p-3 rounded-lg bg-white border border-gray-200">
                       <p className="text-xs text-gray-700">
-                        {order.status === 'delivered'
-                          ? '📦 Your order has been delivered! Please confirm receipt to complete your order.'
-                          : order.status === 'completed'
+                        {order.status === 'completed'
                           ? '✅ You have successfully confirmed receipt of your order. Thank you for shopping with us!'
                           : order.status === 'ready_for_pickup'
-                          ? '📦 Your order is ready for pickup! Please visit the store to collect your items.'
+                          ? '📦 Your order is ready for pickup! Please visit the store to collect your items and confirm receipt through the notification.'
                           : '⏳ Your order is still being processed. Please wait for confirmation.'}
                       </p>
                     </div>
-
-                    {/* Receive Order Button */}
-                    {order.status === 'delivered' && (
-                      <button
-                        onClick={() => handleReceiveOrder(order.id)}
-                        className="w-full bg-green-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg hover:bg-green-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-2"
-                      >
-                        <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Confirm Receipt
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>

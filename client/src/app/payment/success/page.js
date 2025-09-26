@@ -40,6 +40,13 @@ export default function PaymentSuccessPage() {
             text: `Your payment for Order #${orderId} has been processed successfully.`,
             confirmButtonColor: '#000C50',
           });
+        } else if (data.payment_status === 'unpaid' && data.payment_method === 'gcash') {
+          Swal.fire({
+            icon: 'info',
+            title: 'GCash Payment Selected',
+            text: `Your order #${orderId} has been created with GCash payment method. Please complete payment at the counter.`,
+            confirmButtonColor: '#000C50',
+          });
         }
       } catch (error) {
         console.error('Failed to check payment status:', error);
@@ -80,9 +87,25 @@ export default function PaymentSuccessPage() {
         <div className="max-w-2xl mx-auto">
           {/* Success Header */}
           <div className="text-center mb-8">
-            <div className="text-6xl mb-4">✅</div>
-            <h1 className="text-3xl font-bold text-green-600 mb-2">Payment Successful!</h1>
-            <p className="text-gray-600">Your order has been processed and payment received</p>
+            <div className="text-6xl mb-4">
+              {orderDetails?.payment_status === 'unpaid' && orderDetails?.payment_method === 'gcash' ? '💳' : '✅'}
+            </div>
+            <h1 className={`text-3xl font-bold mb-2 ${
+              orderDetails?.payment_status === 'unpaid' && orderDetails?.payment_method === 'gcash' 
+                ? 'text-blue-600' 
+                : 'text-green-600'
+            }`}>
+              {orderDetails?.payment_status === 'unpaid' && orderDetails?.payment_method === 'gcash' 
+                ? 'GCash Payment Selected!' 
+                : 'Payment Successful!'
+              }
+            </h1>
+            <p className="text-gray-600">
+              {orderDetails?.payment_status === 'unpaid' && orderDetails?.payment_method === 'gcash'
+                ? 'Your order has been created with GCash payment method'
+                : 'Your order has been processed and payment received'
+              }
+            </p>
           </div>
 
           {/* Order Details */}
@@ -106,14 +129,8 @@ export default function PaymentSuccessPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Payment Method:</span>
-                  <span>GCash</span>
+                  <span className="capitalize">{orderDetails.payment_method || 'GCash'}</span>
                 </div>
-                {orderDetails.paymongo_status && (
-                  <div className="flex justify-between">
-                    <span className="font-medium">Gateway Status:</span>
-                    <span className="capitalize">{orderDetails.paymongo_status}</span>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -122,10 +139,22 @@ export default function PaymentSuccessPage() {
           <div className="bg-blue-50 rounded-lg p-6 mb-6">
             <h3 className="text-lg font-bold mb-3">What's Next?</h3>
             <div className="space-y-2 text-sm">
-              <p>• You will receive an email confirmation shortly</p>
-              <p>• Your order will be processed and prepared for pickup</p>
-              <p>• You'll be notified when your order is ready</p>
-              <p>• Please bring a valid ID when picking up your order</p>
+              {orderDetails?.payment_status === 'unpaid' && orderDetails?.payment_method === 'gcash' ? (
+                <>
+                  <p>• You will receive an email confirmation shortly</p>
+                  <p>• Please complete your GCash payment at the counter</p>
+                  <p>• Your order will be processed after payment confirmation</p>
+                  <p>• You'll be notified when your order is ready for pickup</p>
+                  <p>• Please bring a valid ID when picking up your order</p>
+                </>
+              ) : (
+                <>
+                  <p>• You will receive an email confirmation shortly</p>
+                  <p>• Your order will be processed and prepared for pickup</p>
+                  <p>• You'll be notified when your order is ready</p>
+                  <p>• Please bring a valid ID when picking up your order</p>
+                </>
+              )}
             </div>
           </div>
 

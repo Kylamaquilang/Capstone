@@ -329,12 +329,12 @@ export default function ProductTable({ category = '' }) {
                       <ActionMenu
                         actions={[
                           {
-                            label: 'Edit Product',
+                            label: 'Edit',
                             icon: PencilSquareIcon,
                             onClick: () => handleEdit(product.id)
                           },
                           {
-                            label: 'Delete Product',
+                            label: 'Delete',
                             icon: TrashIcon,
                             onClick: () => handleDelete(product.id, product.name),
                             danger: true
@@ -397,12 +397,12 @@ export default function ProductTable({ category = '' }) {
                       <ActionMenu
                         actions={[
                           {
-                            label: 'Edit Product',
+                            label: 'Edit',
                             icon: PencilSquareIcon,
                             onClick: () => handleEdit(product.id)
                           },
                           {
-                            label: 'Delete Product',
+                            label: 'Delete',
                             icon: TrashIcon,
                             onClick: () => handleDelete(product.id, product.name),
                             danger: true

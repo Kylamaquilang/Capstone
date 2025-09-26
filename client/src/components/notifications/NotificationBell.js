@@ -10,23 +10,24 @@ const NotificationBell = ({ userType = 'user', userId }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const { socket, isConnected, joinUserRoom } = useSocket();
+  const { socket, isConnected, connectionFailed, joinUserRoom } = useSocket();
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
       // Try to load from API first
       try {
-        const response = await fetch('/api/notifications', {
+        const response = await fetch('http://localhost:5000/api/notifications', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache',
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
           },
         });
         if (response.ok) {
           const data = await response.json();
-          setNotifications(data);
+          setNotifications(Array.isArray(data) ? data : []);
           return;
         }
       } catch (apiError) {
@@ -35,12 +36,12 @@ const NotificationBell = ({ userType = 'user', userId }) => {
       
       // Fallback to sample notifications if API is not available
       const sampleNotifications = generateSampleNotifications();
-      setNotifications(sampleNotifications);
+      setNotifications(Array.isArray(sampleNotifications) ? sampleNotifications : []);
     } catch (error) {
       console.error('Error loading notifications:', error);
       // Use sample data as fallback
       const sampleNotifications = generateSampleNotifications();
-      setNotifications(sampleNotifications);
+      setNotifications(Array.isArray(sampleNotifications) ? sampleNotifications : []);
     } finally {
       setLoading(false);
     }
@@ -51,12 +52,12 @@ const NotificationBell = ({ userType = 'user', userId }) => {
     loadNotifications();
     
     // Join user room for real-time notifications
-    if (userId && isConnected) {
+    if (userId && isConnected && !connectionFailed) {
       joinUserRoom(userId);
     }
     
     // Set up Socket.io event listeners for real-time updates
-    if (socket) {
+    if (socket && !connectionFailed) {
       const handleNewNotification = (notification) => {
         console.log('🔔 Real-time notification received:', notification);
         setNotifications(prev => [notification, ...prev]);
@@ -87,12 +88,16 @@ const NotificationBell = ({ userType = 'user', userId }) => {
         socket.off('order-status-updated', handleOrderUpdate);
       };
     }
-  }, [userId, socket, isConnected, joinUserRoom, loadNotifications]);
+  }, [userId, socket, isConnected, connectionFailed, joinUserRoom, loadNotifications]);
 
   // Update unread count when notifications change
   useEffect(() => {
-    const unread = notifications.filter(n => !n.read).length;
-    setUnreadCount(unread);
+    if (Array.isArray(notifications)) {
+      const unread = notifications.filter(n => !n.read).length;
+      setUnreadCount(unread);
+    } else {
+      setUnreadCount(0);
+    }
   }, [notifications]);
 
   const toggleDropdown = () => {

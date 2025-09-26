@@ -37,8 +37,8 @@ export default function AdminSalesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dateRange, setDateRange] = useState({
-    start_date: '2025-09-20',
-    end_date: '2025-09-25'
+    start_date: '',
+    end_date: ''
   });
   const [groupBy, setGroupBy] = useState('day');
 
@@ -48,10 +48,16 @@ export default function AdminSalesPage() {
       setError('');
       
       const params = new URLSearchParams({
-        start_date: dateRange.start_date,
-        end_date: dateRange.end_date,
         group_by: groupBy
       });
+      
+      // Only add date filters if they are provided
+      if (dateRange.start_date) {
+        params.append('start_date', dateRange.start_date);
+      }
+      if (dateRange.end_date) {
+        params.append('end_date', dateRange.end_date);
+      }
       
       console.log('📊 Sales fetch params:', { start_date: dateRange.start_date, end_date: dateRange.end_date, group_by: groupBy });
       
@@ -87,14 +93,27 @@ export default function AdminSalesPage() {
           
           if (Array.isArray(orders) && orders.length > 0) {
             // Filter orders by date range and status
-            const filteredOrders = orders.filter(order => {
-              const orderDate = new Date(order.created_at);
-              const startDate = new Date(dateRange.start_date);
-              const endDate = new Date(dateRange.end_date);
-              endDate.setHours(23, 59, 59, 999); // Include the entire end date
-              
-              const isInDateRange = orderDate >= startDate && orderDate <= endDate;
+            let filteredOrders = orders.filter(order => {
               const isNotCancelled = order.status !== 'cancelled';
+              
+              // If no date range is specified, return all non-cancelled orders
+              if (!dateRange.start_date && !dateRange.end_date) {
+                return isNotCancelled;
+              }
+              
+              const orderDate = new Date(order.created_at);
+              let isInDateRange = true;
+              
+              if (dateRange.start_date) {
+                const startDate = new Date(dateRange.start_date);
+                isInDateRange = isInDateRange && orderDate >= startDate;
+              }
+              
+              if (dateRange.end_date) {
+                const endDate = new Date(dateRange.end_date);
+                endDate.setHours(23, 59, 59, 999); // Include the entire end date
+                isInDateRange = isInDateRange && orderDate <= endDate;
+              }
               
               console.log(`Order ${order.id}: ${order.created_at} - In range: ${isInDateRange}, Not cancelled: ${isNotCancelled}`);
               
@@ -103,7 +122,7 @@ export default function AdminSalesPage() {
             
             console.log(`📊 Filtered orders: ${filteredOrders.length} orders in date range`);
             
-            if (filteredOrders.length === 0) {
+            if (filteredOrders.length === 0 && (dateRange.start_date || dateRange.end_date)) {
               console.log('📊 No orders found in date range, trying without date filter...');
               // Try without date filter to see all orders
               const allNonCancelledOrders = orders.filter(order => order.status !== 'cancelled');
@@ -217,6 +236,18 @@ export default function AdminSalesPage() {
                 console.log('Sales data calculated successfully from all orders');
                 return;
               }
+            } else if (filteredOrders.length === 0) {
+              console.log('📊 No orders found in database');
+              setSalesData({
+                salesData: [],
+                topProducts: [],
+                paymentBreakdown: [],
+                inventorySummary: [],
+                salesLogsSummary: {},
+                summary: {}
+              });
+              setError('No orders found in the system.');
+              return;
             }
             
             // Calculate basic sales data from filtered orders
@@ -332,45 +363,17 @@ export default function AdminSalesPage() {
           console.log('Basic orders API also failed:', ordersError.message);
         }
         
-        // Fallback 2: Use sample data
-        console.log('Using sample sales data...');
-        const sampleSalesData = {
-          salesData: [
-            { period: '2024-01-15', orders: 12, revenue: 15000, avg_order_value: 1250 },
-            { period: '2024-01-16', orders: 8, revenue: 12000, avg_order_value: 1500 },
-            { period: '2024-01-17', orders: 15, revenue: 18000, avg_order_value: 1200 },
-            { period: '2024-01-18', orders: 10, revenue: 14000, avg_order_value: 1400 },
-            { period: '2024-01-19', orders: 18, revenue: 22000, avg_order_value: 1222 }
-          ],
-          topProducts: [
-            { product_name: 'Classic Polo Shirt', product_image: '/images/polo.png', total_sold: 25, total_revenue: 7500, category_name: 'Shirts' },
-            { product_name: 'Denim Jeans', product_image: '/images/jeans.png', total_sold: 18, total_revenue: 10800, category_name: 'Pants' },
-            { product_name: 'Running Shoes', product_image: '/images/shoes.png', total_sold: 12, total_revenue: 9600, category_name: 'Shoes' }
-          ],
-          paymentBreakdown: [
-            { payment_method: 'gcash', order_count: 25, total_revenue: 30000, avg_order_value: 1200 },
-            { payment_method: 'cash', order_count: 20, total_revenue: 25000, avg_order_value: 1250 }
-          ],
-          inventorySummary: [
-            { movement_type: 'sale', movement_count: 45, total_quantity: 180, products_affected: 12 },
-            { movement_type: 'restock', movement_count: 8, total_quantity: 200, products_affected: 8 }
-          ],
-          salesLogsSummary: {
-            completed_sales: 45,
-            completed_revenue: 55000,
-            reversed_sales: 2,
-            total_sales_logs: 47
-          },
-          summary: {
-            total_orders: 45,
-            total_revenue: 55000,
-            avg_order_value: 1222
-          }
-        };
-        
-        setSalesData(sampleSalesData);
-        setError('Using sample data (all APIs unavailable)');
-        console.log('Sample sales data loaded');
+        // No fallback to sample data - show empty state instead
+        console.log('No sales data available - showing empty state');
+        setSalesData({
+          salesData: [],
+          topProducts: [],
+          paymentBreakdown: [],
+          inventorySummary: [],
+          salesLogsSummary: {},
+          summary: {}
+        });
+        setError('No sales data available. Please check if there are any orders in the system.');
         
       }
     } catch (err) {
@@ -488,9 +491,9 @@ export default function AdminSalesPage() {
   return (
     <div className="min-h-screen text-black admin-page">
       <Navbar />
-      <div className="flex">
+      <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64 mt-20">
+        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
           {/* Header */}
           <div className="mb-2">
             <div className="flex items-center justify-between">

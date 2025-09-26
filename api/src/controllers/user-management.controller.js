@@ -22,6 +22,7 @@ export const getAllUsersWithStatus = async (req, res) => {
         created_at,
         contact_number
        FROM users 
+       WHERE is_active = 1
        ORDER BY created_at DESC`
     );
 

@@ -29,6 +29,7 @@ export default function AdminOrdersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
 
@@ -71,8 +72,13 @@ export default function AdminOrdersPage() {
       filtered = filtered.filter(order => order.payment_status === paymentStatusFilter);
     }
 
+    // Filter by payment method
+    if (paymentMethodFilter) {
+      filtered = filtered.filter(order => order.payment_method === paymentMethodFilter);
+    }
+
     setFilteredOrders(filtered);
-  }, [orders, searchTerm, statusFilter, paymentStatusFilter]);
+  }, [orders, searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter]);
 
   const handleViewDetails = (orderId) => {
     setSelectedOrderId(orderId);
@@ -196,11 +202,11 @@ export default function AdminOrdersPage() {
     <ErrorBoundary>
       <div className="min-h-screen text-black admin-page">
         <Navbar />
-        <div className="flex">
+        <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
           <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64">
+        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
           {/* Main Container with Controls and Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-20">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Header Section */}
             <div className="p-3 sm:p-4 border-b border-gray-200">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
@@ -215,7 +221,8 @@ export default function AdminOrdersPage() {
 
             {/* Search and Filter Controls */}
             <div className="p-3 sm:p-4 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="flex flex-col gap-3">
+                {/* Search Bar */}
                 <div className="flex-1">
                   <input
                     type="text"
@@ -225,34 +232,62 @@ export default function AdminOrdersPage() {
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
-                <div className="sm:w-48">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">All Order Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="processing">Processing</option>
-                    <option value="ready_for_pickup">Ready for Pickup</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="refunded">Refunded</option>
-                  </select>
-                </div>
-                <div className="sm:w-48">
-                  <select
-                    value={paymentStatusFilter}
-                    onChange={(e) => setPaymentStatusFilter(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">All Payment Statuses</option>
-                    <option value="unpaid">Unpaid</option>
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                    <option value="failed">Failed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                
+                {/* Filter Controls */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                  <div className="sm:w-48">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Order Statuses</option>
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="ready_for_pickup">Ready for Pickup</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="refunded">Refunded</option>
+                    </select>
+                  </div>
+                  <div className="sm:w-48">
+                    <select
+                      value={paymentStatusFilter}
+                      onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Payment Statuses</option>
+                      <option value="unpaid">Unpaid</option>
+                      <option value="pending">Pending</option>
+                      <option value="paid">Paid</option>
+                      <option value="failed">Failed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                  <div className="sm:w-48">
+                    <select
+                      value={paymentMethodFilter}
+                      onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Payment Methods</option>
+                      <option value="gcash">GCash</option>
+                      <option value="cash">Pay at Counter</option>
+                    </select>
+                  </div>
+                  <div className="sm:w-32">
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setStatusFilter('');
+                        setPaymentStatusFilter('');
+                        setPaymentMethodFilter('');
+                      }}
+                      className="w-full bg-gray-100 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -316,14 +351,12 @@ export default function AdminOrdersPage() {
                         <td className="px-4 py-3 border-r border-gray-100">
                           <div>
                             <div className="text-xs font-medium text-gray-900">{order.user_name}</div>
-                            <div className="text-xs text-gray-500">ID: {order.student_id || 'N/A'}</div>
-                            <div className="text-xs text-gray-400">{order.email}</div>
                           </div>
                         </td>
                         <td className="px-4 py-3 border-r border-gray-100">
                           <div className="text-center">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
-                              {order.total_quantity || 0} qty
+                              {order.total_quantity || 0}
                             </span>
                           </div>
                         </td>
@@ -342,17 +375,6 @@ export default function AdminOrdersPage() {
                               ) : (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
                                   Cash
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs">
-                              {order.pay_at_counter ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
-                                  Pay at Counter
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
-                                  Online Payment
                                 </span>
                               )}
                             </div>
@@ -401,7 +423,6 @@ export default function AdminOrdersPage() {
                         </td>
                         <td className="px-4 py-3 border-r border-gray-100">
                           <div className="text-xs text-gray-900">{new Date(order.created_at).toLocaleDateString()}</div>
-                          <div className="text-xs text-gray-500">{new Date(order.created_at).toLocaleTimeString()}</div>
                         </td>
                         <td className="px-4 py-3">
                           <ActionMenu

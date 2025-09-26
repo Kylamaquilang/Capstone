@@ -321,11 +321,11 @@ export default function AdminUsersPage() {
   return (
     <div className="min-h-screen text-black admin-page">
       <Navbar />
-      <div className="flex">
+      <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64">
+        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
           {/* Main Container with Buttons and Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-20">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Header Section */}
             <div className="p-3 sm:p-4 border-b border-gray-200">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
@@ -451,11 +451,6 @@ export default function AdminUsersPage() {
                         <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
                           <div>
                             <div className="text-xs font-medium text-gray-900">{user.name || 'N/A'}</div>
-                            {user.first_name && user.last_name && (
-                              <div className="text-xs text-gray-500">
-                                {user.first_name} {user.middle_name ? user.middle_name + ' ' : ''}{user.last_name}{user.suffix ? ' ' + user.suffix : ''}
-                              </div>
-                            )}
                           </div>
                         </td>
                         <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
@@ -465,7 +460,7 @@ export default function AdminUsersPage() {
                         <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
                           <div className="text-xs">
                             <div className="font-medium text-gray-900">{user.degree || 'N/A'}</div>
-                            <div className="text-xs text-gray-500">{getDegreeDisplayName(user.degree)}</div>
+                      
                           </div>
                         </td>
                         <td className="px-2 sm:px-4 py-3 border-r border-gray-100">{getStatusBadge(user.status)}</td>
@@ -479,13 +474,13 @@ export default function AdminUsersPage() {
                           <ActionMenu
                             actions={[
                               {
-                                label: user.is_active ? 'Deactivate User' : 'Activate User',
+                                label: user.is_active ? 'Deactivate' : 'Activate',
                                 icon: user.is_active ? UserMinusIcon : UserPlusIcon,
                                 onClick: () => handleStatusToggle(user.id, user.is_active),
                                 disabled: updatingStatus === user.id
                               },
                               {
-                                label: 'Delete User',
+                                label: 'Delete',
                                 icon: PencilSquareIcon,
                                 onClick: () => handleDeleteUser(user.id, user.name),
                                 danger: true

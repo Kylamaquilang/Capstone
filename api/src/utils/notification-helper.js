@@ -79,14 +79,37 @@ export const createOrderStatusNotification = async (user_id, orderId, status) =>
     };
     
     // Create notification with related_id for order tracking
+    // For ready_for_pickup status, add action data for confirmation button
+    const hasAction = status === 'ready_for_pickup';
+    const actionData = hasAction ? JSON.stringify({
+      actionType: 'confirm_receipt',
+      actionText: 'Confirm Receipt',
+      orderId: orderId
+    }) : null;
+    
     await pool.query(`
-      INSERT INTO notifications (user_id, title, message, type, related_id, created_at) 
-      VALUES (?, ?, ?, ?, ?, NOW())
-    `, [user_id, data.title, data.message, 'system', orderId]);
+      INSERT INTO notifications (user_id, title, message, type, related_id, action_data, created_at) 
+      VALUES (?, ?, ?, ?, ?, ?, NOW())
+    `, [user_id, data.title, data.message, 'system', orderId, actionData]);
+    
+    return {
+      title: data.title,
+      message: data.message,
+      productSummary,
+      orderId,
+      status
+    };
   } catch (error) {
     console.error(' Error creating order status notification:', error);
     // Fallback to simple notification
     await createNotification(user_id, `Your order #${orderId} status has been updated to ${status}.`, ' Order Update', 'system');
+    return {
+      title: ' Order Update',
+      message: `Your order #${orderId} status has been updated to ${status}.`,
+      productSummary: '',
+      orderId,
+      status
+    };
   }
 };
 
@@ -131,4 +154,108 @@ export const createWelcomeNotification = async (user_id, userName) => {
 //  Create promotional notification
 export const createPromotionalNotification = async (user_id, promoMessage) => {
   await createNotification(user_id, promoMessage);
+};
+
+//  Create admin order notification with detailed summary
+export const createAdminOrderNotification = async (orderId, total_amount, payment_method) => {
+  try {
+    // Get order details with customer info and product summary
+    const [orderDetails] = await pool.query(`
+      SELECT 
+        o.id,
+        o.total_amount,
+        o.payment_method,
+        o.payment_status,
+        o.status,
+        o.created_at,
+        u.name as customer_name,
+        u.student_id,
+        u.email as customer_email
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      WHERE o.id = ?
+    `, [orderId]);
+
+    if (orderDetails.length === 0) {
+      console.error('Order not found for admin notification');
+      return;
+    }
+
+    const order = orderDetails[0];
+
+    // Get product details for the order
+    const [productInfo] = await pool.query(`
+      SELECT p.name, oi.quantity, ps.size as size_name, oi.unit_price, oi.total_price
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+      WHERE oi.order_id = ?
+      ORDER BY oi.id
+    `, [orderId]);
+
+    // Create detailed product summary
+    let productSummary = '';
+    if (productInfo.length > 0) {
+      if (productInfo.length === 1) {
+        const item = productInfo[0];
+        productSummary = item.size_name 
+          ? `${item.quantity}x ${item.name} (${item.size_name}) - ₱${item.total_price.toFixed(2)}`
+          : `${item.quantity}x ${item.name} - ₱${item.total_price.toFixed(2)}`;
+      } else if (productInfo.length <= 3) {
+        productSummary = productInfo.map(item => 
+          item.size_name 
+            ? `${item.quantity}x ${item.name} (${item.size_name}) - ₱${item.total_price.toFixed(2)}`
+            : `${item.quantity}x ${item.name} - ₱${item.total_price.toFixed(2)}`
+        ).join(', ');
+      } else {
+        const firstItem = productInfo[0];
+        const firstItemText = firstItem.size_name 
+          ? `${firstItem.quantity}x ${firstItem.name} (${firstItem.size_name}) - ₱${firstItem.total_price.toFixed(2)}`
+          : `${firstItem.quantity}x ${firstItem.name} - ₱${firstItem.total_price.toFixed(2)}`;
+        productSummary = `${firstItemText} and ${productInfo.length - 1} more items`;
+      }
+    }
+
+    // Create notification message based on payment method
+    let title = '🛒 New Order Received';
+    let message = '';
+    
+    if (payment_method === 'gcash' && order.payment_status === 'unpaid') {
+      message = `New GCash order from ${order.customer_name} (${order.student_id}): ${productSummary}. Total: ₱${total_amount.toFixed(2)}. Payment pending at counter.`;
+    } else if (payment_method === 'cash') {
+      message = `New cash order from ${order.customer_name} (${order.student_id}): ${productSummary}. Total: ₱${total_amount.toFixed(2)}. Payment at counter.`;
+    } else {
+      message = `New order from ${order.customer_name} (${order.student_id}): ${productSummary}. Total: ₱${total_amount.toFixed(2)}.`;
+    }
+
+    // Get all admin users
+    const [admins] = await pool.query(`
+      SELECT id FROM users WHERE role = 'admin'
+    `);
+
+    // Create notification for each admin
+    for (const admin of admins) {
+      await pool.query(`
+        INSERT INTO notifications (user_id, title, message, type, related_id, created_at) 
+        VALUES (?, ?, ?, ?, ?, NOW())
+      `, [admin.id, title, message, 'admin_order', orderId]);
+    }
+
+    console.log(`✅ Admin order notification created for order #${orderId}`);
+
+    return {
+      title,
+      message,
+      orderId,
+      customerName: order.customer_name,
+      studentId: order.student_id,
+      totalAmount: total_amount,
+      paymentMethod: payment_method,
+      paymentStatus: order.payment_status,
+      productSummary
+    };
+  } catch (error) {
+    console.error('❌ Error creating admin order notification:', error);
+    throw error;
+  }
 };

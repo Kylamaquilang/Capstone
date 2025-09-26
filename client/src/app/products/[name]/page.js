@@ -217,33 +217,28 @@ export default function ProductDetailPage() {
         cartData.size_id = sizeInfo.id;
       }
 
-      // Add to cart
-      const response = await API.post('/cart', cartData);
-
-      if (response.data.success) {
-        // Increment cart count
-        incrementCartCount();
-        
-        // No success message - go directly to checkout
-        // Create cart item data for checkout
-        const cartItem = {
-          id: Date.now(), // Temporary ID for checkout
-          product_id: product.id,
-          product_name: product.name,
-          product_image: getImageUrl(product.image) || '/images/polo.png',
-          price: parseFloat(product.price),
-          quantity: quantity,
-          size: selectedSize || null
-        };
-        
-        // Pass the cart item to checkout page
-        const queryString = new URLSearchParams({
-          items: JSON.stringify([cartItem])
-        }).toString();
-        
-        router.push(`/checkout?${queryString}`);
-        return true;
-      }
+      // For BUY NOW, don't add to cart - go directly to checkout
+      // Create product data for direct checkout
+      const productItem = {
+        id: Date.now(), // Temporary ID for checkout
+        product_id: product.id,
+        product_name: product.name,
+        product_image: getImageUrl(product.image) || '/images/polo.png',
+        price: parseFloat(product.price),
+        quantity: quantity,
+        size: selectedSize || null,
+        size_id: product.sizes && product.sizes.length > 0 && selectedSize 
+          ? product.sizes.find(s => s.size === selectedSize)?.id 
+          : null
+      };
+      
+      // Pass the product item to checkout page
+      const queryString = new URLSearchParams({
+        items: JSON.stringify([productItem])
+      }).toString();
+      
+      router.push(`/checkout?${queryString}`);
+      return true;
     } catch (err) {
       console.log('Error adding to cart (server might be starting):', err.message);
       

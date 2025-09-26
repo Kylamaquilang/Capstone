@@ -47,9 +47,9 @@ export default function AdminProductPage() {
   return (
     <div className="min-h-screen text-black admin-page">
       <Navbar />
-      <div className="flex">
+      <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
-        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64 pt-50 mt-20">
+        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
           {/* Header Section */}
           <div className="mb-2 ml-1 sm:ml-2">
             <h1 className="text-lg sm:text-2xl font-semibold text-gray-900 mb-1">Products</h1>

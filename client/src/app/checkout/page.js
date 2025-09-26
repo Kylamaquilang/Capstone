@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
+import ThankYouModal from '@/components/common/ThankYouModal';
 import Swal from 'sweetalert2';
 import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
@@ -20,6 +21,8 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [showThankYouModal, setShowThankYouModal] = useState(false);
+  const [orderId, setOrderId] = useState(null);
 
   // Get selected items from URL parameters
   useEffect(() => {
@@ -76,7 +79,7 @@ const CheckoutPage = () => {
     if (method === 'gcash') {
       Swal.fire({
         title: 'Proceed with GCash?',
-        text: 'You will be redirected to PayMongo for secure payment.',
+        text: 'Please proceed to the counter for GCash payment',
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: '#000C50',
@@ -140,18 +143,19 @@ const CheckoutPage = () => {
 
         const orderId = orderResponse.data.orderId;
 
-        // Create GCash payment
-        const paymentResponse = await API.post('/payments/gcash/create', {
+        // Select GCash payment method (no actual payment processing)
+        const paymentResponse = await API.post('/payments/gcash/select', {
           orderId: orderId,
           amount: totalAmount,
           description: `Order #${orderId} - CPC Store`
         });
 
-        if (paymentResponse.data.payment_url) {
-          // Redirect to PayMongo payment page
-          window.location.href = paymentResponse.data.payment_url;
+        if (paymentResponse.data.success) {
+          // Show thank you modal
+          setOrderId(orderId);
+          setShowThankYouModal(true);
         } else {
-          throw new Error('Payment URL not received');
+          throw new Error('Failed to select GCash payment method');
         }
 
       } else if (selectedMethod === 'pickup') {
@@ -176,26 +180,13 @@ const CheckoutPage = () => {
           }));
         }
 
-        const response = await API.post('/checkout', checkoutData);
+        const orderResponse = await API.post('/checkout', checkoutData);
 
-        // Create product summary
-        const productSummary = cartItems.length === 1 
-          ? cartItems[0].product_name
-          : `${cartItems[0].product_name} and ${cartItems.length - 1} other item${cartItems.length - 1 !== 1 ? 's' : ''}`;
+        const orderId = orderResponse.data.orderId;
 
-        Swal.fire({
-          icon: 'success',
-          title: 'Order Placed Successfully!',
-          text: `${productSummary} - Please pay ₱${totalAmount.toFixed(2)} upon pickup.`,
-          confirmButtonColor: '#000C50',
-          customClass: {
-            title: 'text-lg font-medium',
-            content: 'text-sm font-normal',
-            confirmButton: 'text-sm font-medium'
-          }
-        }).then(() => {
-          router.push('/cart');
-        });
+        // Show thank you modal for cash payment
+        setOrderId(orderId);
+        setShowThankYouModal(true);
       }
 
     } catch (error) {
@@ -208,6 +199,12 @@ const CheckoutPage = () => {
     } finally {
       setProcessingPayment(false);
     }
+  };
+
+  const handleCloseThankYouModal = () => {
+    setShowThankYouModal(false);
+    // Redirect to dashboard after modal closes
+    router.push('/dashboard');
   };
 
   if (loading) {
@@ -386,6 +383,15 @@ const CheckoutPage = () => {
       </main>
 
       <Footer />
+      
+      {/* Thank You Modal */}
+      {showThankYouModal && (
+        <ThankYouModal 
+          isOpen={showThankYouModal}
+          onClose={handleCloseThankYouModal}
+          orderId={orderId}
+        />
+      )}
     </div>
   );
 };

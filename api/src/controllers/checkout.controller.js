@@ -1,80 +1,13 @@
 import { pool } from '../database/db.js'
-import { createOrderStatusNotification } from '../utils/notification-helper.js'
+import { createOrderStatusNotification, createAdminOrderNotification } from '../utils/notification-helper.js'
+import { emitUserNotification, emitAdminNotification } from '../utils/socket-helper.js'
 
-// Helper function to create admin notifications for new orders
-const createAdminOrderNotification = async (orderId, totalAmount, paymentMethod) => {
-  try {
-    // Get all admin users
-    const [adminUsers] = await pool.query(`
-      SELECT id, name FROM users WHERE role = 'admin'
-    `);
-    
-    // Get customer info for the order
-    const [orderInfo] = await pool.query(`
-      SELECT u.name as customer_name, u.email as customer_email
-      FROM orders o
-      JOIN users u ON o.user_id = u.id
-      WHERE o.id = ?
-    `, [orderId]);
-    
-    const customerName = orderInfo[0]?.customer_name || 'Customer';
-    
-    // Get product details for the order
-    const [productInfo] = await pool.query(`
-      SELECT p.name as product_name, oi.quantity, ps.size as size_name
-      FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
-      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
-      WHERE oi.order_id = ?
-      ORDER BY oi.id
-    `, [orderId]);
-    
-    // Create product summary
-    let productSummary = '';
-    if (productInfo.length > 0) {
-      if (productInfo.length === 1) {
-        const item = productInfo[0];
-        productSummary = item.size_name 
-          ? `${item.quantity}x ${item.product_name} (${item.size_name})`
-          : `${item.quantity}x ${item.product_name}`;
-      } else if (productInfo.length <= 3) {
-        productSummary = productInfo.map(item => 
-          item.size_name 
-            ? `${item.quantity}x ${item.product_name} (${item.size_name})`
-            : `${item.quantity}x ${item.product_name}`
-        ).join(', ');
-      } else {
-        const firstItem = productInfo[0];
-        const firstItemText = firstItem.size_name 
-          ? `${firstItem.quantity}x ${firstItem.product_name} (${firstItem.size_name})`
-          : `${firstItem.quantity}x ${firstItem.product_name}`;
-        productSummary = `${firstItemText} and ${productInfo.length - 1} more items`;
-      }
-    }
-    
-    // Create notification for each admin user
-    for (const admin of adminUsers) {
-      await pool.query(`
-        INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
-        VALUES (?, ?, ?, ?, ?, NOW())
-      `, [
-        admin.id,
-        `🆕 New Order`,
-        `New order #${orderId} from ${customerName} for ${productSummary} - ₱${totalAmount.toFixed(2)}`,
-        'admin_order',
-        orderId
-      ]);
-    }
-    
-    console.log(`✅ Admin notifications created for order #${orderId}`);
-  } catch (error) {
-    console.error('❌ Error creating admin notifications:', error);
-  }
-}
 
 export const checkout = async (req, res) => {
   const user_id = req.user.id
   const { payment_method, pay_at_counter, cart_item_ids, products } = req.body
+
+  console.log('🛒 Checkout request:', { user_id, payment_method, pay_at_counter, cart_item_ids, products });
 
   if (!payment_method) {
     return res.status(400).json({ 
@@ -145,13 +78,16 @@ export const checkout = async (req, res) => {
       })
     }
 
+    // Validate stock availability for all items
     for (const item of cartItems) {
       // Check stock based on whether it's a size-specific item or general product
       const availableStock = item.size_id ? item.size_stock : item.stock
+      console.log(`🔍 Stock validation: Product ID ${item.product_id}, Size ID ${item.size_id || 'N/A'}, Available: ${availableStock}, Requested: ${item.quantity}`);
+      
       if (item.quantity > availableStock) {
         return res.status(400).json({
           error: 'Insufficient stock',
-          message: `Insufficient stock for product ID ${item.product_id}`
+          message: `Insufficient stock for product ID ${item.product_id}. Available: ${availableStock}, Requested: ${item.quantity}`
         })
       }
     }
@@ -170,77 +106,182 @@ export const checkout = async (req, res) => {
     
     const orderNumber = `ORD${dateStr}${String(existingOrders[0].count + 1).padStart(4, '0')}`;
 
-    const [orderResult] = await pool.query(`
-      INSERT INTO orders (user_id, order_number, total_amount, payment_method, payment_status, status, pay_at_counter)
-      VALUES (?, ?, ?, ?, 'unpaid', 'pending', ?)
-    `, [user_id, orderNumber, total_amount, payment_method, pay_at_counter || false])
+    // Start database transaction to ensure atomicity
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
 
-    const orderId = orderResult.insertId
+    let orderId; // Declare orderId outside the try block
 
-    for (const item of cartItems) {
-      // Get product name
-      const [productInfo] = await pool.query(`SELECT name FROM products WHERE id = ?`, [item.product_id]);
-      const productName = productInfo[0]?.name || 'Unknown Product';
-      
-      await pool.query(
-        `INSERT INTO order_items (order_id, product_id, size_id, product_name, quantity, unit_price, total_price)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [orderId, item.product_id, item.size_id || null, productName, item.quantity, item.size_price || item.price, (item.size_price || item.price) * item.quantity]
-      )
+    try {
+      // Create order
+      const [orderResult] = await connection.query(`
+        INSERT INTO orders (user_id, order_number, total_amount, payment_method, payment_status, status, pay_at_counter)
+        VALUES (?, ?, ?, ?, 'unpaid', 'pending', ?)
+      `, [user_id, orderNumber, total_amount, payment_method, pay_at_counter || false])
 
-      // Update stock and log inventory movement
-      if (item.size_id) {
-        await pool.query(
-          `UPDATE product_sizes SET stock = stock - ? WHERE id = ?`,
-          [item.quantity, item.size_id]
-        )
+      orderId = orderResult.insertId
+
+      // Process each item in the order
+      for (const item of cartItems) {
+        // Get product name
+        const [productInfo] = await connection.query(`SELECT name FROM products WHERE id = ?`, [item.product_id]);
+        const productName = productInfo[0]?.name || 'Unknown Product';
         
-        // Log inventory movement for size-specific items
-        await pool.query(`
-          INSERT INTO inventory_movements (product_id, size_id, movement_type, quantity_change, reason, order_id, created_at)
-          VALUES (?, ?, 'sale', ?, 'Order placed', ?, NOW())
-        `, [item.product_id, item.size_id, -item.quantity, orderId])
-      } else {
-        await pool.query(
-          `UPDATE products SET stock = stock - ? WHERE id = ?`,
-          [item.quantity, item.product_id]
+        // Insert order item
+        await connection.query(
+          `INSERT INTO order_items (order_id, product_id, size_id, product_name, quantity, unit_price, total_price)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [orderId, item.product_id, item.size_id || null, productName, item.quantity, item.size_price || item.price, (item.size_price || item.price) * item.quantity]
         )
-        
-        // Log inventory movement for general products
-        await pool.query(`
-          INSERT INTO inventory_movements (product_id, movement_type, quantity_change, reason, order_id, created_at)
-          VALUES (?, 'sale', ?, 'Order placed', ?, NOW())
-        `, [item.product_id, -item.quantity, orderId])
+
+        // Log inventory movement - the database trigger will handle stock deduction
+        if (item.size_id) {
+          console.log(`📦 Processing size-specific item: Product ID ${item.product_id}, Size ID ${item.size_id}, Quantity ${item.quantity}`);
+          
+          // Check stock before processing
+          const [currentStock] = await connection.query(
+            `SELECT stock FROM product_sizes WHERE id = ?`,
+            [item.size_id]
+          );
+          
+          if (currentStock.length === 0) {
+            throw new Error(`Size ID ${item.size_id} not found`);
+          }
+          
+          const availableStock = currentStock[0].stock;
+          console.log(`📦 Size ID ${item.size_id} current stock: ${availableStock}, requested: ${item.quantity}`);
+          
+          if (availableStock < item.quantity) {
+            throw new Error(`Insufficient stock for size ID ${item.size_id}. Available: ${availableStock}, Requested: ${item.quantity}`);
+          }
+          
+          // Log inventory movement - trigger will deduct stock automatically
+          await connection.query(`
+            INSERT INTO inventory_movements (product_id, size_id, movement_type, quantity_change, reason, order_id, created_at)
+            VALUES (?, ?, 'sale', ?, 'Order placed', ?, NOW())
+          `, [item.product_id, item.size_id, -item.quantity, orderId])
+          
+          console.log(`✅ Size-specific stock deduction logged for Size ID ${item.size_id} (trigger will handle deduction)`);
+        } else {
+          // Check stock before processing
+          const [currentStock] = await connection.query(
+            `SELECT stock FROM products WHERE id = ?`,
+            [item.product_id]
+          );
+          
+          if (currentStock.length === 0) {
+            throw new Error(`Product ID ${item.product_id} not found`);
+          }
+          
+          const availableStock = currentStock[0].stock;
+          console.log(`📦 Product ID ${item.product_id} current stock: ${availableStock}, requested: ${item.quantity}`);
+          
+          if (availableStock < item.quantity) {
+            throw new Error(`Insufficient stock for product ID ${item.product_id}. Available: ${availableStock}, Requested: ${item.quantity}`);
+          }
+          
+          // Log inventory movement - trigger will deduct stock automatically
+          await connection.query(`
+            INSERT INTO inventory_movements (product_id, movement_type, quantity_change, reason, order_id, created_at)
+            VALUES (?, 'sale', ?, 'Order placed', ?, NOW())
+          `, [item.product_id, -item.quantity, orderId])
+          
+          console.log(`✅ General product stock deduction logged for Product ID ${item.product_id} (trigger will handle deduction)`);
+        }
       }
+
+      // Only delete cart items if we processed cart items (not direct products)
+      if (products && products.length > 0) {
+        // For direct products (BUY NOW), don't delete cart items since they weren't in cart
+        console.log('Direct product checkout - no cart items to delete');
+      } else if (cart_item_ids && cart_item_ids.length > 0) {
+        // Delete only the selected cart items
+        const placeholders = cart_item_ids.map(() => '?').join(',');
+        await connection.query(`DELETE FROM cart_items WHERE user_id = ? AND id IN (${placeholders})`, [user_id, ...cart_item_ids])
+      } else {
+        // Fallback: delete all cart items (for backward compatibility)
+        await connection.query(`DELETE FROM cart_items WHERE user_id = ?`, [user_id])
+      }
+
+      // Commit the transaction
+      await connection.commit();
+      
+    } catch (error) {
+      // Rollback the transaction on error
+      console.error('❌ Checkout transaction error:', error);
+      await connection.rollback();
+      throw error;
+    } finally {
+      // Release the connection
+      connection.release();
     }
 
-    // Only delete cart items if we processed cart items (not direct products)
-    if (products && products.length > 0) {
-      // For direct products (BUY NOW), don't delete cart items since they weren't in cart
-      console.log('Direct product checkout - no cart items to delete');
-    } else if (cart_item_ids && cart_item_ids.length > 0) {
-      // Delete only the selected cart items
-      const placeholders = cart_item_ids.map(() => '?').join(',');
-      await pool.query(`DELETE FROM cart_items WHERE user_id = ? AND id IN (${placeholders})`, [user_id, ...cart_item_ids])
-    } else {
-      // Fallback: delete all cart items (for backward compatibility)
-      await pool.query(`DELETE FROM cart_items WHERE user_id = ?`, [user_id])
+    console.log('✅ Transaction completed successfully, orderId:', orderId);
+
+    // Create user notification for order placed
+    try {
+      console.log('📧 Creating user notification...');
+      const userNotification = await createOrderStatusNotification(user_id, orderId, 'pending');
+      console.log('✅ User notification created');
+      
+      // Emit real-time notification to user
+      const io = req.app.get('io');
+      if (io) {
+        emitUserNotification(io, user_id, {
+          title: userNotification.title,
+          message: userNotification.message,
+          type: 'system',
+          orderId: orderId,
+          status: 'pending',
+          read: false
+        });
+        console.log('📡 Real-time user notification sent');
+      }
+    } catch (notificationError) {
+      console.error('❌ Error creating user notification:', notificationError);
+      // Don't fail the checkout if notification fails
     }
 
-    // Create notification for order placement
-    await createOrderStatusNotification(user_id, orderId, 'pending');
+    // Create admin notifications for new order (outside transaction)
+    try {
+      console.log('📧 Creating admin notification...');
+      const adminNotification = await createAdminOrderNotification(orderId, total_amount, payment_method);
+      console.log('✅ Admin notification created');
+      
+      // Emit real-time notification to admin
+      const io = req.app.get('io');
+      if (io) {
+        emitAdminNotification(io, {
+          title: adminNotification.title,
+          message: adminNotification.message,
+          type: 'admin_order',
+          orderId: orderId,
+          customerName: adminNotification.customerName,
+          studentId: adminNotification.studentId,
+          totalAmount: adminNotification.totalAmount,
+          paymentMethod: adminNotification.paymentMethod,
+          paymentStatus: adminNotification.paymentStatus,
+          read: false
+        });
+        console.log('📡 Real-time admin notification sent');
+      }
+    } catch (notificationError) {
+      console.error('❌ Error creating admin notification:', notificationError);
+      // Don't fail the checkout if notification fails
+    }
 
-    // Create admin notifications for new order
-    await createAdminOrderNotification(orderId, total_amount, payment_method);
-
+    console.log('🎉 Checkout completed successfully, sending response...');
     res.status(200).json({
       success: true,
       message: 'Checkout successful',
       orderId,
-      total_amount
+      total_amount,
+      payment_method,
+      payment_status: payment_method === 'gcash' ? 'unpaid' : 'pending'
     })
   } catch (err) {
-    console.error('Checkout error:', err)
+    console.error('❌ Checkout error:', err);
+    console.error('❌ Error stack:', err.stack);
     
     // Handle specific database errors
     if (err.code === 'ER_NO_SUCH_TABLE') {
@@ -259,7 +300,8 @@ export const checkout = async (req, res) => {
     
     res.status(500).json({ 
       error: 'Server error',
-      message: 'Failed to process checkout. Please try again.'
+      message: 'Failed to process checkout. Please try again.',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
     })
   }
 }

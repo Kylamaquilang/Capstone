@@ -1,5 +1,5 @@
 import { pool } from '../database/db.js'
-import { sendOrderReceiptEmail } from '../utils/emailService.js'
+import { sendOrderReceiptEmail, sendOrderReceivedEmail, sendReadyForPickupEmail } from '../utils/emailService.js'
 import { createOrderStatusNotification } from '../utils/notification-helper.js'
 import { emitOrderUpdate, emitNewOrderAlert, createAndEmitNotification } from '../utils/socket-helper.js'
 
@@ -41,6 +41,43 @@ const createDeliveredOrderNotification = async (orderId, userId) => {
   }
 }
 
+// 📄 User gets their order details (for thank you page)
+export const getUserOrderDetails = async (req, res) => {
+  const user_id = req.user.id
+  const order_id = req.params.id
+
+  try {
+    // Get order details
+    const [orders] = await pool.query(`
+      SELECT id, total_amount, payment_method, pay_at_counter, status, payment_status, created_at
+      FROM orders 
+      WHERE id = ? AND user_id = ?
+    `, [order_id, user_id])
+
+    if (orders.length === 0) {
+      return res.status(404).json({ error: 'Order not found' })
+    }
+
+    const order = orders[0]
+
+    // Get order items
+    const [items] = await pool.query(`
+      SELECT product_name, quantity, unit_price, total_price
+      FROM order_items 
+      WHERE order_id = ?
+    `, [order_id])
+
+    res.json({
+      ...order,
+      items: items
+    })
+
+  } catch (error) {
+    console.error('Error fetching user order details:', error)
+    res.status(500).json({ error: 'Failed to fetch order details' })
+  }
+}
+
 // 📄 User views their orders
 export const getUserOrders = async (req, res) => {
   const user_id = req.user.id
@@ -77,7 +114,8 @@ export const getAllOrders = async (req, res) => {
         o.status, 
         o.created_at,
         o.updated_at,
-        (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) as item_count
+        (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) as item_count,
+        (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id) as total_quantity
       FROM orders o
       JOIN users u ON o.user_id = u.id
       ORDER BY o.created_at DESC
@@ -282,6 +320,47 @@ export const updateOrderStatus = async (req, res) => {
 
     // Create notification for user
     await createOrderStatusNotification(userId, id, status)
+    
+    // Send email notifications for specific status changes
+    if (status === 'processing' || status === 'ready_for_pickup') {
+      try {
+        // Get user email and order details for email
+        const [userInfo] = await pool.query(
+          'SELECT email, name FROM users WHERE id = ?',
+          [userId]
+        )
+        
+        if (userInfo.length > 0) {
+          const [orderDetails] = await pool.query(`
+            SELECT o.id as orderId, o.total_amount, o.payment_method, o.created_at,
+                   oi.quantity, oi.price, p.name as product_name
+            FROM orders o
+            JOIN order_items oi ON o.id = oi.order_id
+            JOIN products p ON oi.product_id = p.id
+            WHERE o.id = ?
+          `, [id])
+          
+          if (orderDetails.length > 0) {
+            const orderData = {
+              orderId: id,
+              items: orderDetails,
+              totalAmount: orderDetails[0].total_amount,
+              paymentMethod: orderDetails[0].payment_method,
+              createdAt: orderDetails[0].created_at
+            }
+            
+            if (status === 'processing') {
+              await sendOrderReceivedEmail(userInfo[0].email, userInfo[0].name, orderData)
+            } else if (status === 'ready_for_pickup') {
+              await sendReadyForPickupEmail(userInfo[0].email, userInfo[0].name, orderData)
+            }
+          }
+        }
+      } catch (emailError) {
+        console.error('Error sending status email:', emailError)
+        // Don't fail the status update if email fails
+      }
+    }
     
     // Emit real-time order update
     const io = req.app.get('io')
@@ -531,25 +610,26 @@ export const getSalesPerformance = async (req, res) => {
       inventorySummary = [];
     }
 
-    // Get sales logs summary (simplified)
+    // Get sales logs summary from orders (more accurate)
     console.log('📊 Executing sales logs summary query...')
     let salesLogsSummary = {};
     try {
+      // Use orders table for accurate sales data instead of sales_logs
       const [salesLogsResult] = await pool.query(`
         SELECT 
           COUNT(*) as total_sales_logs,
-          SUM(amount) as total_sales_revenue,
-          COUNT(CASE WHEN movement_type = 'sale' THEN 1 END) as completed_sales,
-          COUNT(CASE WHEN movement_type = 'reversal' THEN 1 END) as reversed_sales,
-          SUM(CASE WHEN movement_type = 'sale' THEN amount ELSE 0 END) as completed_revenue,
-          SUM(CASE WHEN movement_type = 'reversal' THEN amount ELSE 0 END) as reversed_revenue
-        FROM sales_logs sl
+          SUM(total_amount) as total_sales_revenue,
+          COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as completed_sales,
+          COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as reversed_sales,
+          SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END) as completed_revenue,
+          SUM(CASE WHEN status = 'cancelled' THEN total_amount ELSE 0 END) as reversed_revenue
+        FROM orders o
         WHERE 1=1
-        ${dateFilter.replace('created_at', 'sl.created_at')}
+        ${dateFilter}
       `, dateParams);
       salesLogsSummary = salesLogsResult[0] || {};
     } catch (salesLogsError) {
-      console.log('📊 Sales logs table not available:', salesLogsError.message);
+      console.log('📊 Sales logs query failed:', salesLogsError.message);
       salesLogsSummary = {};
     }
 
@@ -575,7 +655,7 @@ export const getSalesPerformance = async (req, res) => {
       topProducts,
       paymentBreakdown,
       inventorySummary,
-      salesLogsSummary: salesLogsSummary[0],
+      salesLogsSummary: salesLogsSummary,
       summary: summaryData,
       period: { start_date, end_date, group_by }
     })
@@ -844,6 +924,98 @@ export const userConfirmOrderReceipt = async (req, res) => {
 
   } catch (err) {
     console.error('User confirm order receipt error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// ✅ Confirm order receipt via notification
+export const confirmOrderReceiptNotification = async (req, res) => {
+  const { orderId } = req.params
+  const user_id = req.user.id
+
+  try {
+    // Get order details and verify ownership
+    const [orderData] = await pool.query(`
+      SELECT o.id, o.user_id, o.status, o.total_amount, o.payment_method, o.created_at, u.name, u.email
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      WHERE o.id = ? AND o.user_id = ?
+    `, [orderId, user_id])
+
+    if (orderData.length === 0) {
+      return res.status(404).json({ error: 'Order not found or access denied' })
+    }
+
+    const order = orderData[0]
+
+    if (order.status !== 'ready_for_pickup') {
+      return res.status(400).json({ 
+        error: 'Order must be ready for pickup to confirm receipt' 
+      })
+    }
+
+    // Update order status to completed
+    await pool.query(
+      'UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?',
+      ['completed', orderId]
+    )
+
+    // Get order items for email receipt
+    const [orderItems] = await pool.query(`
+      SELECT oi.product_name, oi.quantity, oi.unit_price, oi.total_price
+      FROM order_items oi
+      WHERE oi.order_id = ?
+    `, [orderId])
+
+    // Send receipt email
+    try {
+      const orderDataForEmail = {
+        orderId: orderId,
+        items: orderItems,
+        totalAmount: order.total_amount,
+        paymentMethod: order.payment_method,
+        createdAt: order.created_at,
+        status: 'completed',
+        confirmedAt: new Date()
+      }
+
+      await sendOrderReceiptEmail(order.email, order.name, orderDataForEmail)
+      console.log(`✅ Receipt email sent to ${order.email} for order #${orderId}`)
+    } catch (emailError) {
+      console.error('Error sending receipt email:', emailError)
+      // Don't fail the confirmation if email fails
+    }
+
+    // Create thank you notification for user
+    const productSummary = orderItems.length === 1 
+      ? `${orderItems[0].quantity}x ${orderItems[0].product_name}`
+      : `${orderItems.length} items`
+
+    await pool.query(`
+      INSERT INTO notifications (user_id, title, message, type, created_at)
+      VALUES (?, ?, ?, ?, NOW())
+    `, [
+      user_id,
+      '🎉 Order Confirmed!',
+      `Thank you for confirming receipt! Your order for ${productSummary} has been completed. A receipt has been sent to your email.`,
+      'system'
+    ])
+
+    // Mark the ready_for_pickup notification as read/handled
+    await pool.query(`
+      UPDATE notifications 
+      SET is_read = 1 
+      WHERE user_id = ? AND related_id = ? AND type = 'system'
+    `, [user_id, orderId])
+
+    res.json({ 
+      success: true,
+      message: 'Order confirmed successfully! Receipt sent to your email.',
+      orderId: orderId
+    })
+
+  } catch (err) {
+    console.error('Confirm order receipt via notification error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }

@@ -376,9 +376,9 @@ export default function AdminInventoryPage() {
     return (
       <div className="min-h-screen text-black admin-page">
         <Navbar />
-        <div className="flex">
+        <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
           <Sidebar />
-          <div className="flex-1 flex items-center justify-center bg-gray-50 pt-32 lg:ml-64">
+          <div className="flex-1 flex items-center justify-center bg-gray-50 lg:ml-64">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#000C50] mx-auto mb-4"></div>
               <div className="text-sm text-gray-600">Loading inventory data...</div>
@@ -392,9 +392,9 @@ export default function AdminInventoryPage() {
   return (
     <div className="min-h-screen text-black admin-page">
       <Navbar />
-      <div className="flex">
+      <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64 mt-20">
+        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
            {/* Header */}
            <div className="mb-4 sm:mb-6">
              <div className="flex justify-between items-center">

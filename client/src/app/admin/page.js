@@ -90,11 +90,11 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col min-h-screen text-black admin-page">
-        <Navbar />
-        <div className="flex flex-1">
-          <Sidebar />
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
+    <div className="flex flex-col min-h-screen text-black admin-page">
+      <Navbar />
+      <div className="flex flex-1 pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center bg-gray-50">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#000C50] mx-auto mb-4"></div>
               <div className="text-sm text-gray-600">Loading dashboard...</div>
@@ -108,7 +108,7 @@ export default function AdminDashboardPage() {
   return (
     <div className="flex flex-col min-h-screen text-black admin-page">
       <Navbar />
-      <div className="flex flex-1">
+      <div className="flex flex-1 pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
         <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-0 ml-0">
           {/* Header */}

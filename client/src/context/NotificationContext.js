@@ -9,7 +9,7 @@ export function NotificationProvider({ children }) {
   const [cartCount, setCartCount] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected, connectionFailed } = useSocket();
 
   const fetchCounts = async () => {
     try {
@@ -69,7 +69,7 @@ export function NotificationProvider({ children }) {
     fetchCounts();
     
     // Set up Socket.io event listeners for real-time updates
-    if (socket) {
+    if (socket && !connectionFailed) {
       const handleCartUpdate = (data) => {
         console.log('🛒 Real-time cart update received:', data);
         // Update cart count based on action
@@ -96,7 +96,7 @@ export function NotificationProvider({ children }) {
         socket.off('new-notification', handleNewNotification);
       };
     }
-  }, [socket, isConnected]);
+  }, [socket, isConnected, connectionFailed]);
 
   return (
     <NotificationContext.Provider
