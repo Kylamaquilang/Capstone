@@ -23,6 +23,7 @@ import {
 import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
 import Swal from 'sweetalert2';
+import { useSocket } from '@/context/SocketContext';
 
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import Navbar from '@/components/common/nav-bar';
@@ -31,6 +32,7 @@ import Footer from '@/components/common/footer';
 export default function UserProfilePage() {
   const router = useRouter();
   const { user: authUser, logout } = useAuth();
+  const { socket, isConnected, joinUserRoom } = useSocket();
   const [menuOpen, setMenuOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [profile, setProfile] = useState(null);
@@ -118,7 +120,46 @@ export default function UserProfilePage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+
+    // Set up Socket.io listeners for real-time updates
+    if (socket && isConnected && authUser?.id) {
+      // Join user room for real-time updates
+      joinUserRoom(authUser.id.toString());
+
+      // Listen for order updates
+      const handleOrderUpdate = (orderData) => {
+        console.log('📦 Real-time order update received on profile:', orderData);
+        setOrders(prev => prev.map(order => 
+          order.id === orderData.orderId 
+            ? { ...order, status: orderData.status }
+            : order
+        ));
+      };
+
+      // Listen for new orders
+      const handleNewOrder = (orderData) => {
+        console.log('🛒 Real-time new order received on profile:', orderData);
+        setOrders(prev => [orderData, ...prev]);
+      };
+
+      // Listen for new notifications (might indicate order changes)
+      const handleNewNotification = (notificationData) => {
+        console.log('🔔 Real-time notification received on profile:', notificationData);
+        // Refresh orders when notifications arrive (might be order-related)
+        fetchData();
+      };
+
+      socket.on('order-status-updated', handleOrderUpdate);
+      socket.on('new-order', handleNewOrder);
+      socket.on('new-notification', handleNewNotification);
+
+      return () => {
+        socket.off('order-status-updated', handleOrderUpdate);
+        socket.off('new-order', handleNewOrder);
+        socket.off('new-notification', handleNewNotification);
+      };
+    }
+  }, [socket, isConnected, authUser?.id, joinUserRoom]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

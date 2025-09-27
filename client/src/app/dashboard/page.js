@@ -10,9 +10,11 @@ import Link from 'next/link';
 import { getProductImageUrl } from '@/utils/imageUtils';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useSocket } from '@/context/SocketContext';
 
 export default function UserDashboard() {
   const { user, isAuthenticated, loading } = useAuth();
+  const { socket, isConnected, joinUserRoom } = useSocket();
   const router = useRouter();
   const [products, setProducts] = useState({});
   const [productsLoading, setProductsLoading] = useState(true);
@@ -23,8 +25,36 @@ export default function UserDashboard() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchProducts();
+
+      // Set up Socket.io listeners for real-time updates
+      if (socket && isConnected && user?.id) {
+        // Join user room for real-time updates
+        joinUserRoom(user.id.toString());
+
+        // Listen for order updates
+        const handleOrderUpdate = (orderData) => {
+          console.log('📦 Real-time order update received on dashboard:', orderData);
+          // Refresh products when orders are updated (might affect stock)
+          fetchProducts();
+        };
+
+        // Listen for new notifications (might indicate order changes)
+        const handleNewNotification = (notificationData) => {
+          console.log('🔔 Real-time notification received on dashboard:', notificationData);
+          // Refresh products when notifications arrive (might be order-related)
+          fetchProducts();
+        };
+
+        socket.on('order-status-updated', handleOrderUpdate);
+        socket.on('new-notification', handleNewNotification);
+
+        return () => {
+          socket.off('order-status-updated', handleOrderUpdate);
+          socket.off('new-notification', handleNewNotification);
+        };
+      }
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, socket, isConnected, user?.id, joinUserRoom]);
 
   // Check for order completion from URL params
   useEffect(() => {

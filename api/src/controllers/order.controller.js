@@ -1,7 +1,7 @@
 import { pool } from '../database/db.js'
-import { sendOrderReceiptEmail, sendOrderReceivedEmail, sendReadyForPickupEmail } from '../utils/emailService.js'
 import { createOrderStatusNotification } from '../utils/notification-helper.js'
 import { emitOrderUpdate, emitNewOrderAlert, createAndEmitNotification, emitUserNotification } from '../utils/socket-helper.js'
+import { sendDeliveredOrderEmail } from '../utils/emailService.js'
 
 // Helper function to create delivered order notification for admin confirmation
 const createDeliveredOrderNotification = async (orderId, userId) => {
@@ -11,15 +11,23 @@ const createDeliveredOrderNotification = async (orderId, userId) => {
       SELECT id, name FROM users WHERE role = 'admin'
     `);
     
-    // Get customer info for the order
+    // Get customer info and product summary for the order
     const [orderInfo] = await pool.query(`
-      SELECT u.name as customer_name
+      SELECT u.name as customer_name,
+             GROUP_CONCAT(CONCAT(oi.quantity, 'x ', p.name, 
+               CASE WHEN ps.size IS NOT NULL THEN CONCAT(' (', ps.size, ')') ELSE '' END
+             ) SEPARATOR ', ') as product_summary
       FROM orders o
       JOIN users u ON o.user_id = u.id
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
       WHERE o.id = ?
+      GROUP BY o.id, u.name
     `, [orderId]);
     
     const customerName = orderInfo[0]?.customer_name || 'Customer';
+    const productSummary = orderInfo[0]?.product_summary || 'items';
     
     // Create notification for each admin user
     for (const admin of adminUsers) {
@@ -28,8 +36,8 @@ const createDeliveredOrderNotification = async (orderId, userId) => {
         VALUES (?, ?, ?, ?, ?, NOW())
       `, [
         admin.id,
-        `📦 Order Delivered - Confirmation Needed`,
-        `Order #${orderId} from ${customerName} has been delivered. Please confirm receipt.`,
+        `📦 ${productSummary} Order Delivered - Confirmation Needed`,
+        `Order for ${productSummary} from ${customerName} has been delivered. Please confirm receipt.`,
         'delivered_confirmation',
         orderId
       ]);
@@ -38,6 +46,52 @@ const createDeliveredOrderNotification = async (orderId, userId) => {
     console.log(`✅ Delivered order confirmation notifications created for order #${orderId}`);
   } catch (error) {
     console.error('❌ Error creating delivered order notification:', error);
+  }
+}
+
+// Helper function to create cancelled order notification for admin
+const createCancelledOrderNotification = async (orderId, userId) => {
+  try {
+    // Get all admin users
+    const [adminUsers] = await pool.query(`
+      SELECT id, name FROM users WHERE role = 'admin'
+    `);
+    
+    // Get customer info and product summary for the order
+    const [orderInfo] = await pool.query(`
+      SELECT u.name as customer_name,
+             GROUP_CONCAT(CONCAT(oi.quantity, 'x ', p.name, 
+               CASE WHEN ps.size IS NOT NULL THEN CONCAT(' (', ps.size, ')') ELSE '' END
+             ) SEPARATOR ', ') as product_summary
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+      WHERE o.id = ?
+      GROUP BY o.id, u.name
+    `, [orderId]);
+    
+    const customerName = orderInfo[0]?.customer_name || 'Customer';
+    const productSummary = orderInfo[0]?.product_summary || 'items';
+    
+    // Create notification for each admin user
+    for (const admin of adminUsers) {
+      await pool.query(`
+        INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
+      `, [
+        admin.id,
+        `❌ ${productSummary} Order Cancelled`,
+        `Order for ${productSummary} from ${customerName} has been cancelled.`,
+        'order_cancelled',
+        orderId
+      ]);
+    }
+    
+    console.log(`✅ Cancelled order notifications created for order #${orderId}`);
+  } catch (error) {
+    console.error('❌ Error creating cancelled order notification:', error);
   }
 }
 
@@ -346,46 +400,60 @@ export const updateOrderStatus = async (req, res) => {
       console.log(`🔔 Not emitting notification - io: ${!!io}, notificationResult:`, !!notificationResult);
     }
     
-    // Send email notifications for specific status changes
-    if (status === 'processing' || status === 'ready_for_pickup') {
+    // Send delivered order email with thank you message and receipt
+    if (status === 'delivered' && oldStatus !== 'delivered') {
       try {
-        // Get user email and order details for email
-        const [userInfo] = await pool.query(
-          'SELECT email, name FROM users WHERE id = ?',
-          [userId]
-        )
+        console.log(`📧 Preparing to send delivered order email for order ${id}`);
         
-        if (userInfo.length > 0) {
-          const [orderDetails] = await pool.query(`
-            SELECT o.id as orderId, o.total_amount, o.payment_method, o.created_at,
-                   oi.quantity, oi.unit_price, oi.unit_cost, p.name as product_name
-            FROM orders o
-            JOIN order_items oi ON o.id = oi.order_id
-            JOIN products p ON oi.product_id = p.id
-            WHERE o.id = ?
-          `, [id])
+        // Get order details for email
+        const [orderDetails] = await pool.query(`
+          SELECT o.id as orderId, o.total_amount, o.payment_method, o.created_at,
+                 u.name as customer_name, u.email as customer_email,
+                 oi.quantity, oi.unit_price as price, p.name as product_name, ps.size
+          FROM orders o
+          JOIN users u ON o.user_id = u.id
+          JOIN order_items oi ON o.id = oi.order_id
+          JOIN products p ON oi.product_id = p.id
+          LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+          WHERE o.id = ?
+        `, [id]);
+        
+        if (orderDetails.length > 0) {
+          const orderData = {
+            orderId: orderDetails[0].orderId,
+            items: orderDetails.map(item => ({
+              quantity: item.quantity,
+              product_name: item.product_name,
+              price: item.price,
+              size: item.size
+            })),
+            totalAmount: orderDetails[0].total_amount,
+            paymentMethod: orderDetails[0].payment_method,
+            createdAt: orderDetails[0].created_at,
+            deliveredAt: new Date().toISOString()
+          };
           
-          if (orderDetails.length > 0) {
-            const orderData = {
-              orderId: id,
-              items: orderDetails,
-              totalAmount: orderDetails[0].total_amount,
-              paymentMethod: orderDetails[0].payment_method,
-              createdAt: orderDetails[0].created_at
-            }
-            
-            if (status === 'processing') {
-              await sendOrderReceivedEmail(userInfo[0].email, userInfo[0].name, orderData)
-            } else if (status === 'ready_for_pickup') {
-              await sendReadyForPickupEmail(userInfo[0].email, userInfo[0].name, orderData)
-            }
+          const emailResult = await sendDeliveredOrderEmail(
+            orderDetails[0].customer_email,
+            orderDetails[0].customer_name,
+            orderData
+          );
+          
+          if (emailResult.success) {
+            console.log(`✅ Delivered order email sent successfully to: ${orderDetails[0].customer_email}`);
+          } else {
+            console.log(`⚠️ Delivered order email failed: ${emailResult.message}`);
           }
+        } else {
+          console.log(`⚠️ Could not find order details for email - order ${id}`);
         }
       } catch (emailError) {
-        console.error('Error sending status email:', emailError)
-        // Don't fail the status update if email fails
+        console.error('❌ Error sending delivered order email:', emailError);
+        // Don't fail the entire operation if email fails
       }
     }
+    
+    // Email notifications disabled - only in-app notifications are used
     
     // Emit real-time order update
     if (io) {
@@ -400,6 +468,11 @@ export const updateOrderStatus = async (req, res) => {
     // If order is marked as delivered, create special notification for admin confirmation
     if (status === 'delivered') {
       await createDeliveredOrderNotification(id, userId)
+    }
+    
+    // If order is cancelled, create admin notification
+    if (status === 'cancelled') {
+      await createCancelledOrderNotification(id, userId)
     }
 
     res.json({ 

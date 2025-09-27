@@ -15,6 +15,8 @@ export const getAllUsersWithStatus = async (req, res) => {
         middle_name,
         suffix,
         degree,
+        year_level,
+        section,
         status,
         role,
         is_active,

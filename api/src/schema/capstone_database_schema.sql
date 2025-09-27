@@ -27,6 +27,8 @@ CREATE TABLE users (
     middle_name VARCHAR(50),
     suffix VARCHAR(10),
     degree ENUM('BEED', 'BSED', 'BSIT', 'BSHM'),
+    year_level ENUM('1st Year', '2nd Year', '3rd Year', '4th Year'),
+    section VARCHAR(20),
     status ENUM('regular', 'irregular'),
     
     -- Contact information

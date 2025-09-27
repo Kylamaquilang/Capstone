@@ -5,8 +5,10 @@ import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
 import AddProductModal from './add-product-modal';
 import API from '@/lib/axios';
+import { useSocket } from '@/context/SocketContext';
 
 export default function AdminProductPage() {
+  const { socket, isConnected, joinAdminRoom } = useSocket();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categories, setCategories] = useState([]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -39,10 +41,47 @@ export default function AdminProductPage() {
     };
     fetchCategories();
 
+    // Set up Socket.io listeners for real-time updates
+    if (socket && isConnected) {
+      // Join admin room for real-time updates
+      joinAdminRoom();
+
+      // Listen for product updates
+      const handleProductUpdate = (productData) => {
+        console.log('📦 Real-time product update received:', productData);
+        // Refresh categories when products are updated (might affect categories)
+        fetchCategories();
+      };
+
+      // Listen for new products
+      const handleNewProduct = (productData) => {
+        console.log('📦 Real-time new product received:', productData);
+        // Refresh categories when new products are added
+        fetchCategories();
+      };
+
+      // Listen for admin notifications (might indicate product changes)
+      const handleAdminNotification = (notificationData) => {
+        console.log('🔔 Real-time admin notification received:', notificationData);
+        // Refresh categories when admin notifications arrive
+        fetchCategories();
+      };
+
+      socket.on('product-updated', handleProductUpdate);
+      socket.on('new-product', handleNewProduct);
+      socket.on('admin-notification', handleAdminNotification);
+
+      return () => {
+        socket.off('product-updated', handleProductUpdate);
+        socket.off('new-product', handleNewProduct);
+        socket.off('admin-notification', handleAdminNotification);
+      };
+    }
+
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [socket, isConnected, joinAdminRoom]);
 
   return (
     <div className="min-h-screen text-black admin-page">

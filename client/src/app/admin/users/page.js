@@ -3,12 +3,14 @@ import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
+import { useSocket } from '@/context/SocketContext';
 import ActionMenu from '@/components/common/ActionMenu';
 import { EyeIcon, PencilSquareIcon, UserMinusIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import AddStudentModal from '@/components/user/AddStudentModal';
 import BulkUploadModal from '@/components/user/BulkUploadModal';
 
 export default function AdminUsersPage() {
+  const { socket, isConnected, joinAdminRoom } = useSocket();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,7 +53,46 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+
+    // Set up Socket.io listeners for real-time updates
+    if (socket && isConnected) {
+      // Join admin room for real-time updates
+      joinAdminRoom();
+
+      // Listen for user updates
+      const handleUserUpdate = (userData) => {
+        console.log('👤 Real-time user update received:', userData);
+        setUsers(prev => prev.map(user => 
+          user.id === userData.userId 
+            ? { ...user, is_active: userData.is_active, status: userData.status }
+            : user
+        ));
+      };
+
+      // Listen for new user additions
+      const handleNewUser = (userData) => {
+        console.log('👤 Real-time new user received:', userData);
+        setUsers(prev => [userData, ...prev]);
+      };
+
+      // Listen for admin notifications (might indicate user changes)
+      const handleAdminNotification = (notificationData) => {
+        console.log('🔔 Real-time admin notification received:', notificationData);
+        // Refresh users when admin notifications arrive (might be user-related)
+        fetchUsers();
+      };
+
+      socket.on('user-updated', handleUserUpdate);
+      socket.on('new-user', handleNewUser);
+      socket.on('admin-notification', handleAdminNotification);
+
+      return () => {
+        socket.off('user-updated', handleUserUpdate);
+        socket.off('new-user', handleNewUser);
+        socket.off('admin-notification', handleAdminNotification);
+      };
+    }
+  }, [socket, isConnected, joinAdminRoom]);
 
   // Pagination logic
   const totalPages = Math.ceil(users.length / itemsPerPage);
@@ -406,7 +447,7 @@ export default function AdminUsersPage() {
               <div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">
                         <div className="flex items-center gap-2">
@@ -423,7 +464,7 @@ export default function AdminUsersPage() {
                             title={selectedUsers.size === users.length ? "Deselect all users" : "Select all users"}
                           />
                           <span className="text-xs text-gray-500 hidden sm:inline">
-                            {selectedUsers.size === users.length ? 'All' : 'Select All'}
+                            {selectedUsers.size === users.length ? 'All' : ''}
                           </span>
                         </div>
                       </th>
@@ -616,5 +657,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-
-

@@ -4,7 +4,6 @@ import ProtectedRoute from '@/components/common/ProtectedRoute';
 import Footer from '@/components/common/footer';
 import Navbar from '@/components/common/nav-bar';
 import { useAuth } from '@/context/auth-context';
-import { useNotifications } from '@/context/NotificationContext';
 import API from '@/lib/axios';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -14,7 +13,6 @@ import Swal from 'sweetalert2';
 
 export default function ProductPage() {
   const { user, isAuthenticated } = useAuth();
-  const { incrementCartCount } = useNotifications();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -104,7 +102,6 @@ export default function ProductPage() {
       const response = await API.post('/cart', cartData);
 
       if (response.data.success) {
-        incrementCartCount();
         Swal.fire({
           icon: 'success',
           title: 'Added to Cart!',

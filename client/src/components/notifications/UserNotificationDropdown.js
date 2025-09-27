@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { formatTimestamp, generateSampleNotifications } from '@/utils/notificationTemplates';
+import { formatTimestamp } from '@/utils/notificationTemplates';
+import API from '@/lib/axios';
 
 const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [], onUpdateNotifications }) => {
   const [localNotifications, setLocalNotifications] = useState([]);
@@ -48,33 +49,21 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
   const loadNotifications = async () => {
     setLoading(true);
     try {
-      // Try to load from API first
-      try {
-        const response = await fetch('http://localhost:5000/api/notifications', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setLocalNotifications(data);
-          return;
-        }
-      } catch (apiError) {
-        console.log('API not available, using sample data:', apiError.message);
-      }
+      const response = await API.get('/notifications');
+      const notificationsData = response.data.notifications || response.data || [];
       
-      // Fallback to sample notifications if API is not available
-      const sampleNotifications = generateSampleNotifications();
-      setLocalNotifications(sampleNotifications);
+      // Normalize notification data to handle both API and frontend field names
+      const normalizedNotifications = notificationsData.map(notification => ({
+        ...notification,
+        read: notification.is_read !== undefined ? !!notification.is_read : notification.read,
+        timestamp: notification.created_at || notification.timestamp
+      }));
+      
+      setLocalNotifications(Array.isArray(normalizedNotifications) ? normalizedNotifications : []);
+      console.log('🔔 Loaded notifications for dropdown:', normalizedNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
-      // Use sample data as fallback
-      const sampleNotifications = generateSampleNotifications();
-      setLocalNotifications(sampleNotifications);
+      setLocalNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -82,30 +71,7 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
 
   const markAsRead = async (notificationId) => {
     try {
-      // Try API call first
-      try {
-        const response = await fetch(`/api/notifications/${notificationId}/read`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        if (response.ok) {
-          // Update local state
-          const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
-          const updatedNotifications = notificationsArray.map(notification =>
-            notification.id === notificationId
-              ? { ...notification, read: true }
-              : notification
-          );
-          setLocalNotifications(updatedNotifications);
-          return;
-        }
-      } catch (apiError) {
-        console.log('API not available, updating locally:', apiError.message);
-      }
-      
-      // Fallback to local update
+      await API.put(`/notifications/${notificationId}/read`);
       const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
       const updatedNotifications = notificationsArray.map(notification =>
         notification.id === notificationId
@@ -113,6 +79,9 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
           : notification
       );
       setLocalNotifications(updatedNotifications);
+      if (onUpdateNotifications) {
+        onUpdateNotifications(updatedNotifications);
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -158,26 +127,13 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
 
   const deleteNotification = async (notificationId) => {
     try {
-      // Try API call first
-      try {
-        const response = await fetch(`/api/notifications/${notificationId}`, {
-          method: 'DELETE',
-        });
-        if (response.ok) {
-          // Update local state
-          const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
-          const updatedNotifications = notificationsArray.filter(notification => notification.id !== notificationId);
-          setLocalNotifications(updatedNotifications);
-          return;
-        }
-      } catch (apiError) {
-        console.log('API not available, updating locally:', apiError.message);
-      }
-      
-      // Fallback to local update
+      await API.delete(`/notifications/${notificationId}`);
       const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
       const updatedNotifications = notificationsArray.filter(notification => notification.id !== notificationId);
       setLocalNotifications(updatedNotifications);
+      if (onUpdateNotifications) {
+        onUpdateNotifications(updatedNotifications);
+      }
     } catch (error) {
       console.error('Error deleting notification:', error);
     }
@@ -274,7 +230,7 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
                         </p>
                         <div className="flex items-center justify-between mt-2">
                           <p className="text-xs text-gray-400">
-                            {formatTimestamp(notification.timestamp)}
+                            {formatTimestamp(notification.created_at || notification.timestamp)}
                           </p>
                           {!notification.read && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">

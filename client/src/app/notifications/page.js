@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { formatTimestamp, generateSampleNotifications } from '@/utils/notificationTemplates';
+import { formatTimestamp } from '@/utils/notificationTemplates';
 import Navbar from '@/components/common/nav-bar';
+import API from '@/lib/axios';
+import { useSocket } from '@/context/SocketContext';
+import { useAuth } from '@/context/auth-context';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
@@ -10,20 +13,58 @@ export default function NotificationsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const { socket, isConnected, joinUserRoom } = useSocket();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadNotifications();
-  }, []);
+    
+    // Join user room for real-time notifications
+    if (user?.id && isConnected) {
+      joinUserRoom(user.id.toString());
+    }
+    
+    // Set up Socket.io event listeners for real-time updates
+    if (socket && isConnected) {
+      const handleNewNotification = (notification) => {
+        console.log('🔔 Real-time notification received on page:', notification);
+        
+        // Normalize the notification data
+        const normalizedNotification = {
+          ...notification,
+          read: notification.is_read !== undefined ? !!notification.is_read : notification.read,
+          timestamp: notification.created_at || notification.timestamp
+        };
+        
+        setNotifications(prev => [normalizedNotification, ...prev]);
+      };
+
+      socket.on('new-notification', handleNewNotification);
+
+      return () => {
+        socket.off('new-notification', handleNewNotification);
+      };
+    }
+  }, [socket, isConnected, user?.id, joinUserRoom]);
 
   const loadNotifications = async () => {
     setLoading(true);
     try {
-      // For demo purposes, using sample notifications
-      // In production, replace with actual API call
-      const sampleNotifications = generateSampleNotifications();
-      setNotifications(sampleNotifications);
+      const response = await API.get('/notifications');
+      const notificationsData = response.data.notifications || response.data || [];
+      
+      // Normalize notification data to handle both API and frontend field names
+      const normalizedNotifications = notificationsData.map(notification => ({
+        ...notification,
+        read: notification.is_read !== undefined ? !!notification.is_read : notification.read,
+        timestamp: notification.created_at || notification.timestamp
+      }));
+      
+      setNotifications(Array.isArray(normalizedNotifications) ? normalizedNotifications : []);
+      console.log('📱 Loaded notifications:', normalizedNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -31,6 +72,7 @@ export default function NotificationsPage() {
 
   const markAsRead = async (notificationId) => {
     try {
+      await API.put(`/notifications/${notificationId}/read`);
       setNotifications(prev => 
         prev.map(notification => 
           notification.id === notificationId 
@@ -38,7 +80,6 @@ export default function NotificationsPage() {
             : notification
         )
       );
-      // In production, make API call to mark as read
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -61,10 +102,10 @@ export default function NotificationsPage() {
 
   const deleteNotification = async (notificationId) => {
     try {
+      await API.delete(`/notifications/${notificationId}`);
       setNotifications(prev => 
         prev.filter(notification => notification.id !== notificationId)
       );
-      // In production, make API call to delete notification
     } catch (error) {
       console.error('Error deleting notification:', error);
     }
@@ -72,10 +113,10 @@ export default function NotificationsPage() {
 
   const markAllAsRead = async () => {
     try {
+      await API.put('/notifications/mark-all-read');
       setNotifications(prev => 
         prev.map(notification => ({ ...notification, read: true }))
       );
-      // In production, make API call to mark all as read
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
@@ -246,7 +287,7 @@ export default function NotificationsPage() {
                             </p>
                             <div className="flex items-center justify-between">
                               <p className="text-xs text-gray-400">
-                                {formatTimestamp(notification.timestamp)}
+                                {formatTimestamp(notification.created_at || notification.timestamp)}
                               </p>
                               <div className="flex items-center space-x-2">
                                 {!notification.read ? (

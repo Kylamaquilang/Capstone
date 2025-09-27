@@ -12,6 +12,8 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
     suffix: '', 
     email: '', 
     degree: 'BSIT', 
+    year_level: '1st Year',
+    section: 'A',
     status: 'regular' 
   });
   const [submitting, setSubmitting] = useState(false);
@@ -39,6 +41,8 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
         suffix: '', 
         email: '', 
         degree: 'BSIT', 
+        year_level: '1st Year',
+        section: 'A',
         status: 'regular' 
       });
       onSuccess?.();
@@ -64,6 +68,8 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
         suffix: '', 
         email: '', 
         degree: 'BSIT', 
+        year_level: '1st Year',
+        section: 'A',
         status: 'regular' 
       });
       onClose();
@@ -213,6 +219,39 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
                     <option value="BSBA">BSBA - Bachelor of Science in Business Administration</option>
                     <option value="BSCS">BSCS - Bachelor of Science in Computer Science</option>
                   </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    Year Level <span className="text-red-500">*</span>
+                  </label>
+                  <select 
+                    name="year_level" 
+                    value={form.year_level} 
+                    onChange={handleChange} 
+                    disabled={submitting}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    Section <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    name="section" 
+                    value={form.section} 
+                    onChange={handleChange} 
+                    placeholder="e.g., A, B, C"
+                    disabled={submitting}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed" 
+                    required 
+                  />
                 </div>
                 
                 <div>

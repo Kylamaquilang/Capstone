@@ -21,6 +21,8 @@ export const addStudent = async (req, res) => {
       suffix, 
       email, 
       degree, 
+      year_level,
+      section,
       status 
     } = req.body;
 
@@ -51,6 +53,14 @@ export const addStudent = async (req, res) => {
     if (!validDegrees.includes(degree)) {
       return res.status(400).json({ 
         error: 'Invalid degree. Must be one of: BEED, BSED, BSIT, BSHM' 
+      });
+    }
+
+    // Validate year_level
+    const validYearLevels = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+    if (year_level && !validYearLevels.includes(year_level)) {
+      return res.status(400).json({ 
+        error: 'Invalid year level. Must be one of: 1st Year, 2nd Year, 3rd Year, 4th Year' 
       });
     }
 
@@ -97,11 +107,13 @@ export const addStudent = async (req, res) => {
         middle_name,
         suffix,
         degree,
+        year_level,
+        section,
         status,
         created_at, 
         is_active, 
         must_change_password
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, 1)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, 1)`,
       [
         student_id.trim(),
         email.trim(),
@@ -113,6 +125,8 @@ export const addStudent = async (req, res) => {
         middle_name?.trim() || null,
         suffix?.trim() || null,
         degree,
+        year_level || null,
+        section?.trim() || null,
         status,
       ]
     );
@@ -367,9 +381,15 @@ export const addStudentsBulk = async (req, res) => {
             }
           });
           
-          // Set default status if not provided
+          // Set default values if not provided
           if (!cleanedData.status) {
             cleanedData.status = 'regular'; // Default status
+          }
+          if (!cleanedData.year_level) {
+            cleanedData.year_level = '1st Year'; // Default year level
+          }
+          if (!cleanedData.section) {
+            cleanedData.section = 'A'; // Default section
           }
           
           // Debug: Show first few processed rows
@@ -661,6 +681,8 @@ export const addStudentsBulk = async (req, res) => {
             row.middle_name?.trim() || null,
             row.suffix?.trim() || null,
             mappedDegree,
+            row.year_level || '1st Year',
+            row.section || 'A',
             mappedStatus,
             1, // is_active (active by default)
             1  // must_change_password
@@ -696,6 +718,8 @@ export const addStudentsBulk = async (req, res) => {
               middle_name,
               suffix,
               degree,
+              year_level,
+              section,
               status,
               is_active, 
               must_change_password
@@ -721,10 +745,12 @@ export const addStudentsBulk = async (req, res) => {
                   middle_name,
                   suffix,
                   degree,
+                  year_level,
+                  section,
                   status,
                   is_active, 
                   must_change_password
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
                 studentData
               );
             } catch (individualError) {

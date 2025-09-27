@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
-import { useNotifications } from '@/context/NotificationContext';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
@@ -14,7 +13,6 @@ import { getImageUrl } from '@/utils/imageUtils';
 export default function ProductDetailPage() {
   const { name } = useParams();
   const { user, isAuthenticated } = useAuth();
-  const { incrementCartCount } = useNotifications();
   const router = useRouter();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -119,8 +117,7 @@ export default function ProductDetailPage() {
       const response = await API.post('/cart', cartData);
 
       if (response.data.success) {
-        // Increment cart count
-        incrementCartCount();
+        // Cart count will be updated via Socket.io
         
         Swal.fire({
           icon: 'success',

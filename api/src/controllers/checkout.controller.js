@@ -1,6 +1,6 @@
 import { pool } from '../database/db.js'
 import { createOrderStatusNotification, createAdminOrderNotification } from '../utils/notification-helper.js'
-import { emitUserNotification, emitAdminNotification } from '../utils/socket-helper.js'
+import { emitUserNotification, emitAdminNotification, emitInventoryUpdate, emitNewOrder } from '../utils/socket-helper.js'
 
 
 export const checkout = async (req, res) => {
@@ -39,13 +39,24 @@ export const checkout = async (req, res) => {
         }
         
         const item = productData[0];
+        
+        // Validate that we have a valid price
+        const price = item.size_id ? item.size_price : item.price;
+        if (!price || isNaN(price)) {
+          return res.status(400).json({ 
+            error: 'Invalid price',
+            message: `Price not found for product ID ${product.product_id}${product.size_id ? ` with size ID ${product.size_id}` : ''}`
+          });
+        }
+        
         cartItems.push({
           cart_id: null, // No cart ID for direct products
           quantity: product.quantity,
           product_id: item.product_id,
           size_id: product.size_id || null,
           stock: item.size_id ? item.size_stock : item.stock,
-          price: item.size_id ? item.size_price : item.price
+          price: parseFloat(price),
+          size_price: parseFloat(item.size_price || 0)
         });
       }
     } else if (cart_item_ids && cart_item_ids.length > 0) {
@@ -71,6 +82,13 @@ export const checkout = async (req, res) => {
       `, [user_id])
     }
 
+    // Convert prices to numbers for all cart items
+    cartItems = cartItems.map(item => ({
+      ...item,
+      price: parseFloat(item.price || 0),
+      size_price: parseFloat(item.size_price || 0)
+    }));
+
     if (cartItems.length === 0) {
       return res.status(400).json({ 
         error: 'Empty cart',
@@ -92,10 +110,37 @@ export const checkout = async (req, res) => {
       }
     }
 
+    console.log('🔍 Cart items after processing:', cartItems.map(item => ({
+      product_id: item.product_id,
+      size_id: item.size_id,
+      quantity: item.quantity,
+      price: item.price,
+      size_price: item.size_price,
+      calculated_price: item.size_id ? item.size_price : item.price
+    })));
+
     const total_amount = cartItems.reduce((sum, item) => {
       const price = item.size_id ? item.size_price : item.price
-      return sum + price * item.quantity
+      const itemTotal = price * item.quantity
+      
+      console.log(`💰 Price calculation: Product ${item.product_id}, Size ${item.size_id}, Price ${price}, Quantity ${item.quantity}, Total ${itemTotal}`);
+      
+      if (isNaN(itemTotal)) {
+        throw new Error(`Invalid price calculation for product ID ${item.product_id}: price=${price}, quantity=${item.quantity}`)
+      }
+      
+      return sum + itemTotal
     }, 0)
+
+    console.log('💰 Total amount calculated:', total_amount);
+
+    // Validate total amount
+    if (isNaN(total_amount) || total_amount <= 0) {
+      return res.status(400).json({ 
+        error: 'Invalid total amount',
+        message: 'Unable to calculate order total. Please check product prices.'
+      })
+    }
 
     // Generate unique order number
     const today = new Date();
@@ -224,6 +269,39 @@ export const checkout = async (req, res) => {
     }
 
     console.log('✅ Transaction completed successfully, orderId:', orderId);
+
+    // Emit inventory updates and new order to admin
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        // Emit inventory updates for each product
+        for (const item of items) {
+          emitInventoryUpdate(io, {
+            productId: item.product_id,
+            productName: item.product_name,
+            quantityChange: -item.quantity,
+            movementType: 'sale',
+            reason: 'Order placed',
+            orderId: orderId
+          });
+        }
+        
+        // Emit new order event
+        emitNewOrder(io, {
+          orderId: orderId,
+          userId: user_id,
+          totalAmount: total_amount,
+          paymentMethod: payment_method,
+          itemCount: items.length,
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log('📡 Real-time inventory updates and new order sent to admin');
+      }
+    } catch (socketError) {
+      console.error('❌ Error emitting inventory updates:', socketError);
+      // Don't fail the checkout if socket emission fails
+    }
 
     // Create user notification for order placed
     try {

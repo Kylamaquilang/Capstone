@@ -4,6 +4,7 @@ import Sidebar from '@/components/common/side-bar';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
+import { useSocket } from '@/context/SocketContext';
 import { 
   ClockIcon, 
   CogIcon, 
@@ -18,6 +19,7 @@ import ActionMenu from '@/components/common/ActionMenu';
 import OrderDetailsModal from '@/components/order/OrderDetailsModal';
 
 export default function AdminOrdersPage() {
+  const { socket, isConnected, joinAdminRoom } = useSocket();
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -195,10 +197,61 @@ export default function AdminOrdersPage() {
 
     loadOrders();
 
+    // Set up Socket.io listeners for real-time updates
+    if (socket && isConnected) {
+      // Join admin room for real-time updates
+      joinAdminRoom();
+
+      // Listen for new orders
+      const handleNewOrder = (orderData) => {
+        console.log('🛒 Real-time new order received:', orderData);
+        if (isMounted) {
+          setOrders(prev => [orderData, ...prev]);
+          setFilteredOrders(prev => [orderData, ...prev]);
+        }
+      };
+
+      // Listen for order updates
+      const handleOrderUpdate = (orderData) => {
+        console.log('📦 Real-time order update received:', orderData);
+        if (isMounted) {
+          setOrders(prev => prev.map(order => 
+            order.id === orderData.orderId 
+              ? { ...order, status: orderData.status }
+              : order
+          ));
+          setFilteredOrders(prev => prev.map(order => 
+            order.id === orderData.orderId 
+              ? { ...order, status: orderData.status }
+              : order
+          ));
+        }
+      };
+
+      // Listen for admin notifications
+      const handleAdminNotification = (notificationData) => {
+        console.log('🔔 Real-time admin notification received:', notificationData);
+        // Refresh orders when new admin notifications arrive
+        if (isMounted) {
+          loadOrders();
+        }
+      };
+
+      socket.on('admin-order-updated', handleOrderUpdate);
+      socket.on('admin-notification', handleAdminNotification);
+      socket.on('new-order', handleNewOrder);
+
+      return () => {
+        socket.off('admin-order-updated', handleOrderUpdate);
+        socket.off('admin-notification', handleAdminNotification);
+        socket.off('new-order', handleNewOrder);
+      };
+    }
+
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [socket, isConnected, joinAdminRoom]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);

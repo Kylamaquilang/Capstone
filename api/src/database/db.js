@@ -9,13 +9,11 @@ const dbConfig = {
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'capstone',
-  port: process.env.DB_PORT || 3306, // Fixed: MySQL default port is 3306
+  port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  connectTimeout: 60000,
-  acquireTimeout: 60000,
-  timeout: 60000,
+  connectTimeout: 60000, // Time to wait for initial connection
   charset: 'utf8mb4',
 };
 

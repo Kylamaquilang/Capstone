@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import UserNotificationDropdown from './UserNotificationDropdown';
-import { generateSampleNotifications } from '@/utils/notificationTemplates';
 import { useSocket } from '@/context/SocketContext';
+import API from '@/lib/axios';
 
 const NotificationBell = ({ userType = 'user', userId }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,33 +15,21 @@ const NotificationBell = ({ userType = 'user', userId }) => {
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      // Try to load from API first
-      try {
-        const response = await fetch('http://localhost:5000/api/notifications', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache',
-            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setNotifications(Array.isArray(data) ? data : []);
-          return;
-        }
-      } catch (apiError) {
-        console.log('API not available, using sample data:', apiError.message);
-      }
+      const response = await API.get('/notifications');
+      const notificationsData = response.data.notifications || response.data || [];
       
-      // Fallback to sample notifications if API is not available
-      const sampleNotifications = generateSampleNotifications();
-      setNotifications(Array.isArray(sampleNotifications) ? sampleNotifications : []);
+      // Normalize notification data to handle both API and frontend field names
+      const normalizedNotifications = notificationsData.map(notification => ({
+        ...notification,
+        read: notification.is_read !== undefined ? !!notification.is_read : notification.read,
+        timestamp: notification.created_at || notification.timestamp
+      }));
+      
+      setNotifications(Array.isArray(normalizedNotifications) ? normalizedNotifications : []);
+      console.log('🔔 Loaded notifications for bell:', normalizedNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
-      // Use sample data as fallback
-      const sampleNotifications = generateSampleNotifications();
-      setNotifications(Array.isArray(sampleNotifications) ? sampleNotifications : []);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -57,36 +45,31 @@ const NotificationBell = ({ userType = 'user', userId }) => {
     }
     
     // Set up Socket.io event listeners for real-time updates
-    if (socket && !connectionFailed) {
+    if (socket && isConnected) {
+      console.log('🔔 Setting up Socket.io listeners for NotificationBell');
+      
       const handleNewNotification = (notification) => {
-        console.log('🔔 Real-time notification received:', notification);
+        console.log('🔔 Real-time notification received in bell:', notification);
         setNotifications(prev => [notification, ...prev]);
         setUnreadCount(prev => prev + 1);
       };
 
       const handleOrderUpdate = (orderData) => {
-        console.log('📦 Real-time order update received:', orderData);
-        // Create notification for order update
-        const orderNotification = {
-          id: `order_update_${orderData.orderId}_${Date.now()}`,
-          type: 'order',
-          title: `Order #${orderData.orderId} Updated`,
-          message: `Your order status has been updated to: ${orderData.status}`,
-          timestamp: orderData.timestamp,
-          read: false,
-          priority: 'high'
-        };
-        setNotifications(prev => [orderNotification, ...prev]);
-        setUnreadCount(prev => prev + 1);
+        console.log('📦 Real-time order update received in bell:', orderData);
+        // Don't create duplicate notifications - the backend already sends the notification
+        // Just update the UI state if needed
       };
 
       socket.on('new-notification', handleNewNotification);
       socket.on('order-status-updated', handleOrderUpdate);
 
       return () => {
+        console.log('🔔 Cleaning up Socket.io listeners for NotificationBell');
         socket.off('new-notification', handleNewNotification);
         socket.off('order-status-updated', handleOrderUpdate);
       };
+    } else {
+      console.log('🔔 Socket not connected or not available for NotificationBell');
     }
   }, [userId, socket, isConnected, connectionFailed, joinUserRoom, loadNotifications]);
 

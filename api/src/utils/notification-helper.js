@@ -56,29 +56,29 @@ export const createOrderStatusNotification = async (user_id, orderId, status) =>
     
     const statusData = {
       'pending': {
-        title: ' Order Placed',
+        title: `${productSummary} Order Placed`,
         message: `Your order for ${productSummary} has been placed and is pending confirmation.`
       },
       'processing': {
-        title: ' Order Received',
-        message: `Thank you! Your order for ${productSummary} has been received and is being processed.`
+        title: `${productSummary} Order Update`,
+        message: `Your order for ${productSummary} is now being processed.`
       },
       'ready_for_pickup': {
-        title: ' Ready for Pickup',
+        title: `${productSummary} Ready for Pickup`,
         message: `Your order for ${productSummary} is ready for pickup at the accounting office!`
       },
       'delivered': {
-        title: ' Order Delivered',
+        title: `${productSummary} Order Delivered`,
         message: `Your order for ${productSummary} has been delivered successfully!`
       },
       'cancelled': {
-        title: ' Order Cancelled',
+        title: `${productSummary} Order Cancelled`,
         message: `Your order for ${productSummary} has been cancelled.`
       }
     };
     
     const data = statusData[status] || {
-      title: ' Order Update',
+      title: `${productSummary} Order Update`,
       message: `Your order for ${productSummary} status has been updated to ${status}.`
     };
     
@@ -213,25 +213,25 @@ export const createAdminOrderNotification = async (orderId, total_amount, paymen
       if (productInfo.length === 1) {
         const item = productInfo[0];
         productSummary = item.size_name 
-          ? `${item.quantity}x ${item.name} (${item.size_name}) - ₱${item.total_price.toFixed(2)}`
-          : `${item.quantity}x ${item.name} - ₱${item.total_price.toFixed(2)}`;
+          ? `${item.quantity}x ${item.name} (${item.size_name}) - ₱${Number(item.total_price).toFixed(2)}`
+          : `${item.quantity}x ${item.name} - ₱${Number(item.total_price).toFixed(2)}`;
       } else if (productInfo.length <= 3) {
         productSummary = productInfo.map(item => 
           item.size_name 
-            ? `${item.quantity}x ${item.name} (${item.size_name}) - ₱${item.total_price.toFixed(2)}`
-            : `${item.quantity}x ${item.name} - ₱${item.total_price.toFixed(2)}`
+            ? `${item.quantity}x ${item.name} (${item.size_name}) - ₱${Number(item.total_price).toFixed(2)}`
+            : `${item.quantity}x ${item.name} - ₱${Number(item.total_price).toFixed(2)}`
         ).join(', ');
       } else {
         const firstItem = productInfo[0];
         const firstItemText = firstItem.size_name 
-          ? `${firstItem.quantity}x ${firstItem.name} (${firstItem.size_name}) - ₱${firstItem.total_price.toFixed(2)}`
-          : `${firstItem.quantity}x ${firstItem.name} - ₱${firstItem.total_price.toFixed(2)}`;
+          ? `${firstItem.quantity}x ${firstItem.name} (${firstItem.size_name}) - ₱${Number(firstItem.total_price).toFixed(2)}`
+          : `${firstItem.quantity}x ${firstItem.name} - ₱${Number(firstItem.total_price).toFixed(2)}`;
         productSummary = `${firstItemText} and ${productInfo.length - 1} more items`;
       }
     }
 
-    // Create notification message based on payment method
-    let title = '🛒 New Order Received';
+    // Create notification message for admin (different from user)
+    let title = `🛒 ${productSummary} New Order`;
     let message = '';
     
     if (payment_method === 'gcash' && order.payment_status === 'unpaid') {

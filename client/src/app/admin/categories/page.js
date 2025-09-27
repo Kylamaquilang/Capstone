@@ -6,8 +6,10 @@ import Navbar from '@/components/common/admin-navbar';
 import API from '@/lib/axios';
 import ActionMenu from '@/components/common/ActionMenu';
 import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { useSocket } from '@/context/SocketContext';
 
 export default function AdminCategoriesPage() {
+  const { socket, isConnected, joinAdminRoom } = useSocket();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -21,7 +23,45 @@ export default function AdminCategoriesPage() {
 
   useEffect(() => {
     loadCategories();
-  }, []);
+
+    // Set up Socket.io listeners for real-time updates
+    if (socket && isConnected) {
+      // Join admin room for real-time updates
+      joinAdminRoom();
+
+      // Listen for category updates
+      const handleCategoryUpdate = (categoryData) => {
+        console.log('📁 Real-time category update received:', categoryData);
+        setCategories(prev => prev.map(category => 
+          category.id === categoryData.categoryId 
+            ? { ...category, name: categoryData.name }
+            : category
+        ));
+      };
+
+      // Listen for new categories
+      const handleNewCategory = (categoryData) => {
+        console.log('📁 Real-time new category received:', categoryData);
+        setCategories(prev => [categoryData, ...prev]);
+      };
+
+      // Listen for category deletions
+      const handleCategoryDelete = (categoryData) => {
+        console.log('🗑️ Real-time category deletion received:', categoryData);
+        setCategories(prev => prev.filter(category => category.id !== categoryData.categoryId));
+      };
+
+      socket.on('category-updated', handleCategoryUpdate);
+      socket.on('new-category', handleNewCategory);
+      socket.on('category-deleted', handleCategoryDelete);
+
+      return () => {
+        socket.off('category-updated', handleCategoryUpdate);
+        socket.off('new-category', handleNewCategory);
+        socket.off('category-deleted', handleCategoryDelete);
+      };
+    }
+  }, [socket, isConnected, joinAdminRoom]);
 
   // Pagination logic
   const totalPages = Math.ceil(categories.length / itemsPerPage);

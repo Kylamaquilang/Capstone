@@ -3,8 +3,10 @@ import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
+import { useSocket } from '@/context/SocketContext';
 
 export default function AdminNotificationPage() {
+  const { socket, isConnected, joinAdminRoom } = useSocket();
   const [notifications, setNotifications] = useState([]);
   const [lowStock, setLowStock] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -152,7 +154,43 @@ export default function AdminNotificationPage() {
   useEffect(() => {
     fetchNotifications();
     fetchLowStock();
-  }, []);
+
+    // Set up Socket.io listeners for real-time updates
+    if (socket && isConnected) {
+      // Join admin room for real-time updates
+      joinAdminRoom();
+
+      // Listen for new admin notifications
+      const handleAdminNotification = (notificationData) => {
+        console.log('🔔 Real-time admin notification received:', notificationData);
+        setNotifications(prev => [notificationData, ...prev]);
+      };
+
+      // Listen for order updates (might generate notifications)
+      const handleOrderUpdate = (orderData) => {
+        console.log('📦 Real-time order update received:', orderData);
+        // Refresh notifications when orders are updated
+        fetchNotifications();
+      };
+
+      // Listen for new orders (might generate notifications)
+      const handleNewOrder = (orderData) => {
+        console.log('🛒 Real-time new order received:', orderData);
+        // Refresh notifications when new orders arrive
+        fetchNotifications();
+      };
+
+      socket.on('admin-notification', handleAdminNotification);
+      socket.on('admin-order-updated', handleOrderUpdate);
+      socket.on('new-order', handleNewOrder);
+
+      return () => {
+        socket.off('admin-notification', handleAdminNotification);
+        socket.off('admin-order-updated', handleOrderUpdate);
+        socket.off('new-order', handleNewOrder);
+      };
+    }
+  }, [socket, isConnected, joinAdminRoom]);
 
   // Pagination logic
   const totalPages = Math.ceil(notifications.length / itemsPerPage);

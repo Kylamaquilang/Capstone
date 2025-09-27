@@ -120,8 +120,21 @@ export const notificationTemplates = {
 
 // Timestamp formatting utility
 export const formatTimestamp = (timestamp) => {
+  // Safety check for undefined, null, or invalid timestamp
+  if (!timestamp) {
+    return 'No date';
+  }
+
+  // Convert to Date object if it's not already
+  const date = new Date(timestamp);
+  
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+
   const now = new Date();
-  const diff = now - timestamp;
+  const diff = now - date;
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
@@ -136,7 +149,7 @@ export const formatTimestamp = (timestamp) => {
   } else if (days < 7) {
     return `${days} day${days > 1 ? 's' : ''} ago`;
   } else {
-    return timestamp.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('en-US', {
       day: 'numeric',
       month: 'short',
       year: 'numeric'

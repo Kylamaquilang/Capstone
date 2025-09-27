@@ -9,36 +9,80 @@ export function SocketProvider({ children }) {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Socket.io is temporarily disabled due to server configuration issues
-    // This prevents the "Invalid namespace" errors from appearing in the console
-    console.log('🔌 Socket.io temporarily disabled - real-time features unavailable');
-    setIsConnected(false);
-    setSocket(null);
-    
-    // TODO: Re-enable Socket.io once server configuration is fixed
+    // Initialize Socket.io connection
+    const socketInstance = io('http://localhost:5000', {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    socketInstance.on('connect', () => {
+      console.log('🔌 Socket.io connected successfully');
+      setIsConnected(true);
+      setSocket(socketInstance);
+    });
+
+    socketInstance.on('disconnect', () => {
+      console.log('🔌 Socket.io disconnected');
+      setIsConnected(false);
+    });
+
+    socketInstance.on('connect_error', (error) => {
+      console.error('🔌 Socket.io connection error:', error.message);
+      setIsConnected(false);
+    });
+
     return () => {
-      // Cleanup
+      socketInstance.disconnect();
     };
   }, []);
 
   const joinUserRoom = (userId) => {
-    console.log(`👤 Socket.io disabled - cannot join user room for user ${userId}`);
+    if (socket && isConnected) {
+      socket.emit('join-user-room', userId);
+      console.log(`👤 Joined user room for user ${userId}`);
+    } else {
+      console.log(`👤 Socket not connected - cannot join user room for user ${userId}`);
+    }
   };
 
   const joinAdminRoom = () => {
-    console.log('👨‍💼 Socket.io disabled - cannot join admin room');
+    if (socket && isConnected) {
+      socket.emit('join-admin-room');
+      console.log('👨‍💼 Joined admin room');
+    } else {
+      console.log('👨‍💼 Socket not connected - cannot join admin room');
+    }
   };
 
   const emitCartUpdate = (data) => {
-    console.log('🛒 Socket.io disabled - cart update not sent');
+    if (socket && isConnected) {
+      socket.emit('cart-update', data);
+      console.log('🛒 Cart update sent via Socket.io');
+    } else {
+      console.log('🛒 Socket not connected - cart update not sent');
+    }
   };
 
   const emitOrderUpdate = (data) => {
-    console.log('📦 Socket.io disabled - order update not sent');
+    if (socket && isConnected) {
+      socket.emit('order-update', data);
+      console.log('📦 Order update sent via Socket.io');
+    } else {
+      console.log('📦 Socket not connected - order update not sent');
+    }
   };
 
   const emitNotification = (data) => {
-    console.log('🔔 Socket.io disabled - notification not sent');
+    if (socket && isConnected) {
+      socket.emit('notification', data);
+      console.log('🔔 Notification sent via Socket.io');
+    } else {
+      console.log('🔔 Socket not connected - notification not sent');
+    }
   };
 
   return (

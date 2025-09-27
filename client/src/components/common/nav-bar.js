@@ -7,11 +7,13 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import { useNotifications } from '@/context/NotificationContext';
+import { useAuth } from '@/context/auth-context';
 import { useEffect, useState } from 'react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 
 export default function Navbar() {
   const { cartCount, notificationCount } = useNotifications();
+  const { user } = useAuth();
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
@@ -66,7 +68,7 @@ export default function Navbar() {
       </div>
       <div className="flex gap-4 items-center">
         
-        <NotificationBell userType="user" userId="1" />
+        <NotificationBell userType="user" userId={user?.id?.toString()} />
         
         <Link href="/cart">
           <Badge count={cartCount}>

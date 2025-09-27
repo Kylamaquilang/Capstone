@@ -141,3 +141,33 @@ export const emitNewOrderAlert = (io, orderData) => {
   }
 };
 
+/**
+ * Emit inventory update to admin
+ * @param {Object} io - Socket.io instance
+ * @param {Object} inventoryData - Inventory update data
+ */
+export const emitInventoryUpdate = (io, inventoryData) => {
+  if (io) {
+    io.to('admin-room').emit('inventory-updated', {
+      ...inventoryData,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`📦 Real-time inventory update sent for product ${inventoryData.productId}`);
+  }
+};
+
+/**
+ * Emit new order to admin room
+ * @param {Object} io - Socket.io instance
+ * @param {Object} orderData - Order data
+ */
+export const emitNewOrder = (io, orderData) => {
+  if (io) {
+    io.to('admin-room').emit('new-order', {
+      ...orderData,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`🛒 Real-time new order sent for order ${orderData.orderId}`);
+  }
+};
+

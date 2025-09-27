@@ -7,8 +7,10 @@ import { EyeIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import ActionMenu from '@/components/common/ActionMenu';
 import EditProductModal from '@/components/product/EditProductModal';
+import { useSocket } from '@/context/SocketContext';
 
 export default function ProductTable({ category = '' }) {
+  const { socket, isConnected, joinAdminRoom } = useSocket();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -86,7 +88,57 @@ export default function ProductTable({ category = '' }) {
 
   useEffect(() => {
     fetchProducts();
-  }, [category]);
+
+    // Set up Socket.io listeners for real-time updates
+    if (socket && isConnected) {
+      // Join admin room for real-time updates
+      joinAdminRoom();
+
+      // Listen for product updates
+      const handleProductUpdate = (productData) => {
+        console.log('📦 Real-time product update received:', productData);
+        setProducts(prev => prev.map(product => 
+          product.id === productData.productId 
+            ? { ...product, ...productData }
+            : product
+        ));
+      };
+
+      // Listen for new products
+      const handleNewProduct = (productData) => {
+        console.log('📦 Real-time new product received:', productData);
+        setProducts(prev => [productData, ...prev]);
+      };
+
+      // Listen for product deletions
+      const handleProductDelete = (productData) => {
+        console.log('🗑️ Real-time product deletion received:', productData);
+        setProducts(prev => prev.filter(product => product.id !== productData.productId));
+      };
+
+      // Listen for inventory updates
+      const handleInventoryUpdate = (inventoryData) => {
+        console.log('📦 Real-time inventory update received:', inventoryData);
+        setProducts(prev => prev.map(product => 
+          product.id === inventoryData.productId 
+            ? { ...product, stock: Math.max(0, product.stock + inventoryData.quantityChange) }
+            : product
+        ));
+      };
+
+      socket.on('product-updated', handleProductUpdate);
+      socket.on('new-product', handleNewProduct);
+      socket.on('product-deleted', handleProductDelete);
+      socket.on('inventory-updated', handleInventoryUpdate);
+
+      return () => {
+        socket.off('product-updated', handleProductUpdate);
+        socket.off('new-product', handleNewProduct);
+        socket.off('product-deleted', handleProductDelete);
+        socket.off('inventory-updated', handleInventoryUpdate);
+      };
+    }
+  }, [category, socket, isConnected, joinAdminRoom]);
 
   // Filter and sort products
   const filteredAndSortedProducts = products
