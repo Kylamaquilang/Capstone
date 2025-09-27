@@ -18,6 +18,7 @@ export default function EditProductPage() {
   // Form state
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  const [costPrice, setCostPrice] = useState('');
   const [stock, setStock] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
@@ -47,6 +48,7 @@ export default function EditProductPage() {
       // Set form values
       setName(data.name || '');
       setPrice(data.price || '');
+      setCostPrice(data.original_price || '');
       setStock(data.stock || '');
       setCategoryId(data.category_id || '');
       setDescription(data.description || '');
@@ -73,10 +75,42 @@ export default function EditProductPage() {
     setSaving(true);
     
     try {
+      // Validation
+      if (!name.trim()) {
+        alert('Please enter a product name');
+        setSaving(false);
+        return;
+      }
+      
+      if (!price || Number(price) <= 0) {
+        alert('Please enter a valid selling price');
+        setSaving(false);
+        return;
+      }
+      
+      if (!costPrice || Number(costPrice) <= 0) {
+        alert('Please enter a valid cost price');
+        setSaving(false);
+        return;
+      }
+      
+      if (Number(price) <= Number(costPrice)) {
+        alert('Selling price must be higher than cost price');
+        setSaving(false);
+        return;
+      }
+      
+      if (!stock || Number(stock) < 0) {
+        alert('Please enter a valid stock quantity');
+        setSaving(false);
+        return;
+      }
+
       const updateData = {
         name: name.trim(),
         description: description.trim(),
         price: Number(price),
+        original_price: Number(costPrice),
         stock: Number(stock),
         category_id: categoryId ? Number(categoryId) : null
       };
@@ -200,19 +234,52 @@ export default function EditProductPage() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">
-                    Price <span className="text-red-500">*</span>
+                    Cost Price <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={costPrice}
+                    onChange={(e) => setCostPrice(e.target.value)}
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter cost price"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-700">
+                    Selling Price <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter price"
+                    placeholder="Enter selling price"
                     min="0"
                     step="0.01"
                     required
                   />
                 </div>
+
+                {/* Profit Analysis Display */}
+                {costPrice && price && Number(costPrice) > 0 && Number(price) > 0 && (
+                  <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-blue-800 font-medium">Profit Analysis:</span>
+                      <div className="text-right">
+                        <div className="text-green-600 font-bold">
+                          Profit: ₱{(Number(price) - Number(costPrice)).toFixed(2)}
+                        </div>
+                        <div className="text-blue-600">
+                          Margin: {(((Number(price) - Number(costPrice)) / Number(price)) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700">

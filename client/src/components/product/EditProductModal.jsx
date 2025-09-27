@@ -13,6 +13,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
   // Form state
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  const [costPrice, setCostPrice] = useState('');
   const [stock, setStock] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
@@ -38,6 +39,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       // Set form values
       setName(data.name || '');
       setPrice(data.price || '');
+      setCostPrice(data.original_price || '');
       setStock(data.stock || '');
       setCategoryId(data.category_id || '');
       setDescription(data.description || '');
@@ -83,7 +85,17 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
         return;
       }
       if (!price || Number(price) <= 0) {
-        setError('Please enter a valid price');
+        setError('Please enter a valid selling price');
+        setSaving(false);
+        return;
+      }
+      if (!costPrice || Number(costPrice) <= 0) {
+        setError('Please enter a valid cost price');
+        setSaving(false);
+        return;
+      }
+      if (Number(price) <= Number(costPrice)) {
+        setError('Selling price must be higher than cost price');
         setSaving(false);
         return;
       }
@@ -118,6 +130,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
         name: name.trim(),
         description: description.trim() || null,
         price: Number(price),
+        original_price: Number(costPrice),
         stock: Number(stock),
         category_id: categoryId ? Number(categoryId) : null,
         image: finalImageUrl,
@@ -239,10 +252,28 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                       />
                     </div>
 
-                    {/* Price */}
+                    {/* Cost Price */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Price (₱)
+                        Cost Price (₱)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={costPrice}
+                        onChange={(e) => setCostPrice(e.target.value)}
+                        required
+                        disabled={saving}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    {/* Selling Price */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Selling Price (₱)
                       </label>
                       <input
                         type="number"
@@ -256,6 +287,23 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                         placeholder="0.00"
                       />
                     </div>
+
+                    {/* Profit Analysis Display */}
+                    {costPrice && price && Number(costPrice) > 0 && Number(price) > 0 && (
+                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-blue-800 font-medium">Profit Analysis:</span>
+                          <div className="text-right">
+                            <div className="text-green-600 font-bold">
+                              Profit: ₱{(Number(price) - Number(costPrice)).toFixed(2)}
+                            </div>
+                            <div className="text-blue-600">
+                              Margin: {(((Number(price) - Number(costPrice)) / Number(price)) * 100).toFixed(1)}%
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Stock */}
                     <div>

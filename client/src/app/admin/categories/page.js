@@ -15,11 +15,19 @@ export default function AdminCategoriesPage() {
   const [editName, setEditName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const router = useRouter();
 
   useEffect(() => {
     loadCategories();
   }, []);
+
+  // Pagination logic
+  const totalPages = Math.ceil(categories.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedCategories = categories.slice(startIndex, endIndex);
 
   const loadCategories = async () => {
     try {
@@ -155,12 +163,11 @@ export default function AdminCategoriesPage() {
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Category Name</th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Created</th>
                       <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {categories.map((category, index) => (
+                    {paginatedCategories.map((category, index) => (
                       <tr key={category.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                         index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                       }`}>
@@ -192,11 +199,6 @@ export default function AdminCategoriesPage() {
                             <span className="text-xs font-medium text-gray-900">{category.name}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 border-r border-gray-100">
-                          <div className="text-xs text-gray-900">
-                            {category.created_at ? new Date(category.created_at).toLocaleDateString() : 'N/A'}
-                          </div>
-                        </td>
                         <td className="px-4 py-3">
                           {editingId !== category.id && (
                             <ActionMenu
@@ -221,13 +223,105 @@ export default function AdminCategoriesPage() {
                   </tbody>
                 </table>
               </div>
-              {categories.length === 0 && (
+              {paginatedCategories.length === 0 && (
                 <div className="p-8 text-center">
                   <div className="text-gray-300 text-3xl mb-4">🏷️</div>
                   <h3 className="text-sm font-medium text-gray-900 mb-2">No categories found</h3>
                   <p className="text-gray-500 text-xs">Add your first category to get started.</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {categories.length > 0 && (
+            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                {/* Records Info */}
+                <div className="text-xs text-gray-600">
+                  Showing {startIndex + 1} to {Math.min(endIndex, categories.length)} of {categories.length} categories
+                </div>
+                
+                {/* Pagination Controls */}
+                <div className="flex items-center gap-2">
+                  {/* Previous Button */}
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1 || totalPages <= 1}
+                    className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  
+                  {/* Page Numbers */}
+                  <div className="flex items-center gap-1">
+                    {/* First page */}
+                    {currentPage > 3 && (
+                      <>
+                        <button
+                          onClick={() => setCurrentPage(1)}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                        >
+                          1
+                        </button>
+                        {currentPage > 4 && <span className="text-xs text-gray-400">...</span>}
+                      </>
+                    )}
+                    
+                    {/* Page numbers around current page */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      if (pageNum < 1 || pageNum > totalPages) return null;
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-2 py-1 text-xs border rounded-md transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-[#000C50] text-white border-[#000C50]'
+                              : 'border-gray-300 hover:bg-gray-100'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                    
+                    {/* Last page */}
+                    {currentPage < totalPages - 2 && (
+                      <>
+                        {currentPage < totalPages - 3 && <span className="text-xs text-gray-400">...</span>}
+                        <button
+                          onClick={() => setCurrentPage(totalPages)}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                        >
+                          {totalPages}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  
+                  {/* Next Button */}
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages || totalPages <= 1}
+                    className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           </div>

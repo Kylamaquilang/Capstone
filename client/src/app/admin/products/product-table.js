@@ -100,7 +100,7 @@ export default function ProductTable({ category = '' }) {
       let aValue = a[sortField];
       let bValue = b[sortField];
       
-      if (sortField === 'price' || sortField === 'stock') {
+      if (sortField === 'price' || sortField === 'original_price' || sortField === 'stock') {
         aValue = Number(aValue) || 0;
         bValue = Number(bValue) || 0;
       } else {
@@ -249,10 +249,21 @@ export default function ProductTable({ category = '' }) {
               </th>
               <th 
                 className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSort('original_price')}
+              >
+                <div className="flex items-center gap-1">
+                  Cost Price
+                  {sortField === 'original_price' && (
+                    <span className="text-blue-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('price')}
               >
                 <div className="flex items-center gap-1">
-                  Price
+                  Selling Price
                   {sortField === 'price' && (
                     <span className="text-blue-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                   )}
@@ -292,6 +303,11 @@ export default function ProductTable({ category = '' }) {
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
                         {product.category_name || product.category || 'Uncategorized'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <div className="text-xs font-medium text-gray-900">
+                        ₱{Number(product.original_price || 0).toFixed(2)}
+                      </div>
                     </td>
                     <td className="px-4 py-3 border-r border-gray-100">
                       <div className="text-xs font-medium text-gray-900">
@@ -360,6 +376,11 @@ export default function ProductTable({ category = '' }) {
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
                         {product.category_name || product.category || 'Uncategorized'}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 border-r border-gray-100">
+                      <div className="text-xs font-medium text-gray-900">
+                        ₱{Number(product.original_price || 0).toFixed(2)}
+                      </div>
                     </td>
                     <td className="px-4 py-3 border-r border-gray-100">
                       <div className="text-xs font-medium text-gray-900">

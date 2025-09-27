@@ -59,7 +59,7 @@ export const getAllProductsSimple = async (req, res) => {
 // ✅ Create Product
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, stock, sizes, category_id, image } = req.body;
+    const { name, description, price, original_price, stock, sizes, category_id, image } = req.body;
 
     // Enhanced validation
     if (!validateName(name)) {
@@ -70,7 +70,19 @@ export const createProduct = async (req, res) => {
 
     if (!validatePrice(price)) {
       return res.status(400).json({ 
-        error: 'Valid price is required' 
+        error: 'Valid selling price is required' 
+      });
+    }
+
+    if (!validatePrice(original_price)) {
+      return res.status(400).json({ 
+        error: 'Valid cost price is required' 
+      });
+    }
+
+    if (Number(price) <= Number(original_price)) {
+      return res.status(400).json({ 
+        error: 'Selling price must be higher than cost price' 
       });
     }
 
@@ -142,12 +154,13 @@ export const createProduct = async (req, res) => {
     try {
       // Insert product
       const [productResult] = await connection.query(
-        `INSERT INTO products (name, description, price, stock, category_id, image, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+        `INSERT INTO products (name, description, price, original_price, stock, category_id, image, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           name.trim(),
           description?.trim() || null,
           parseFloat(price),
+          parseFloat(original_price),
           parseInt(stock),
           category_id || null,
           image?.trim() || null
@@ -348,7 +361,7 @@ export const getProductByName = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, stock, sizes, category_id, image } = req.body;
+    const { name, description, price, original_price, stock, sizes, category_id, image } = req.body;
 
     if (!validateId(id)) {
       return res.status(400).json({ error: 'Invalid product ID' });
@@ -369,7 +382,19 @@ export const updateProduct = async (req, res) => {
 
     if (price !== undefined && !validatePrice(price)) {
       return res.status(400).json({ 
-        error: 'Valid price is required' 
+        error: 'Valid selling price is required' 
+      });
+    }
+
+    if (original_price !== undefined && !validatePrice(original_price)) {
+      return res.status(400).json({ 
+        error: 'Valid cost price is required' 
+      });
+    }
+
+    if (price !== undefined && original_price !== undefined && Number(price) <= Number(original_price)) {
+      return res.status(400).json({ 
+        error: 'Selling price must be higher than cost price' 
       });
     }
 
@@ -426,6 +451,11 @@ export const updateProduct = async (req, res) => {
       if (price !== undefined) {
         updateFields.push('price = ?');
         updateValues.push(parseFloat(price));
+      }
+
+      if (original_price !== undefined) {
+        updateFields.push('original_price = ?');
+        updateValues.push(parseFloat(original_price));
       }
 
       if (stock !== undefined) {

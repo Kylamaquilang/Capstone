@@ -7,6 +7,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [costPrice, setCostPrice] = useState('');
   const [stock, setStock] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [file, setFile] = useState(null);
@@ -39,7 +40,19 @@ export default function AddProductModal({ onClose, onSuccess }) {
         return;
       }
       if (!price || Number(price) <= 0) {
-        alert('Please enter a valid price');
+        alert('Please enter a valid selling price');
+        setLoading(false);
+        return;
+      }
+      
+      if (!costPrice || Number(costPrice) <= 0) {
+        alert('Please enter a valid cost price');
+        setLoading(false);
+        return;
+      }
+      
+      if (Number(price) <= Number(costPrice)) {
+        alert('Selling price must be higher than cost price');
         setLoading(false);
         return;
       }
@@ -74,6 +87,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
         name: name.trim(),
         description: description.trim() || null,
         price: Number(price),
+        original_price: Number(costPrice),
         stock: Number(stock),
         category_id: categoryId ? Number(categoryId) : null,
         image: finalImageUrl,
@@ -169,13 +183,27 @@ export default function AddProductModal({ onClose, onSuccess }) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Base Price</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
+                  <input
+                    type="number"
+                    value={costPrice}
+                    onChange={(e) => setCostPrice(e.target.value)}
+                    className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter cost price"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price</label>
                   <input
                     type="number"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter base price"
+                    placeholder="Enter selling price"
                     min="0"
                     step="0.01"
                     required
@@ -195,6 +223,23 @@ export default function AddProductModal({ onClose, onSuccess }) {
                   />
                 </div>
               </div>
+
+              {/* Profit Analysis Display */}
+              {costPrice && price && Number(costPrice) > 0 && Number(price) > 0 && (
+                <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-blue-800 font-medium">Profit Analysis:</span>
+                    <div className="text-right">
+                      <div className="text-green-600 font-bold">
+                        Profit: ₱{(Number(price) - Number(costPrice)).toFixed(2)}
+                      </div>
+                      <div className="text-blue-600">
+                        Margin: {(((Number(price) - Number(costPrice)) / Number(price)) * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>

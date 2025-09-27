@@ -423,25 +423,26 @@ export const sendReadyForPickupEmail = async (email, userName, orderData) => {
     `).join('');
     
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-    const orderUrl = `${clientUrl}/user-profile`;
+    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const confirmUrl = `${apiUrl}/api/orders/${orderId}/confirm-receipt`;
     
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `CPC Essen - Order Ready for Pickup #${orderId}`,
+      subject: `CPC Essen - Online Receipt #${orderId}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
           <div style="background-color: #000C50; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
             <h1 style="margin: 0; font-size: 24px;">CPC Essen</h1>
-            <p style="margin: 5px 0 0 0; font-size: 16px;">Ready for Pickup</p>
+            <p style="margin: 5px 0 0 0; font-size: 16px;">Online Receipt</p>
           </div>
           
           <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h2 style="color: #333; margin-bottom: 20px;">Great news, ${userName}!</h2>
+            <h2 style="color: #333; margin-bottom: 20px;">Thank you for your order, ${userName}!</h2>
             
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
-              <p style="margin: 0; color: #856404; font-weight: bold;">📦 Order Ready for Pickup</p>
-              <p style="margin: 5px 0 0 0; color: #856404;">Your order is ready for pickup at the accounting office! Please bring a valid ID when collecting your items.</p>
+            <div style="background-color: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+              <p style="margin: 0; color: #155724; font-weight: bold;">✅ Order Ready for Pickup</p>
+              <p style="margin: 5px 0 0 0; color: #155724;">Your order is ready for pickup at the accounting office! Please bring a valid ID when collecting your items.</p>
             </div>
             
             <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #000C50;">
@@ -478,10 +479,19 @@ export const sendReadyForPickupEmail = async (email, userName, orderData) => {
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${orderUrl}" 
-                 style="background-color: #000C50; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
-                View Order Details
+              <a href="${confirmUrl}" 
+                 style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px; margin-right: 10px;">
+                ✅ Received Order
               </a>
+              <a href="${clientUrl}/dashboard" 
+                 style="background-color: #000C50; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+                View Dashboard
+              </a>
+            </div>
+            
+            <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+              <p style="margin: 0; color: #856404; font-weight: bold;">📋 Important Instructions</p>
+              <p style="margin: 5px 0 0 0; color: #856404;">Please click "Received Order" button after collecting your items to complete your order and receive your thank you message.</p>
             </div>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">

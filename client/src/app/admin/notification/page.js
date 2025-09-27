@@ -11,6 +11,8 @@ export default function AdminNotificationPage() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('orders');
   const [processingOrder, setProcessingOrder] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const fetchNotifications = async () => {
     try {
@@ -152,6 +154,12 @@ export default function AdminNotificationPage() {
     fetchLowStock();
   }, []);
 
+  // Pagination logic
+  const totalPages = Math.ceil(notifications.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedNotifications = notifications.slice(startIndex, endIndex);
+
   return (
     <div className="min-h-screen text-black admin-page">
       <Navbar />
@@ -226,8 +234,8 @@ export default function AdminNotificationPage() {
             ) : (
               <div className="space-y-4">
                 {activeTab === 'orders' ? (
-                  notifications.length > 0 ? (
-                    notifications.map((notification) => {
+                  paginatedNotifications.length > 0 ? (
+                    paginatedNotifications.map((notification) => {
                         // Extract order ID from the message
                         const orderIdMatch = notification.message.match(/Order #(\d+)/);
                         const orderId = orderIdMatch ? orderIdMatch[1] : null;
@@ -307,7 +315,101 @@ export default function AdminNotificationPage() {
                       <p className="text-gray-500">Order notifications will appear here when customers place orders.</p>
                     </div>
                   )
-                ) : (
+                ) : null}
+                
+                {/* Pagination for orders tab */}
+                {activeTab === 'orders' && notifications.length > 0 && (
+                  <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 mt-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                      {/* Records Info */}
+                      <div className="text-xs text-gray-600">
+                        Showing {startIndex + 1} to {Math.min(endIndex, notifications.length)} of {notifications.length} notifications
+                      </div>
+                      
+                      {/* Pagination Controls */}
+                      <div className="flex items-center gap-2">
+                        {/* Previous Button */}
+                        <button
+                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                          disabled={currentPage === 1 || totalPages <= 1}
+                          className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                        >
+                          Previous
+                        </button>
+                        
+                        {/* Page Numbers */}
+                        <div className="flex items-center gap-1">
+                          {/* First page */}
+                          {currentPage > 3 && (
+                            <>
+                              <button
+                                onClick={() => setCurrentPage(1)}
+                                className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                              >
+                                1
+                              </button>
+                              {currentPage > 4 && <span className="text-xs text-gray-400">...</span>}
+                            </>
+                          )}
+                          
+                          {/* Page numbers around current page */}
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+                            
+                            if (pageNum < 1 || pageNum > totalPages) return null;
+                            
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`px-2 py-1 text-xs border rounded-md transition-colors ${
+                                  currentPage === pageNum
+                                    ? 'bg-[#000C50] text-white border-[#000C50]'
+                                    : 'border-gray-300 hover:bg-gray-100'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          })}
+                          
+                          {/* Last page */}
+                          {currentPage < totalPages - 2 && (
+                            <>
+                              {currentPage < totalPages - 3 && <span className="text-xs text-gray-400">...</span>}
+                              <button
+                                onClick={() => setCurrentPage(totalPages)}
+                                className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                              >
+                                {totalPages}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                        
+                        {/* Next Button */}
+                        <button
+                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                          disabled={currentPage === totalPages || totalPages <= 1}
+                          className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'low-stock' ? (
                   <div className="bg-white border border-gray-300 overflow-hidden rounded-lg">
                     <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                       <table className="min-w-full divide-y divide-gray-200">
@@ -357,7 +459,7 @@ export default function AdminNotificationPage() {
                       )}
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </div>

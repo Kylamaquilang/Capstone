@@ -367,6 +367,11 @@ export const addStudentsBulk = async (req, res) => {
             }
           });
           
+          // Set default status if not provided
+          if (!cleanedData.status) {
+            cleanedData.status = 'regular'; // Default status
+          }
+          
           // Debug: Show first few processed rows
           if (i <= 3) {
             console.log(`🔍 Processing row ${i}:`, {
@@ -657,6 +662,8 @@ export const addStudentsBulk = async (req, res) => {
             row.suffix?.trim() || null,
             mappedDegree,
             mappedStatus,
+            1, // is_active (active by default)
+            1  // must_change_password
           ]);
 
           successCount++;
@@ -690,7 +697,6 @@ export const addStudentsBulk = async (req, res) => {
               suffix,
               degree,
               status,
-              created_at, 
               is_active, 
               must_change_password
             ) VALUES ?`,
@@ -716,10 +722,9 @@ export const addStudentsBulk = async (req, res) => {
                   suffix,
                   degree,
                   status,
-                  created_at, 
                   is_active, 
                   must_change_password
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, 1)`,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
                 studentData
               );
             } catch (individualError) {

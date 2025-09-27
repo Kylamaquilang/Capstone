@@ -8,6 +8,7 @@ export default function AddProductForm() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [costPrice, setCostPrice] = useState('');
   const [stock, setStock] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [file, setFile] = useState(null);
@@ -51,7 +52,19 @@ export default function AddProductForm() {
         return;
       }
       if (!price || Number(price) <= 0) {
-        alert('Please enter a valid price');
+        alert('Please enter a valid selling price');
+        setLoading(false);
+        return;
+      }
+      
+      if (!costPrice || Number(costPrice) <= 0) {
+        alert('Please enter a valid cost price');
+        setLoading(false);
+        return;
+      }
+      
+      if (Number(price) <= Number(costPrice)) {
+        alert('Selling price must be higher than cost price');
         setLoading(false);
         return;
       }
@@ -86,6 +99,7 @@ export default function AddProductForm() {
         name: name.trim(),
         description: description.trim() || null,
         price: Number(price),
+        original_price: Number(costPrice),
         stock: Number(stock),
         category_id: categoryId ? Number(categoryId) : null,
         image: finalImageUrl,
@@ -172,13 +186,27 @@ export default function AddProductForm() {
 
           <div className="flex space-x-4">
             <div className="flex-1">
-              <label className="block text-sm mb-1">BASE PRICE:</label>
+              <label className="block text-sm mb-1">COST PRICE:</label>
+              <input
+                type="number"
+                value={costPrice}
+                onChange={(e) => setCostPrice(e.target.value)}
+                className="w-full border border-gray-400 px-3 py-2 rounded"
+                placeholder="Enter cost price"
+                min="0"
+                step="0.01"
+                required
+              />
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-sm mb-1">SELLING PRICE:</label>
               <input
                 type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 className="w-full border border-gray-400 px-3 py-2 rounded"
-                placeholder="Enter base price"
+                placeholder="Enter selling price"
                 min="0"
                 step="0.01"
                 required
@@ -198,6 +226,23 @@ export default function AddProductForm() {
               />
             </div>
           </div>
+
+          {/* Profit Margin Display */}
+          {costPrice && price && Number(costPrice) > 0 && Number(price) > 0 && (
+            <div className="bg-blue-50 p-3 rounded border border-blue-200">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-blue-800 font-medium">Profit Analysis:</span>
+                <div className="text-right">
+                  <div className="text-green-600 font-bold">
+                    Profit: ₱{(Number(price) - Number(costPrice)).toFixed(2)}
+                  </div>
+                  <div className="text-blue-600">
+                    Margin: {(((Number(price) - Number(costPrice)) / Number(price)) * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm mb-1">CATEGORY:</label>

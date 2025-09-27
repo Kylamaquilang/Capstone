@@ -127,11 +127,18 @@ export const checkout = async (req, res) => {
         const [productInfo] = await connection.query(`SELECT name FROM products WHERE id = ?`, [item.product_id]);
         const productName = productInfo[0]?.name || 'Unknown Product';
         
+        // Get product cost price
+        const [productData] = await connection.query(
+          `SELECT original_price FROM products WHERE id = ?`,
+          [item.product_id]
+        );
+        const costPrice = productData[0]?.original_price || 0;
+
         // Insert order item
         await connection.query(
-          `INSERT INTO order_items (order_id, product_id, size_id, product_name, quantity, unit_price, total_price)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [orderId, item.product_id, item.size_id || null, productName, item.quantity, item.size_price || item.price, (item.size_price || item.price) * item.quantity]
+          `INSERT INTO order_items (order_id, product_id, size_id, product_name, quantity, unit_price, unit_cost, total_price)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [orderId, item.product_id, item.size_id || null, productName, item.quantity, item.size_price || item.price, costPrice, (item.size_price || item.price) * item.quantity]
         )
 
         // Log inventory movement - the database trigger will handle stock deduction

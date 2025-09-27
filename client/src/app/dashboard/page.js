@@ -17,12 +17,30 @@ export default function UserDashboard() {
   const [products, setProducts] = useState({});
   const [productsLoading, setProductsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showThankYouModal, setShowThankYouModal] = useState(false);
+  const [completedOrderId, setCompletedOrderId] = useState(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchProducts();
     }
   }, [isAuthenticated]);
+
+  // Check for order completion from URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderCompleted = urlParams.get('orderCompleted');
+    const orderId = urlParams.get('orderId');
+    
+    if (orderCompleted === 'true' && orderId) {
+      setCompletedOrderId(orderId);
+      setShowThankYouModal(true);
+      
+      // Clean up URL parameters
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
 
   const fetchProducts = async () => {
     try {
@@ -186,6 +204,44 @@ export default function UserDashboard() {
             </div>
           )}
         </div>
+
+        {/* Thank You Modal */}
+        {showThankYouModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 text-center">
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
+                <p className="text-gray-600 mb-4">
+                  Your order #{completedOrderId} has been successfully completed!
+                </p>
+                <p className="text-sm text-gray-500 mb-6">
+                  Thank you for choosing CPC Essen. We hope you enjoy your purchase!
+                </p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setShowThankYouModal(false)}
+                  className="flex-1 bg-[#000C50] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#000C50]/90 transition-colors"
+                >
+                  Continue Shopping
+                </button>
+                <Link
+                  href="/user-profile"
+                  className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors text-center"
+                  onClick={() => setShowThankYouModal(false)}
+                >
+                  View Orders
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Footer />
       </div>

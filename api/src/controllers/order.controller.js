@@ -1,7 +1,7 @@
 import { pool } from '../database/db.js'
 import { sendOrderReceiptEmail, sendOrderReceivedEmail, sendReadyForPickupEmail } from '../utils/emailService.js'
 import { createOrderStatusNotification } from '../utils/notification-helper.js'
-import { emitOrderUpdate, emitNewOrderAlert, createAndEmitNotification } from '../utils/socket-helper.js'
+import { emitOrderUpdate, emitNewOrderAlert, createAndEmitNotification, emitUserNotification } from '../utils/socket-helper.js'
 
 // Helper function to create delivered order notification for admin confirmation
 const createDeliveredOrderNotification = async (orderId, userId) => {
@@ -62,7 +62,7 @@ export const getUserOrderDetails = async (req, res) => {
 
     // Get order items
     const [items] = await pool.query(`
-      SELECT product_name, quantity, unit_price, total_price
+      SELECT product_name, quantity, unit_price, unit_cost, total_price
       FROM order_items 
       WHERE order_id = ?
     `, [order_id])
@@ -127,6 +127,7 @@ export const getAllOrders = async (req, res) => {
         SELECT 
           oi.quantity, 
           oi.unit_price,
+          oi.unit_cost,
           oi.total_price,
           p.name as product_name, 
           p.image, 
@@ -154,7 +155,7 @@ export const getOrderItems = async (req, res) => {
 
   try {
     const [items] = await pool.query(`
-      SELECT oi.quantity, oi.size, oi.unit_price, oi.total_price, p.name, p.image, p.id as product_id
+      SELECT oi.quantity, oi.size, oi.unit_price, oi.unit_cost, oi.total_price, p.name, p.image, p.id as product_id
       FROM order_items oi
       JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = ?
@@ -319,7 +320,31 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     // Create notification for user
-    await createOrderStatusNotification(userId, id, status)
+    console.log(`🔔 Starting notification creation for order ${id}, user ${userId}, status: ${status}`);
+    const notificationResult = await createOrderStatusNotification(userId, id, status)
+    console.log(`🔔 Notification result:`, notificationResult);
+    
+    // Emit real-time notification to user
+    const io = req.app.get('io')
+    console.log(`🔔 Socket.io instance available:`, !!io);
+    if (io && notificationResult) {
+      console.log(`🔔 Emitting notification to user ${userId}`);
+      emitUserNotification(io, userId, {
+        id: notificationResult.id,
+        title: notificationResult.title,
+        message: notificationResult.message,
+        type: notificationResult.type,
+        orderId: id,
+        status: status,
+        read: false,
+        timestamp: new Date().toISOString(),
+        priority: status === 'ready_for_pickup' ? 'high' : 'medium',
+        hasAction: notificationResult.hasAction,
+        actionData: notificationResult.actionData
+      })
+    } else {
+      console.log(`🔔 Not emitting notification - io: ${!!io}, notificationResult:`, !!notificationResult);
+    }
     
     // Send email notifications for specific status changes
     if (status === 'processing' || status === 'ready_for_pickup') {
@@ -333,7 +358,7 @@ export const updateOrderStatus = async (req, res) => {
         if (userInfo.length > 0) {
           const [orderDetails] = await pool.query(`
             SELECT o.id as orderId, o.total_amount, o.payment_method, o.created_at,
-                   oi.quantity, oi.price, p.name as product_name
+                   oi.quantity, oi.unit_price, oi.unit_cost, p.name as product_name
             FROM orders o
             JOIN order_items oi ON o.id = oi.order_id
             JOIN products p ON oi.product_id = p.id
@@ -363,7 +388,6 @@ export const updateOrderStatus = async (req, res) => {
     }
     
     // Emit real-time order update
-    const io = req.app.get('io')
     if (io) {
       emitOrderUpdate(io, userId, {
         orderId: id,
@@ -718,7 +742,7 @@ export const confirmOrderReceipt = async (req, res) => {
 
     if (action === 'received') {
       // Order successfully received - create thank you notification for user
-      await pool.query(`
+      const [notificationResult] = await pool.query(`
         INSERT INTO notifications (user_id, title, message, type, created_at)
         VALUES (?, ?, ?, ?, NOW())
       `, [
@@ -727,6 +751,22 @@ export const confirmOrderReceipt = async (req, res) => {
         'Thank you! Your order has been successfully received and confirmed. We appreciate your business!',
         'system'
       ])
+
+      // Emit real-time notification
+      const io = req.app.get('io')
+      if (io) {
+        emitUserNotification(io, userId, {
+          id: notificationResult.insertId,
+          title: '🎉 Order Successfully Received!',
+          message: 'Thank you! Your order has been successfully received and confirmed. We appreciate your business!',
+          type: 'system',
+          orderId: id,
+          status: 'completed',
+          read: false,
+          timestamp: new Date().toISOString(),
+          priority: 'high'
+        })
+      }
 
       // Update order status to completed
       await pool.query(
@@ -742,7 +782,7 @@ export const confirmOrderReceipt = async (req, res) => {
 
     } else if (action === 'cancelled') {
       // Order cancelled after delivery
-      await pool.query(`
+      const [notificationResult] = await pool.query(`
         INSERT INTO notifications (user_id, title, message, type, created_at)
         VALUES (?, ?, ?, ?, NOW())
       `, [
@@ -751,6 +791,22 @@ export const confirmOrderReceipt = async (req, res) => {
         'Your order has been cancelled after delivery. Please contact support for assistance.',
         'system'
       ])
+
+      // Emit real-time notification
+      const io = req.app.get('io')
+      if (io) {
+        emitUserNotification(io, userId, {
+          id: notificationResult.insertId,
+          title: '❌ Order Cancelled',
+          message: 'Your order has been cancelled after delivery. Please contact support for assistance.',
+          type: 'system',
+          orderId: id,
+          status: 'cancelled',
+          read: false,
+          timestamp: new Date().toISOString(),
+          priority: 'high'
+        })
+      }
 
       // Update order status to cancelled
       await pool.query(
@@ -846,7 +902,7 @@ export const userConfirmOrderReceipt = async (req, res) => {
     }
 
     // Create thank you notification for user
-    await pool.query(`
+    const [notificationResult] = await pool.query(`
       INSERT INTO notifications (user_id, title, message, type, created_at)
       VALUES (?, ?, ?, ?, NOW())
     `, [
@@ -855,6 +911,22 @@ export const userConfirmOrderReceipt = async (req, res) => {
       `Thank you for confirming receipt! Your order for ${productSummary} has been successfully completed. We appreciate your business!`,
       'system'
     ])
+
+    // Emit real-time notification
+    const io = req.app.get('io')
+    if (io) {
+      emitUserNotification(io, user_id, {
+        id: notificationResult.insertId,
+        title: '🎉 Order Confirmed!',
+        message: `Thank you for confirming receipt! Your order for ${productSummary} has been successfully completed. We appreciate your business!`,
+        type: 'system',
+        orderId: id,
+        status: 'completed',
+        read: false,
+        timestamp: new Date().toISOString(),
+        priority: 'high'
+      })
+    }
 
     // Notify admins that user confirmed receipt and inventory updated
     const [adminUsers] = await pool.query(`
@@ -929,6 +1001,53 @@ export const userConfirmOrderReceipt = async (req, res) => {
 }
 
 // ✅ Confirm order receipt via notification
+// 🧪 Test notification endpoint (for debugging)
+export const testNotification = async (req, res) => {
+  const { userId, orderId, status } = req.body;
+  
+  try {
+    console.log(`🧪 Testing notification for user ${userId}, order ${orderId}, status: ${status}`);
+    
+    // Create notification
+    const notificationResult = await createOrderStatusNotification(userId, orderId, status);
+    console.log(`🧪 Notification created:`, notificationResult);
+    
+    // Emit real-time notification
+    const io = req.app.get('io');
+    if (io && notificationResult) {
+      console.log(`🧪 Emitting test notification to user ${userId}`);
+      emitUserNotification(io, userId, {
+        id: notificationResult.id,
+        title: notificationResult.title,
+        message: notificationResult.message,
+        type: notificationResult.type,
+        orderId: orderId,
+        status: status,
+        read: false,
+        timestamp: new Date().toISOString(),
+        priority: status === 'ready_for_pickup' ? 'high' : 'medium',
+        hasAction: notificationResult.hasAction,
+        actionData: notificationResult.actionData
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Test notification sent',
+      notification: notificationResult,
+      socketEmitted: !!io
+    });
+  } catch (error) {
+    console.error('🧪 Test notification error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send test notification',
+      details: error.message
+    });
+  }
+};
+
+// ✅ Confirm order receipt via notification
 export const confirmOrderReceiptNotification = async (req, res) => {
   const { orderId } = req.params
   const user_id = req.user.id
@@ -991,7 +1110,7 @@ export const confirmOrderReceiptNotification = async (req, res) => {
       ? `${orderItems[0].quantity}x ${orderItems[0].product_name}`
       : `${orderItems.length} items`
 
-    await pool.query(`
+    const [notificationResult] = await pool.query(`
       INSERT INTO notifications (user_id, title, message, type, created_at)
       VALUES (?, ?, ?, ?, NOW())
     `, [
@@ -1000,6 +1119,22 @@ export const confirmOrderReceiptNotification = async (req, res) => {
       `Thank you for confirming receipt! Your order for ${productSummary} has been completed. A receipt has been sent to your email.`,
       'system'
     ])
+
+    // Emit real-time notification
+    const io = req.app.get('io')
+    if (io) {
+      emitUserNotification(io, user_id, {
+        id: notificationResult.insertId,
+        title: '🎉 Order Confirmed!',
+        message: `Thank you for confirming receipt! Your order for ${productSummary} has been completed. A receipt has been sent to your email.`,
+        type: 'system',
+        orderId: orderId,
+        status: 'completed',
+        read: false,
+        timestamp: new Date().toISOString(),
+        priority: 'high'
+      })
+    }
 
     // Mark the ready_for_pickup notification as read/handled
     await pool.query(`
@@ -1017,6 +1152,145 @@ export const confirmOrderReceiptNotification = async (req, res) => {
   } catch (err) {
     console.error('Confirm order receipt via notification error:', err)
     res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// ✅ Get Sales Analytics with Profit Analysis
+export const getSalesAnalytics = async (req, res) => {
+  try {
+    const { startDate, endDate, groupBy = 'day' } = req.query;
+    
+    // Build date filter
+    let dateFilter = '';
+    let params = [];
+    
+    if (startDate && endDate) {
+      dateFilter = 'WHERE o.created_at BETWEEN ? AND ?';
+      params = [startDate, endDate];
+    }
+
+    // Get sales data with profit analysis
+    const [salesData] = await pool.query(`
+      SELECT 
+        DATE(o.created_at) as date,
+        COUNT(DISTINCT o.id) as total_orders,
+        SUM(o.total_amount) as total_revenue,
+        SUM(oi.quantity * oi.unit_cost) as total_cost,
+        SUM(o.total_amount) - SUM(oi.quantity * oi.unit_cost) as total_profit,
+        ROUND(((SUM(o.total_amount) - SUM(oi.quantity * oi.unit_cost)) / SUM(o.total_amount)) * 100, 2) as profit_margin_percent
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      ${dateFilter}
+      AND o.status IN ('completed', 'delivered')
+      GROUP BY DATE(o.created_at)
+      ORDER BY date DESC
+      LIMIT 30
+    `, params);
+
+    // Get top products by profit
+    const [topProducts] = await pool.query(`
+      SELECT 
+        p.name as product_name,
+        SUM(oi.quantity) as total_quantity_sold,
+        SUM(oi.quantity * oi.unit_price) as total_revenue,
+        SUM(oi.quantity * oi.unit_cost) as total_cost,
+        SUM(oi.quantity * oi.unit_price) - SUM(oi.quantity * oi.unit_cost) as total_profit,
+        ROUND(((SUM(oi.quantity * oi.unit_price) - SUM(oi.quantity * oi.unit_cost)) / SUM(oi.quantity * oi.unit_price)) * 100, 2) as profit_margin_percent
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      JOIN orders o ON oi.order_id = o.id
+      ${dateFilter}
+      AND o.status IN ('completed', 'delivered')
+      GROUP BY p.id, p.name
+      ORDER BY total_profit DESC
+      LIMIT 10
+    `, params);
+
+    // Get overall summary
+    const [summary] = await pool.query(`
+      SELECT 
+        COUNT(DISTINCT o.id) as total_orders,
+        SUM(o.total_amount) as total_revenue,
+        SUM(oi.quantity * oi.unit_cost) as total_cost,
+        SUM(o.total_amount) - SUM(oi.quantity * oi.unit_cost) as total_profit,
+        ROUND(((SUM(o.total_amount) - SUM(oi.quantity * oi.unit_cost)) / SUM(o.total_amount)) * 100, 2) as overall_profit_margin
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      ${dateFilter}
+      AND o.status IN ('completed', 'delivered')
+    `, params);
+
+    res.json({
+      salesData,
+      topProducts,
+      summary: summary[0] || {
+        total_orders: 0,
+        total_revenue: 0,
+        total_cost: 0,
+        total_profit: 0,
+        overall_profit_margin: 0
+      }
+    });
+
+  } catch (error) {
+    console.error('Sales analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch sales analytics' });
+  }
+}
+
+// ✅ Confirm Order Receipt (Public endpoint for email button)
+export const confirmOrderReceiptPublic = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    
+    if (!orderId) {
+      return res.status(400).json({ error: 'Order ID is required' });
+    }
+
+    // Get order details
+    const [orders] = await pool.query(
+      'SELECT id, user_id, status FROM orders WHERE id = ?',
+      [orderId]
+    );
+
+    if (orders.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = orders[0];
+
+    // Check if order is ready for pickup
+    if (order.status !== 'ready_for_pickup') {
+      return res.status(400).json({ 
+        error: 'Order is not ready for pickup',
+        currentStatus: order.status 
+      });
+    }
+
+    // Update order status to completed
+    await pool.query(
+      'UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?',
+      ['completed', orderId]
+    );
+
+    // Log status change
+    await pool.query(
+      `INSERT INTO order_status_logs (order_id, old_status, new_status, notes, created_at)
+       VALUES (?, ?, ?, ?, NOW())`,
+      [orderId, 'ready_for_pickup', 'completed', 'Order confirmed received by customer']
+    );
+
+    console.log(`✅ Order ${orderId} confirmed received and marked as completed`);
+
+    // Redirect to dashboard with success message
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+    const redirectUrl = `${clientUrl}/dashboard?orderCompleted=true&orderId=${orderId}`;
+    
+    res.redirect(redirectUrl);
+
+  } catch (error) {
+    console.error('Confirm order receipt error:', error);
+    res.status(500).json({ error: 'Failed to confirm order receipt' });
   }
 }
 

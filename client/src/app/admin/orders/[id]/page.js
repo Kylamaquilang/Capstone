@@ -193,14 +193,6 @@ export default function OrderDetailPage() {
                       {getStatusIcon(order.status)} {order.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <div>
-                    <span className="font-medium">Created:</span> {formatDate(order.created_at)}
-                  </div>
-                  {order.updated_at && order.updated_at !== order.created_at && (
-                    <div>
-                      <span className="font-medium">Last Updated:</span> {formatDate(order.updated_at)}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -271,9 +263,6 @@ export default function OrderDetailPage() {
                               <span className="text-gray-500">← {status.old_status.replace('_', ' ')}</span>
                             )}
                           </div>
-                          <div className="text-sm text-gray-600">
-                            {formatDate(status.created_at)}
-                          </div>
                         </div>
                         {status.notes && (
                           <div className="ml-4 text-sm text-gray-600 bg-white p-2 rounded">
@@ -309,7 +298,7 @@ export default function OrderDetailPage() {
               >
                 <option value="pending">Pending</option>
                 <option value="processing">Processing</option>
-                <option value="ready_for_pickup">Ready for Pickup</option>
+                <option value="for pickup">Ready for Pickup</option>
                 <option value="delivered">Delivered</option>
                 <option value="cancelled">Cancelled</option>
                 <option value="refunded">Refunded</option>

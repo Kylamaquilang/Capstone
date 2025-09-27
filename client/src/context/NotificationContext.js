@@ -83,8 +83,8 @@ export function NotificationProvider({ children }) {
         }
       };
 
-      const handleNewNotification = () => {
-        console.log('🔔 Real-time notification received');
+      const handleNewNotification = (notificationData) => {
+        console.log('🔔 Real-time notification received:', notificationData);
         setNotificationCount(prev => prev + 1);
       };
 

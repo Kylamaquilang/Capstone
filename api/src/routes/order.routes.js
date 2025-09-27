@@ -10,7 +10,10 @@ import {
   getSalesPerformance,
   confirmOrderReceipt,
   userConfirmOrderReceipt,
-  confirmOrderReceiptNotification
+  confirmOrderReceiptNotification,
+  testNotification,
+  getSalesAnalytics,
+  confirmOrderReceiptPublic
 } from '../controllers/order.controller.js'
 import { verifyToken, isAdmin } from '../middleware/verifyToken.js'
 
@@ -29,9 +32,13 @@ router.post('/:orderId/confirm-notification', verifyToken, confirmOrderReceiptNo
 // Analytics and reporting routes
 router.get('/stats', verifyToken, isAdmin, getOrderStats)
 router.get('/sales-performance', verifyToken, isAdmin, getSalesPerformance)
+router.get('/sales-analytics', verifyToken, isAdmin, getSalesAnalytics)
 
 // Public sales data endpoint for testing (remove in production)
 router.get('/sales-performance/public', getSalesPerformance)
+
+// Public endpoint for email confirmation (no auth required)
+router.get('/:orderId/confirm-receipt', confirmOrderReceiptPublic)
 
 // Test endpoint to check database connection
 router.get('/test-db', async (req, res) => {
@@ -51,5 +58,8 @@ router.get('/test-db', async (req, res) => {
     })
   }
 })
+
+// Test notification endpoint (for debugging)
+router.post('/test-notification', testNotification)
 
 export default router

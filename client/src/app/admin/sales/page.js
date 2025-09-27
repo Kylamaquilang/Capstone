@@ -78,6 +78,25 @@ export default function AdminSalesPage() {
           summary: data.summary || {}
         });
         
+        // Fetch profit analytics
+        try {
+          console.log('Fetching profit analytics...');
+          const profitParams = new URLSearchParams();
+          if (dateRange.start_date) profitParams.append('startDate', dateRange.start_date);
+          if (dateRange.end_date) profitParams.append('endDate', dateRange.end_date);
+          
+          const { data: profitData } = await API.get(`/orders/sales-analytics?${profitParams}`);
+          console.log('📊 Profit analytics response:', profitData);
+          
+          // Update sales data with profit information
+          setSalesData(prev => ({
+            ...prev,
+            profitAnalytics: profitData
+          }));
+        } catch (profitError) {
+          console.log('Profit analytics API failed:', profitError.message);
+        }
+        
         console.log('Sales performance data loaded successfully from orders');
         return;
       } catch (salesApiError) {
@@ -651,6 +670,81 @@ export default function AdminSalesPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Profit Analytics Section */}
+              {salesData.profitAnalytics && (
+                <div className="mb-2">
+                  <h2 className="text-sm font-semibold text-gray-900 mb-2">Profit Analytics</h2>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                      <div className="flex items-center">
+                        <div className="p-2 bg-blue-50 rounded-md mt-2 ml-4">
+                          <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-blue-600">Total Cost</p>
+                          <p className="text-lg font-bold text-blue-600">
+                            {formatCurrency(salesData.profitAnalytics.summary?.total_cost || 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                      <div className="flex items-center">
+                        <div className="p-2 bg-green-50 rounded-md mt-2 ml-4">
+                          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-green-600">Total Profit</p>
+                          <p className="text-lg font-bold text-green-600">
+                            {formatCurrency(salesData.profitAnalytics.summary?.total_profit || 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                      <div className="flex items-center">
+                        <div className="p-2 bg-purple-50 rounded-md mt-2 ml-4">
+                          <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-purple-600">Profit Margin</p>
+                          <p className="text-lg font-bold text-purple-600">
+                            {salesData.profitAnalytics.summary?.overall_profit_margin || 0}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
+                      <div className="flex items-center">
+                        <div className="p-2 bg-orange-50 rounded-md mt-2 ml-4">
+                          <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-orange-600">Avg Profit/Order</p>
+                          <p className="text-lg font-bold text-orange-600">
+                            {salesData.profitAnalytics.summary?.total_orders > 0 ? 
+                              formatCurrency((salesData.profitAnalytics.summary?.total_profit || 0) / salesData.profitAnalytics.summary?.total_orders) : 
+                              formatCurrency(0)
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Sales Tracking Section */}
               <div className="mb-2">

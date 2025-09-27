@@ -17,6 +17,8 @@ export const createNotification = async (user_id, message, title = null, type = 
 //  Create order status notification with product details
 export const createOrderStatusNotification = async (user_id, orderId, status) => {
   try {
+    console.log(`🔔 Creating notification for user ${user_id}, order ${orderId}, status: ${status}`);
+    
     // Get product details for the order with size information
     const [productInfo] = await pool.query(`
       SELECT p.name, oi.quantity, ps.size as size_name
@@ -26,6 +28,8 @@ export const createOrderStatusNotification = async (user_id, orderId, status) =>
       WHERE oi.order_id = ?
       ORDER BY oi.id
     `, [orderId]);
+    
+    console.log(`🔔 Found ${productInfo.length} products for order ${orderId}`);
     
     // Create product summary with sizes
     let productSummary = '';
@@ -87,28 +91,38 @@ export const createOrderStatusNotification = async (user_id, orderId, status) =>
       orderId: orderId
     }) : null;
     
-    await pool.query(`
-      INSERT INTO notifications (user_id, title, message, type, related_id, action_data, created_at) 
-      VALUES (?, ?, ?, ?, ?, ?, NOW())
-    `, [user_id, data.title, data.message, 'system', orderId, actionData]);
+    const [result] = await pool.query(`
+      INSERT INTO notifications (user_id, title, message, type, related_id, created_at) 
+      VALUES (?, ?, ?, ?, ?, NOW())
+    `, [user_id, data.title, data.message, 'system', orderId]);
+    
+    console.log(`🔔 Notification created successfully with ID: ${result.insertId}`);
     
     return {
+      id: result.insertId,
       title: data.title,
       message: data.message,
       productSummary,
       orderId,
-      status
+      status,
+      type: 'system',
+      hasAction: hasAction,
+      actionData: actionData
     };
   } catch (error) {
     console.error(' Error creating order status notification:', error);
     // Fallback to simple notification
     await createNotification(user_id, `Your order #${orderId} status has been updated to ${status}.`, ' Order Update', 'system');
     return {
+      id: null,
       title: ' Order Update',
       message: `Your order #${orderId} status has been updated to ${status}.`,
       productSummary: '',
       orderId,
-      status
+      status,
+      type: 'system',
+      hasAction: false,
+      actionData: null
     };
   }
 };

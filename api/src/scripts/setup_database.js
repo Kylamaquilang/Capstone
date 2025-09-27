@@ -93,7 +93,6 @@ async function setupDatabase() {
         is_active BOOLEAN DEFAULT TRUE,
         reorder_point INT DEFAULT 5,
         max_stock INT,
-        supplier_info TEXT,
         last_restock_date DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -125,13 +124,7 @@ async function setupDatabase() {
         status VARCHAR(50) DEFAULT 'pending',
         payment_method VARCHAR(50) DEFAULT 'cash',
         payment_status VARCHAR(50) DEFAULT 'pending',
-        shipping_address TEXT,
-        contact_number VARCHAR(20),
-        notes TEXT,
-        estimated_delivery DATETIME,
-        actual_delivery DATETIME,
-        delivery_notes TEXT,
-        customer_notes TEXT,
+        pay_at_counter BOOLEAN DEFAULT FALSE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
@@ -147,6 +140,7 @@ async function setupDatabase() {
         product_name VARCHAR(200) NOT NULL,
         quantity INT NOT NULL,
         unit_price DECIMAL(10,2) NOT NULL,
+        unit_cost DECIMAL(10,2) DEFAULT 0,
         total_price DECIMAL(10,2) NOT NULL,
         size VARCHAR(20),
         color VARCHAR(50),

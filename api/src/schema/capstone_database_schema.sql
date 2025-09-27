@@ -87,7 +87,6 @@ CREATE TABLE products (
     is_active BOOLEAN DEFAULT TRUE,
     reorder_point INT DEFAULT 5,
     max_stock INT,
-    supplier_info TEXT,
     last_restock_date DATETIME,
     
     -- Timestamps
@@ -165,19 +164,8 @@ CREATE TABLE orders (
     payment_status ENUM('unpaid', 'pending', 'paid', 'cancelled', 'refunded') DEFAULT 'unpaid',
     payment_intent_id VARCHAR(255),
     
-    -- Delivery options
+    -- Pickup options
     pay_at_counter BOOLEAN DEFAULT FALSE,
-    shipping_address TEXT,
-    contact_number VARCHAR(20),
-    
-    -- Order details
-    notes TEXT,
-    customer_notes TEXT,
-    
-    -- Delivery tracking
-    estimated_delivery DATETIME,
-    actual_delivery DATETIME,
-    delivery_notes TEXT,
     
     -- Timestamps
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -202,6 +190,7 @@ CREATE TABLE order_items (
     product_name VARCHAR(200) NOT NULL,
     quantity INT NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
+    unit_cost DECIMAL(10,2) DEFAULT 0,
     total_price DECIMAL(10,2) NOT NULL,
     size VARCHAR(20),
     color VARCHAR(50),

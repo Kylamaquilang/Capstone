@@ -39,7 +39,9 @@ const io = new Server(server, {
     ],
     methods: ['GET', 'POST'],
     credentials: true
-  }
+  },
+  transports: ['websocket', 'polling'],
+  allowEIO3: true
 });
 
 // Static uploads directory
@@ -136,6 +138,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
+  console.log(`🔌 Socket transport: ${socket.conn.transport.name}`);
 
   // Join user to their personal room for notifications
   socket.on('join-user-room', (userId) => {
@@ -174,6 +177,11 @@ io.on('connection', (socket) => {
 });
 
 // Make io available to other modules
+// Socket.io error handling
+io.engine.on('connection_error', (err) => {
+  console.error('🔌 Socket.io connection error:', err);
+});
+
 app.set('io', io);
 
 server.listen(PORT, () => {
