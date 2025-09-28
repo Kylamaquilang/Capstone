@@ -187,6 +187,7 @@ export const getAllOrders = async (req, res) => {
         u.name AS user_name,
         u.student_id,
         u.email,
+        u.degree,
         o.total_amount, 
         o.payment_method, 
         o.pay_at_counter,

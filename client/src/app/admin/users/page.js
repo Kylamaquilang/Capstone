@@ -8,6 +8,7 @@ import ActionMenu from '@/components/common/ActionMenu';
 import { EyeIcon, PencilSquareIcon, UserMinusIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import AddStudentModal from '@/components/user/AddStudentModal';
 import BulkUploadModal from '@/components/user/BulkUploadModal';
+import EditUserModal from '@/components/user/EditUserModal';
 
 export default function AdminUsersPage() {
   const { socket, isConnected, joinAdminRoom } = useSocket();
@@ -17,6 +18,8 @@ export default function AdminUsersPage() {
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -103,6 +106,15 @@ export default function AdminUsersPage() {
   const handleModalSuccess = () => {
     fetchUsers(); // Refresh the users list
     setSelectedUsers(new Set()); // Clear selections
+  };
+
+  const handleEditUser = (user) => {
+    setSelectedUser(user);
+    setShowEditUserModal(true);
+  };
+
+  const handleEditUserSuccess = () => {
+    fetchUsers();
   };
 
   // Checkbox handlers
@@ -473,6 +485,8 @@ export default function AdminUsersPage() {
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Email</th>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Role</th>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Degree</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Year</th>
+                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Section</th>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Status</th>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Active</th>
                       <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
@@ -508,7 +522,20 @@ export default function AdminUsersPage() {
                         <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
                           <div className="text-xs">
                             <div className="font-medium text-gray-900">{user.degree || 'N/A'}</div>
-                      
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
+                          <div className="text-xs">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">
+                              {user.year_level || 'N/A'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
+                          <div className="text-xs">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-600">
+                              {user.section || 'N/A'}
+                            </span>
                           </div>
                         </td>
                         <td className="px-2 sm:px-4 py-3 border-r border-gray-100">{getStatusBadge(user.status)}</td>
@@ -516,6 +543,11 @@ export default function AdminUsersPage() {
                         <td className="px-2 sm:px-4 py-3">
                           <ActionMenu
                             actions={[
+                              {
+                                label: 'Edit',
+                                icon: PencilSquareIcon,
+                                onClick: () => handleEditUser(user)
+                              },
                               {
                                 label: user.is_active ? 'Deactivate' : 'Activate',
                                 icon: user.is_active ? UserMinusIcon : UserPlusIcon,
@@ -596,6 +628,14 @@ export default function AdminUsersPage() {
         isOpen={showBulkUploadModal}
         onClose={() => setShowBulkUploadModal(false)}
         onSuccess={handleModalSuccess}
+      />
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        isOpen={showEditUserModal}
+        onClose={() => setShowEditUserModal(false)}
+        onSuccess={handleEditUserSuccess}
+        user={selectedUser}
       />
     </div>
   );

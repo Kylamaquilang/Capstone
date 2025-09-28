@@ -239,6 +239,9 @@ export const getAllProducts = async (req, res) => {
       whereConditions.push('p.stock > 0');
     }
 
+    // Always exclude soft-deleted products
+    whereConditions.push('p.is_active = 1 AND p.deleted_at IS NULL');
+
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
     // Get total count for pagination
@@ -568,11 +571,11 @@ export const deleteProduct = async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      // Delete product sizes first
-      await connection.query('DELETE FROM product_sizes WHERE product_id = ?', [id]);
-      
-      // Delete product
-      const [result] = await connection.query('DELETE FROM products WHERE id = ?', [id]);
+      // Soft delete product by setting is_active to false and deleted_at timestamp
+      const [result] = await connection.query(
+        'UPDATE products SET is_active = 0, deleted_at = NOW() WHERE id = ?', 
+        [id]
+      );
 
       if (result.affectedRows === 0) {
         throw new Error('Product not found');
@@ -599,6 +602,7 @@ export const deleteProduct = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+
 
 // ✅ Get Low Stock Products (for Admin Alerts)
 export const getLowStockProducts = async (req, res) => {

@@ -32,6 +32,7 @@ export const getCategories = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT * FROM categories
+      WHERE is_active = 1 AND deleted_at IS NULL
       ORDER BY name ASC
     `)
     res.json(rows)
@@ -78,7 +79,8 @@ export const deleteCategory = async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete category with products. Move or delete products first.' })
     }
 
-    await pool.query(`DELETE FROM categories WHERE id = ?`, [id])
+    // Soft delete by setting is_active to false and deleted_at timestamp
+    await pool.query(`UPDATE categories SET is_active = 0, deleted_at = NOW() WHERE id = ?`, [id])
     
     // Emit refresh signal for deleted category
     const { io } = req.app.locals;
@@ -93,3 +95,4 @@ export const deleteCategory = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' })
   }
 }
+

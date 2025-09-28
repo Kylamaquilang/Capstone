@@ -72,16 +72,16 @@ export const addStudent = async (req, res) => {
       });
     }
 
-    // Check if student already exists with this email
-    const [existingEmail] = await pool.query('SELECT * FROM users WHERE email = ?', [email.trim()]);
+    // Check if student already exists with this email (excluding soft-deleted users)
+    const [existingEmail] = await pool.query('SELECT * FROM users WHERE email = ? AND (is_active = 1 OR deleted_at IS NULL)', [email.trim()]);
     if (existingEmail.length > 0) {
       return res.status(409).json({ 
         error: 'Student already exists with this email' 
       });
     }
 
-    // Check if student already exists with this student_id
-    const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ?', [student_id.trim()]);
+    // Check if student already exists with this student_id (excluding soft-deleted users)
+    const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ? AND (is_active = 1 OR deleted_at IS NULL)', [student_id.trim()]);
     if (existingStudentId.length > 0) {
       return res.status(409).json({ 
         error: 'Student ID already exists' 
@@ -278,12 +278,17 @@ export const addStudentsBulk = async (req, res) => {
           'course': 'degree',
           'program': 'degree',
           'course/program': 'degree',
-          'year level': 'status',
-          'yearlevel': 'status',
-          'level': 'status',
-          'year': 'status',
-          'grade level': 'status',
-          'class': 'status'
+          'year level': 'year_level',
+          'yearlevel': 'year_level',
+          'level': 'year_level',
+          'year': 'year_level',
+          'grade level': 'year_level',
+          'class': 'year_level',
+          'section': 'section',
+          'sec': 'section',
+          'class section': 'section',
+          'status': 'status',
+          'student status': 'status'
         };
         
         // Auto-detect columns if mapping fails

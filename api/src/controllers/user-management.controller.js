@@ -196,6 +196,74 @@ export const updateUserProfile = async (req, res) => {
   }
 };
 
+// ✅ Admin update user (for admin panel)
+export const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { year_level, section, degree, status } = req.body;
+
+    if (!year_level && !section && !degree && !status) {
+      return res.status(400).json({ error: 'At least one field must be provided' });
+    }
+
+    const updateFields = [];
+    const updateValues = [];
+
+    if (year_level !== undefined) {
+      // Validate year level
+      const validYearLevels = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+      if (year_level && !validYearLevels.includes(year_level)) {
+        return res.status(400).json({ 
+          error: 'Invalid year level. Must be one of: 1st Year, 2nd Year, 3rd Year, 4th Year' 
+        });
+      }
+      updateFields.push('year_level = ?');
+      updateValues.push(year_level || null);
+    }
+
+    if (section !== undefined) {
+      updateFields.push('section = ?');
+      updateValues.push(section?.trim() || null);
+    }
+
+    if (degree !== undefined) {
+      // Validate degree
+      const validDegrees = ['BEED', 'BSED', 'BSIT', 'BSHM'];
+      if (degree && !validDegrees.includes(degree)) {
+        return res.status(400).json({ 
+          error: 'Invalid degree. Must be one of: BEED, BSED, BSIT, BSHM' 
+        });
+      }
+      updateFields.push('degree = ?');
+      updateValues.push(degree || null);
+    }
+
+    if (status !== undefined) {
+      // Validate status
+      const validStatuses = ['regular', 'irregular'];
+      if (status && !validStatuses.includes(status)) {
+        return res.status(400).json({ 
+          error: 'Invalid status. Must be one of: regular, irregular' 
+        });
+      }
+      updateFields.push('status = ?');
+      updateValues.push(status || null);
+    }
+
+    updateValues.push(id);
+
+    await pool.query(
+      `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`,
+      updateValues
+    );
+
+    res.json({ message: 'User updated successfully' });
+  } catch (error) {
+    console.error('Update user error:', error.message);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
 // ✅ Delete user (soft delete by setting is_active to false)
 export const deleteUser = async (req, res) => {
   try {
@@ -214,9 +282,9 @@ export const deleteUser = async (req, res) => {
       return res.status(400).json({ error: 'You cannot delete your own account' });
     }
 
-    // Soft delete by setting is_active to false
+    // Soft delete by setting is_active to false and deleted_at timestamp
     await pool.query(
-      'UPDATE users SET is_active = 0 WHERE id = ?',
+      'UPDATE users SET is_active = 0, deleted_at = NOW() WHERE id = ?',
       [userId]
     );
 
@@ -234,3 +302,4 @@ export const deleteUser = async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };
+

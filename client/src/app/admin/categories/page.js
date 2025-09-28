@@ -23,10 +23,6 @@ export default function AdminCategoriesPage() {
   const [selectAll, setSelectAll] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
-
   const loadCategories = useCallback(async () => {
     try {
       setLoading(true);
@@ -42,6 +38,10 @@ export default function AdminCategoriesPage() {
 
   // Auto-refresh for categories
   useAdminAutoRefresh(loadCategories, 'categories');
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   const handleAddCategorySuccess = () => {
     loadCategories();

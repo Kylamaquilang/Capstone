@@ -32,6 +32,7 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -81,8 +82,13 @@ export default function AdminOrdersPage() {
       filtered = filtered.filter(order => order.payment_method === paymentMethodFilter);
     }
 
+    // Filter by department
+    if (departmentFilter) {
+      filtered = filtered.filter(order => order.degree === departmentFilter);
+    }
+
     setFilteredOrders(filtered);
-  }, [orders, searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter]);
+  }, [orders, searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter, departmentFilter]);
 
   const handleViewDetails = (orderId) => {
     setSelectedOrderId(orderId);
@@ -262,7 +268,7 @@ export default function AdminOrdersPage() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter]);
+  }, [searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter, departmentFilter]);
 
   return (
     <ErrorBoundary>
@@ -341,6 +347,19 @@ export default function AdminOrdersPage() {
                       <option value="cash">Pay at Counter</option>
                     </select>
                   </div>
+                  <div className="sm:w-48">
+                    <select
+                      value={departmentFilter}
+                      onChange={(e) => setDepartmentFilter(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Departments</option>
+                      <option value="BEED">BEED</option>
+                      <option value="BSED">BSED</option>
+                      <option value="BSIT">BSIT</option>
+                      <option value="BSHM">BSHM</option>
+                    </select>
+                  </div>
                   <div className="sm:w-32">
                     <button
                       onClick={() => {
@@ -348,6 +367,7 @@ export default function AdminOrdersPage() {
                         setStatusFilter('');
                         setPaymentStatusFilter('');
                         setPaymentMethodFilter('');
+    setDepartmentFilter('');
                       }}
                       className="w-full bg-gray-100 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
                     >
@@ -377,6 +397,7 @@ export default function AdminOrdersPage() {
                     <tr>
                       <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Products</th>
                       <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Customer</th>
+                      <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Department</th>
                       <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Quantity</th>
                       <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Amount</th>
                       <th className="px-4 py-3 text-xs font-medium text-black-700 border-r border-gray-200">Payment Method</th>
@@ -423,6 +444,13 @@ export default function AdminOrdersPage() {
                         <td className="px-4 py-3 border-r border-gray-100">
                           <div>
                             <div className="text-xs font-medium text-gray-900">{order.user_name}</div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <div className="text-center">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">
+                              {order.degree || 'N/A'}
+                            </span>
                           </div>
                         </td>
                         <td className="px-4 py-3 border-r border-gray-100">

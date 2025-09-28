@@ -6,6 +6,7 @@ import {
   updateUserProfileImage,
   getUserProfile,
   updateUserProfile,
+  updateUser,
   deleteUser
 } from '../controllers/user-management.controller.js';
 import { verifyToken } from '../middleware/auth.middleware.js';
@@ -42,6 +43,7 @@ const upload = multer({
 
 // Admin routes (admin only)
 router.get('/all', verifyToken, isAdmin, getAllUsersWithStatus);
+router.put('/:id', verifyToken, isAdmin, updateUser);
 router.patch('/:userId/status', verifyToken, isAdmin, toggleUserStatus);
 router.delete('/:userId', verifyToken, isAdmin, deleteUser);
 

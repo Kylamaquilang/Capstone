@@ -113,10 +113,10 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
   };
 
   const downloadSampleCSV = () => {
-    const csvContent = `student_id,first_name,last_name,middle_name,suffix,email,degree,status
-20240001,John,Doe,Michael,Jr.,john.doe@example.com,BSIT,regular
-20240002,Jane,Smith,,,jane.smith@example.com,BSED,regular
-20240003,Robert,Johnson,William,III,robert.johnson@example.com,BEED,irregular`;
+    const csvContent = `student_id,first_name,last_name,middle_name,suffix,email,degree,year_level,section,status
+20240001,John,Doe,Michael,Jr.,john.doe@example.com,BSIT,1st Year,A,regular
+20240002,Jane,Smith,,,jane.smith@example.com,BSED,2nd Year,B,regular
+20240003,Robert,Johnson,William,III,robert.johnson@example.com,BEED,3rd Year,C,irregular`;
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -185,11 +185,12 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                 <h3 className="text-sm font-medium text-blue-900 mb-2">Instructions:</h3>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>• Upload a CSV or Excel file with student information</li>
-                  <li>• Required columns: student_id (or Student ID), first_name (or First Name), last_name (or Last Name), email (or Email), degree (or Course/Program), status (or Year Level)</li>
+                  <li>• Required columns: student_id (or Student ID), first_name (or First Name), last_name (or Last Name), email (or Email), degree (or Course/Program), year_level (or Year Level), section (or Section), status (or Status)</li>
                   <li>• Optional columns: middle_name (or Middle Name), suffix (or Suffix)</li>
                   <li>• Student ID must be numeric (4-8 digits)</li>
                   <li>• Valid degrees: BEED, BSED, BSIT, BSHM (or full names like "Bachelor of Science in Information Technology")</li>
-                  <li>• Valid status: regular, irregular (or year levels like "1st year", "2nd year", etc.)</li>
+                  <li>• Valid year levels: 1st Year, 2nd Year, 3rd Year, 4th Year</li>
+                  <li>• Valid status: regular, irregular</li>
                   <li>• Supported formats: .csv, .xlsx, .xls</li>
                   <li>• Download the sample CSV template below</li>
                 </ul>
