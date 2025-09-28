@@ -25,8 +25,8 @@ async function createAdmin() {
     console.log('✅ Connected to database');
     
     // Get admin credentials from command line or use defaults
-    const email = process.argv[2] || 'admin@cpc.edu.ph';
-    const password = process.argv[3] || 'admin123';
+    const email = process.argv[2] || 'acounting.office.cpc@gmail.com';
+    const password = process.argv[3] || 'accountingoffice';
     const name = process.argv[4] || 'System Administrator';
     
     console.log(`📝 Creating admin with email: ${email}`);
@@ -37,8 +37,8 @@ async function createAdmin() {
     
     // Check if admin already exists
     const [existingAdmin] = await connection.execute(
-      'SELECT id FROM users WHERE email = ? OR student_id = ?',
-      [email, 'ADMIN001']
+      'SELECT id FROM users WHERE email = ? OR (role = "admin" AND student_id IS NULL)',
+      [email]
     );
     
     if (existingAdmin.length > 0) {
@@ -52,7 +52,7 @@ async function createAdmin() {
       // Create new admin
       await connection.execute(
         'INSERT INTO users (student_id, name, email, password, role) VALUES (?, ?, ?, ?, ?)',
-        ['ADMIN001', name, email, hashedPassword, 'admin']
+        [null, name, email, hashedPassword, 'admin']
       );
       console.log('✅ Admin user created successfully!');
     }
@@ -80,6 +80,7 @@ async function createAdmin() {
 
 // Run the script
 createAdmin();
+
 
 
 

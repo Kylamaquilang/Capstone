@@ -493,7 +493,7 @@ INSERT INTO categories (name, description) VALUES
 
 -- Insert admin user
 INSERT INTO users (student_id, name, email, password, role, is_active, must_change_password) VALUES
-('ADMIN001', 'System Administrator', 'admin@cpc.edu.ph', '$2b$10$rQZ8K9N2mP3vX7yL1qA4eR5tU6iI8oP9aQ2bR3cS4dT5eU6fV7gW8hX9iJ0kL', 'admin', TRUE, FALSE);
+(NULL, 'System Administrator', 'acounting.office.cpc@gmail.com', '$2b$10$rQZ8K9N2mP3vX7yL1qA4eR5tU6iI8oP9aQ2bR3cS4dT5eU6fV7gW8hX9iJ0kL', 'admin', TRUE, FALSE);
 
 -- Insert sample products
 INSERT INTO products (name, description, price, stock, category_id, size, color) VALUES
