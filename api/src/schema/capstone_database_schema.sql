@@ -482,26 +482,9 @@ DELIMITER ;
 -- SAMPLE DATA
 -- =====================================================
 
--- Insert sample categories
-INSERT INTO categories (name, description) VALUES
-('Uniforms', 'School uniforms and PE uniforms'),
-('School Supplies', 'Notebooks, pens, and other school materials'),
-('Accessories', 'Bags, shoes, and other accessories'),
-('Electronics', 'Calculators and other electronic devices'),
-('Lanyard', 'School lanyards and ID holders'),
-('Tela', 'Tela fabric and materials');
-
 -- Insert admin user
 INSERT INTO users (student_id, name, email, password, role, is_active, must_change_password) VALUES
 (NULL, 'System Administrator', 'acounting.office.cpc@gmail.com', '$2b$10$rQZ8K9N2mP3vX7yL1qA4eR5tU6iI8oP9aQ2bR3cS4dT5eU6fV7gW8hX9iJ0kL', 'admin', TRUE, FALSE);
-
--- Insert sample products
-INSERT INTO products (name, description, price, stock, category_id, size, color) VALUES
-('PE Shirt', 'Physical Education uniform shirt', 250.00, 50, 1, 'M', 'White'),
-('PE Pants', 'Physical Education uniform pants', 300.00, 45, 1, 'M', 'Gray'),
-('School Polo', 'Regular school uniform polo', 400.00, 60, 1, 'M', 'White'),
-('Notebook', 'College ruled notebook', 25.00, 100, 2, NULL, 'Blue'),
-('Ballpen', 'Blue ballpoint pen', 15.00, 200, 2, NULL, 'Blue');
 
 -- =====================================================
 -- VIEWS FOR REPORTING
