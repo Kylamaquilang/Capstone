@@ -14,6 +14,8 @@ export default function AddProductModal({ onClose, onSuccess }) {
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [subcategoryId, setSubcategoryId] = useState('');
   const [sizes, setSizes] = useState([{ size: 'S', stock: '', price: '' }]);
   const [loading, setLoading] = useState(false);
 
@@ -21,13 +23,34 @@ export default function AddProductModal({ onClose, onSuccess }) {
     const loadCategories = async () => {
       try {
         const { data } = await API.get('/categories');
-        setCategories(data || []);
+        // Separate main categories and subcategories
+        const mainCategories = data.filter(cat => !cat.parent_id);
+        setCategories(mainCategories);
       } catch {
         setCategories([]);
       }
     };
     loadCategories();
   }, []);
+
+  // Load subcategories when main category is selected
+  useEffect(() => {
+    const loadSubcategories = async () => {
+      if (categoryId) {
+        try {
+          const { data } = await API.get('/categories');
+          const categorySubcategories = data.filter(cat => cat.parent_id === Number(categoryId));
+          setSubcategories(categorySubcategories);
+        } catch {
+          setSubcategories([]);
+        }
+      } else {
+        setSubcategories([]);
+        setSubcategoryId('');
+      }
+    };
+    loadSubcategories();
+  }, [categoryId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,7 +112,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
         price: Number(price),
         original_price: Number(costPrice),
         stock: Number(stock),
-        category_id: categoryId ? Number(categoryId) : null,
+        category_id: (subcategoryId || categoryId) ? Number(subcategoryId || categoryId) : null,
         image: finalImageUrl,
         sizes: sizesData.length > 0 ? sizesData : undefined
       };
@@ -99,6 +122,18 @@ export default function AddProductModal({ onClose, onSuccess }) {
       // Show success message
       alert('Product created successfully!');
       onSuccess();
+      
+      // Reset form
+      setName('');
+      setDescription('');
+      setPrice('');
+      setCostPrice('');
+      setStock('');
+      setCategoryId('');
+      setSubcategoryId('');
+      setFile(null);
+      setPreviewUrl('');
+      setSizes([{ size: 'S', stock: '', price: '' }]);
     } catch (err) {
       console.error('Error creating product:', err);
       
@@ -251,6 +286,26 @@ export default function AddProductModal({ onClose, onSuccess }) {
                   <option value="">Select category</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Subcategory Field - Always visible but disabled by default */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory</label>
+                <select
+                  value={subcategoryId}
+                  onChange={(e) => setSubcategoryId(e.target.value)}
+                  disabled={subcategories.length === 0}
+                  className={`w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    subcategories.length === 0 ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
+                  }`}
+                >
+                  <option value="">
+                    {subcategories.length === 0 ? 'No subcategories available' : 'Select subcategory'}
+                  </option>
+                  {subcategories.map((sub) => (
+                    <option key={sub.id} value={sub.id}>{sub.name}</option>
                   ))}
                 </select>
               </div>

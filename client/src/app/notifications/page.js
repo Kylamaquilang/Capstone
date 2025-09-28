@@ -344,29 +344,19 @@ export default function NotificationsPage() {
                       disabled={currentPage === 1}
                       className="px-3 py-1 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      Previous
+                      &lt;
                     </button>
-                    <div className="flex items-center space-x-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
-                            currentPage === page
-                              ? 'bg-blue-500 text-white'
-                              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                    </div>
+                    
+                    <span className="px-3 py-1 text-sm font-medium rounded bg-blue-500 text-white">
+                      {currentPage}
+                    </span>
+                    
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                       disabled={currentPage === totalPages}
                       className="px-3 py-1 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      Next
+                      &gt;
                     </button>
                   </div>
                 </div>

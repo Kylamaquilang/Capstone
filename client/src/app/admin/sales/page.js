@@ -3,6 +3,7 @@ import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
+import { getImageUrl } from '@/utils/imageUtils';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -217,7 +218,7 @@ export default function AdminSalesPage() {
                       if (!productSales[productKey]) {
                         productSales[productKey] = {
                           product_name: item.product_name,
-                          product_image: item.image || '/images/polo.png',
+                          product_image: getImageUrl(item.image),
                           total_sold: 0,
                           total_revenue: 0,
                           category_name: 'General'
@@ -1043,7 +1044,7 @@ export default function AdminSalesPage() {
                       <div key={index} className="border border-gray-200 rounded-md p-3">
                         <div className="flex items-center mb-2">
                           <img 
-                            src={product.product_image || '/images/polo.png'} 
+                            src={getImageUrl(product.product_image)} 
                             alt={product.product_name}
                             className="w-10 h-10 rounded object-cover mr-2"
                           />

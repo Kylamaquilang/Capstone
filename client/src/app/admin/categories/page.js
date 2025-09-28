@@ -1,102 +1,50 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
 import API from '@/lib/axios';
 import ActionMenu from '@/components/common/ActionMenu';
-import { PencilSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { useSocket } from '@/context/SocketContext';
+import { PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import AddCategoryModal from '@/components/admin/AddCategoryModal';
+import Swal from 'sweetalert2';
+import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function AdminCategoriesPage() {
-  const { socket, isConnected, joinAdminRoom } = useSocket();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     loadCategories();
+  }, [loadCategories]);
 
-    // Set up Socket.io listeners for real-time updates
-    if (socket && isConnected) {
-      // Join admin room for real-time updates
-      joinAdminRoom();
-
-      // Listen for category updates
-      const handleCategoryUpdate = (categoryData) => {
-        console.log('📁 Real-time category update received:', categoryData);
-        setCategories(prev => prev.map(category => 
-          category.id === categoryData.categoryId 
-            ? { ...category, name: categoryData.name }
-            : category
-        ));
-      };
-
-      // Listen for new categories
-      const handleNewCategory = (categoryData) => {
-        console.log('📁 Real-time new category received:', categoryData);
-        setCategories(prev => [categoryData, ...prev]);
-      };
-
-      // Listen for category deletions
-      const handleCategoryDelete = (categoryData) => {
-        console.log('🗑️ Real-time category deletion received:', categoryData);
-        setCategories(prev => prev.filter(category => category.id !== categoryData.categoryId));
-      };
-
-      socket.on('category-updated', handleCategoryUpdate);
-      socket.on('new-category', handleNewCategory);
-      socket.on('category-deleted', handleCategoryDelete);
-
-      return () => {
-        socket.off('category-updated', handleCategoryUpdate);
-        socket.off('new-category', handleNewCategory);
-        socket.off('category-deleted', handleCategoryDelete);
-      };
-    }
-  }, [socket, isConnected, joinAdminRoom]);
-
-  // Pagination logic
-  const totalPages = Math.ceil(categories.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedCategories = categories.slice(startIndex, endIndex);
-
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     try {
       setLoading(true);
       const { data } = await API.get('/categories');
-      setCategories(data || []);
+      setCategories(data);
     } catch (err) {
       setError('Failed to load categories');
       console.error('Load categories error:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleAddCategory = async (e) => {
-    e.preventDefault();
-    if (!newCategoryName.trim()) {
-      alert('Please enter a category name');
-      return;
-    }
+  // Auto-refresh for categories
+  useAdminAutoRefresh(loadCategories, 'categories');
 
-    try {
-      await API.post('/categories', { name: newCategoryName.trim() });
-      setNewCategoryName('');
-      setShowAddForm(false);
-      loadCategories();
-    } catch (err) {
-      alert(err?.response?.data?.error || 'Failed to add category');
-    }
+  const handleAddCategorySuccess = () => {
+    loadCategories();
   };
 
   const handleEditCategory = async (e) => {
@@ -108,35 +56,138 @@ export default function AdminCategoriesPage() {
 
     try {
       await API.put(`/categories/${editingId}`, { name: editName.trim() });
+      setShowEditModal(false);
       setEditingId(null);
       setEditName('');
+      setNewSubcategoryName('');
+      setEditingCategory(null);
       loadCategories();
     } catch (err) {
       alert(err?.response?.data?.error || 'Failed to update category');
     }
   };
 
-  const handleDeleteCategory = async (id, name) => {
-    if (!confirm(`Are you sure you want to delete the category "${name}"? This action cannot be undone.`)) {
-      return;
-    }
 
-    try {
-      await API.delete(`/categories/${id}`);
-      loadCategories();
-    } catch (err) {
-      alert(err?.response?.data?.error || 'Failed to delete category');
+
+  const handleDeleteCategory = async (id, name) => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `This will delete "${name}". This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await API.delete(`/categories/${id}`);
+        
+        // Update the categories state immediately
+        setCategories(prevCategories => prevCategories.filter(cat => cat.id !== id));
+        
+        Swal.fire(
+          'Deleted!',
+          'The category has been deleted.',
+          'success'
+        );
+        
+        // Also reload from server to ensure consistency
+        loadCategories();
+      } catch (err) {
+        Swal.fire(
+          'Error!',
+          err?.response?.data?.error || 'Failed to delete category',
+          'error'
+        );
+      }
     }
   };
 
   const startEdit = (category) => {
     setEditingId(category.id);
     setEditName(category.name);
+    setEditingCategory(category);
+    setShowEditModal(true);
   };
 
   const cancelEdit = () => {
+    setShowEditModal(false);
     setEditingId(null);
     setEditName('');
+    setEditingCategory(null);
+  };
+
+  const handleSelectCategory = (categoryId) => {
+    setSelectedCategories(prev => {
+      if (prev.includes(categoryId)) {
+        return prev.filter(id => id !== categoryId);
+      } else {
+        return [...prev, categoryId];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedCategories([]);
+    } else {
+      setSelectedCategories(categories.map(cat => cat.id));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCategories.length === 0) {
+      Swal.fire('No Selection', 'Please select categories to delete.', 'warning');
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `This will delete ${selectedCategories.length} categor${selectedCategories.length > 1 ? 'ies' : 'y'}. This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete them!',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        // Delete all selected categories
+        await Promise.all(
+          selectedCategories.map(id => API.delete(`/categories/${id}`))
+        );
+
+        // Update state immediately
+        setCategories(prevCategories => 
+          prevCategories.filter(cat => !selectedCategories.includes(cat.id))
+        );
+
+        // Clear selection
+        setSelectedCategories([]);
+        setSelectAll(false);
+
+        Swal.fire(
+          'Deleted!',
+          `${selectedCategories.length} categor${selectedCategories.length > 1 ? 'ies' : 'y'} deleted successfully.`,
+          'success'
+        );
+
+        // Reload from server to ensure consistency
+        loadCategories();
+      } catch (err) {
+        Swal.fire(
+          'Error!',
+          err?.response?.data?.error || 'Failed to delete categories',
+          'error'
+        );
+      }
+    }
   };
 
   return (
@@ -153,37 +204,25 @@ export default function AdminCategoriesPage() {
                 <div>
                   <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Categories</h1>
                 </div>
-                <button
-                  onClick={() => setShowAddForm(!showAddForm)}
-                  className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium"
-                >
-                  {showAddForm ? 'Cancel' : 'Add Category'}
-                </button>
+                <div className="flex gap-2">
+                  {selectedCategories.length > 0 && (
+                    <button
+                      onClick={handleBulkDelete}
+                      className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+                    >
+                      Delete Selected ({selectedCategories.length})
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium"
+                  >
+                    Add Category
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Add Category Form */}
-            {showAddForm && (
-              <div className="p-4 border-b border-gray-200 bg-blue-10">
-                <h3 className="font-medium text-blue-800 mb-3">Add New Category</h3>
-                <form onSubmit={handleAddCategory} className="flex gap-3">
-                  <input
-                    type="text"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="Enter category name (e.g., POLO, LANYARD, PE, NSTP)"
-                    className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  <button
-                    type="submit"
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
-                  >
-                    Add
-                  </button>
-                </form>
-              </div>
-            )}
 
             {/* Categories Table */}
             {loading ? (
@@ -202,166 +241,65 @@ export default function AdminCategoriesPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-gray-100">
                     <tr>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">
+                        <input
+                          type="checkbox"
+                          checked={selectAll}
+                          onChange={handleSelectAll}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </th>
                       <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Category Name</th>
                       <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedCategories.map((category, index) => (
+                    {categories.map((category, index) => (
                       <tr key={category.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                         index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                       }`}>
                         <td className="px-4 py-3 border-r border-gray-100">
-                          {editingId === category.id ? (
-                            <form onSubmit={handleEditCategory} className="flex gap-2">
-                              <input
-                                type="text"
-                                value={editName}
-                                onChange={(e) => setEditName(e.target.value)}
-                                className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                required
-                              />
-                              <button
-                                type="submit"
-                                className="bg-green-600 text-white px-3 py-2 rounded-md text-xs hover:bg-green-700 transition"
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={cancelEdit}
-                                className="bg-gray-500 text-white px-3 py-2 rounded-md text-xs hover:bg-gray-600 transition"
-                              >
-                                Cancel
-                              </button>
-                            </form>
-                          ) : (
-                            <span className="text-xs font-medium text-gray-900">{category.name}</span>
-                          )}
+                          <input
+                            type="checkbox"
+                            checked={selectedCategories.includes(category.id)}
+                            onChange={() => handleSelectCategory(category.id)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-100">
+                          <span className="text-xs font-medium text-gray-900">
+                            {category.name}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
-                          {editingId !== category.id && (
-                            <ActionMenu
-                              actions={[
-                                {
-                                  label: 'Edit Category',
-                                  icon: PencilSquareIcon,
-                                  onClick: () => startEdit(category)
-                                },
-                                {
-                                  label: 'Delete Category',
-                                  icon: TrashIcon,
-                                  onClick: () => handleDeleteCategory(category.id, category.name),
-                                  danger: true
-                                }
-                              ]}
-                            />
-                          )}
+                          <ActionMenu
+                            actions={[
+                              {
+                                label: 'Edit Category',
+                                icon: PencilSquareIcon,
+                                onClick: () => startEdit(category)
+                              },
+                              {
+                                label: 'Delete Category',
+                                icon: TrashIcon,
+                                onClick: () => handleDeleteCategory(category.id, category.name),
+                                danger: true
+                              }
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              {paginatedCategories.length === 0 && (
+              {categories.length === 0 && (
                 <div className="p-8 text-center">
                   <div className="text-gray-300 text-3xl mb-4">🏷️</div>
                   <h3 className="text-sm font-medium text-gray-900 mb-2">No categories found</h3>
                   <p className="text-gray-500 text-xs">Add your first category to get started.</p>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {categories.length > 0 && (
-            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                {/* Records Info */}
-                <div className="text-xs text-gray-600">
-                  Showing {startIndex + 1} to {Math.min(endIndex, categories.length)} of {categories.length} categories
-                </div>
-                
-                {/* Pagination Controls */}
-                <div className="flex items-center gap-2">
-                  {/* Previous Button */}
-                  <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1 || totalPages <= 1}
-                    className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
-                  >
-                    Previous
-                  </button>
-                  
-                  {/* Page Numbers */}
-                  <div className="flex items-center gap-1">
-                    {/* First page */}
-                    {currentPage > 3 && (
-                      <>
-                        <button
-                          onClick={() => setCurrentPage(1)}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-                        >
-                          1
-                        </button>
-                        {currentPage > 4 && <span className="text-xs text-gray-400">...</span>}
-                      </>
-                    )}
-                    
-                    {/* Page numbers around current page */}
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-                      
-                      if (pageNum < 1 || pageNum > totalPages) return null;
-                      
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`px-2 py-1 text-xs border rounded-md transition-colors ${
-                            currentPage === pageNum
-                              ? 'bg-[#000C50] text-white border-[#000C50]'
-                              : 'border-gray-300 hover:bg-gray-100'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                    
-                    {/* Last page */}
-                    {currentPage < totalPages - 2 && (
-                      <>
-                        {currentPage < totalPages - 3 && <span className="text-xs text-gray-400">...</span>}
-                        <button
-                          onClick={() => setCurrentPage(totalPages)}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-                        >
-                          {totalPages}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  
-                  {/* Next Button */}
-                  <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages || totalPages <= 1}
-                    className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
             </div>
           )}
           </div>
@@ -378,6 +316,68 @@ export default function AdminCategoriesPage() {
           </div>
         </div>
       </div>
+
+      {/* Add Category Modal */}
+      {showAddModal && (
+        <AddCategoryModal 
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={handleAddCategorySuccess}
+        />
+      )}
+
+      {/* Edit Category Modal */}
+      {showEditModal && editingCategory && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Edit Category</h2>
+              <button
+                onClick={cancelEdit}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Forms */}
+            <div className="space-y-4">
+              {/* Edit Category Form */}
+              <form onSubmit={handleEditCategory} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-900 transition-colors"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

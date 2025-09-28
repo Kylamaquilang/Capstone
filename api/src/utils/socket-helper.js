@@ -171,3 +171,56 @@ export const emitNewOrder = (io, orderData) => {
   }
 };
 
+/**
+ * Emit data refresh signal to all users
+ * @param {Object} io - Socket.io instance
+ * @param {string} dataType - Type of data that was updated
+ * @param {Object} data - Updated data
+ */
+export const emitDataRefresh = (io, dataType, data) => {
+  if (io) {
+    // Emit to all connected users
+    io.emit('data-refresh', {
+      dataType,
+      data,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`🔄 Data refresh signal sent for ${dataType}`);
+  }
+};
+
+/**
+ * Emit admin data refresh signal
+ * @param {Object} io - Socket.io instance
+ * @param {string} dataType - Type of data that was updated
+ * @param {Object} data - Updated data
+ */
+export const emitAdminDataRefresh = (io, dataType, data) => {
+  if (io) {
+    io.to('admin-room').emit('admin-data-refresh', {
+      dataType,
+      data,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`🔄 Admin data refresh signal sent for ${dataType}`);
+  }
+};
+
+/**
+ * Emit user-specific data refresh
+ * @param {Object} io - Socket.io instance
+ * @param {string} userId - User ID
+ * @param {string} dataType - Type of data that was updated
+ * @param {Object} data - Updated data
+ */
+export const emitUserDataRefresh = (io, userId, dataType, data) => {
+  if (io) {
+    io.to(`user-${userId}`).emit('user-data-refresh', {
+      dataType,
+      data,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`🔄 User data refresh signal sent to user ${userId} for ${dataType}`);
+  }
+};
+

@@ -94,7 +94,7 @@ export default function OrderDetailPage() {
           <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
             <Sidebar />
           </div>
-          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
+          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="text-center">Loading order details...</div>
             </div>
@@ -112,7 +112,7 @@ export default function OrderDetailPage() {
           <div className="w-64" style={{ height: 'calc(100vh - 64px)' }}>
             <Sidebar />
           </div>
-          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto lg:ml-0 ml-0">
+          <div className="flex-1 flex flex-col bg-gray-100 p-6 overflow-auto">
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="text-center text-red-600">{error || 'Order not found'}</div>
             </div>
@@ -193,13 +193,21 @@ export default function OrderDetailPage() {
                       {getStatusIcon(order.status)} {order.status.replace('_', ' ')}
                     </span>
                   </div>
+                  <div>
+                    <span className="font-medium">Created:</span> {formatDate(order.created_at)}
+                  </div>
+                  {order.updated_at && order.updated_at !== order.created_at && (
+                    <div>
+                      <span className="font-medium">Last Updated:</span> {formatDate(order.updated_at)}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Order Items */}
             <div className="mt-6">
-              <h3 className="text-xs font-semibold mb-3">Order Items</h3>
+              <h3 className="text-lg font-semibold mb-3">Order Items</h3>
               <div className="bg-white border rounded-lg overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-gray-100">
@@ -225,6 +233,7 @@ export default function OrderDetailPage() {
                             )}
                             <div>
                               <div className="font-medium">{item.product_name || item.name || 'Unknown Product'}</div>
+                              <div className="text-sm text-gray-500">ID: {item.product_id}</div>
                             </div>
                           </div>
                         </td>
@@ -263,6 +272,9 @@ export default function OrderDetailPage() {
                               <span className="text-gray-500">← {status.old_status.replace('_', ' ')}</span>
                             )}
                           </div>
+                          <div className="text-sm text-gray-600">
+                            {formatDate(status.created_at)}
+                          </div>
                         </div>
                         {status.notes && (
                           <div className="ml-4 text-sm text-gray-600 bg-white p-2 rounded">
@@ -294,7 +306,7 @@ export default function OrderDetailPage() {
               <select
                 value={statusUpdate.status}
                 onChange={(e) => setStatusUpdate({ ...statusUpdate, status: e.target.value })}
-                className="w-full rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="pending">Pending</option>
                 <option value="processing">Processing</option>

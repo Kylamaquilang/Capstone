@@ -8,19 +8,23 @@ import API from '@/lib/axios';
 import ActionMenu from '@/components/common/ActionMenu';
 import EditProductModal from '@/components/product/EditProductModal';
 import { useSocket } from '@/context/SocketContext';
+import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 
-export default function ProductTable({ category = '' }) {
+export default function ProductTable({ category = '', subcategory = '' }) {
   const { socket, isConnected, joinAdminRoom } = useSocket();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [selectedRows, setSelectedRows] = useState([]);
   const router = useRouter();
 
   const fetchProducts = useCallback(async () => {
@@ -86,6 +90,9 @@ export default function ProductTable({ category = '' }) {
     }
   }, [category]);
 
+  // Auto-refresh for products
+  useAdminAutoRefresh(fetchProducts, 'products');
+
   useEffect(() => {
     fetchProducts();
 
@@ -138,7 +145,7 @@ export default function ProductTable({ category = '' }) {
         socket.off('inventory-updated', handleInventoryUpdate);
       };
     }
-  }, [category, socket, isConnected, joinAdminRoom]);
+  }, [category, subcategory, socket, isConnected, joinAdminRoom]);
 
   // Filter and sort products
   const filteredAndSortedProducts = products
@@ -146,7 +153,8 @@ export default function ProductTable({ category = '' }) {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (product.category_name || product.category || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = !category || product.category_name === category || product.category === category;
-      return matchesSearch && matchesCategory;
+      const matchesSubcategory = !subcategory || product.category_name === subcategory || product.category === subcategory;
+      return matchesSearch && matchesCategory && matchesSubcategory;
     })
     .sort((a, b) => {
       let aValue = a[sortField];
@@ -167,11 +175,53 @@ export default function ProductTable({ category = '' }) {
       }
     });
 
+  // Calculate total rows for pagination (including size rows)
+  const getTotalRows = () => {
+    return filteredAndSortedProducts.reduce((total, product) => {
+      if (product.sizes && product.sizes.length > 0) {
+        return total + product.sizes.length;
+      } else {
+        return total + 1;
+      }
+    }, 0);
+  };
+
   // Pagination
-  const totalPages = Math.ceil(filteredAndSortedProducts.length / itemsPerPage);
+  const totalRows = getTotalRows();
+  const totalPages = Math.ceil(totalRows / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedProducts = filteredAndSortedProducts.slice(startIndex, endIndex);
+  
+  // Get paginated products with their rows
+  const getPaginatedProducts = () => {
+    const allRows = [];
+    filteredAndSortedProducts.forEach((product, productIndex) => {
+      if (product.sizes && product.sizes.length > 0) {
+        product.sizes.forEach((size, sizeIndex) => {
+          allRows.push({
+            ...product,
+            size,
+            rowKey: `${product.id}-${size.size}`,
+            isSizeRow: true,
+            productIndex,
+            sizeIndex
+          });
+        });
+      } else {
+        allRows.push({
+          ...product,
+          size: null,
+          rowKey: `${product.id}-no-size`,
+          isSizeRow: false,
+          productIndex,
+          sizeIndex: 0
+        });
+      }
+    });
+    return allRows.slice(startIndex, endIndex);
+  };
+  
+  const paginatedProducts = getPaginatedProducts();
 
   // Reset to first page when items per page changes
   useEffect(() => {
@@ -230,6 +280,100 @@ export default function ProductTable({ category = '' }) {
     });
   };
 
+  const handleSelectRow = (rowKey) => {
+    setSelectedRows(prev => {
+      if (prev.includes(rowKey)) {
+        return prev.filter(key => key !== rowKey);
+      } else {
+        return [...prev, rowKey];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedRows([]);
+    } else {
+      // Get all row keys from current page
+      const allRowKeys = [];
+      paginatedProducts.forEach((product, productIndex) => {
+        if (product.sizes && product.sizes.length > 0) {
+          product.sizes.forEach((size, sizeIndex) => {
+            allRowKeys.push(`${product.id}-${size.size}`);
+          });
+        } else {
+          allRowKeys.push(`${product.id}-no-size`);
+        }
+      });
+      setSelectedRows(allRowKeys);
+    }
+    setSelectAll(!selectAll);
+  };
+
+  // Get selected products count for display (count each row individually)
+  const getSelectedProductsCount = () => {
+    return selectedRows.length;
+  };
+
+  const handleBulkDelete = async () => {
+    const selectedCount = getSelectedProductsCount();
+    if (selectedCount === 0) {
+      Swal.fire('No Selection', 'Please select products to delete.', 'warning');
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `This will delete ${selectedCount} product row${selectedCount > 1 ? 's' : ''}. This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete them!',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        // Extract unique product IDs from selected rows
+        const uniqueProductIds = new Set();
+        selectedRows.forEach(rowKey => {
+          const productId = rowKey.split('-')[0];
+          uniqueProductIds.add(productId);
+        });
+
+        // Delete all selected products
+        await Promise.all(
+          Array.from(uniqueProductIds).map(id => API.delete(`/products/${id}`))
+        );
+
+        // Update state immediately
+        setProducts(prevProducts => 
+          prevProducts.filter(product => !uniqueProductIds.has(product.id.toString()))
+        );
+
+        // Clear selection
+        setSelectedRows([]);
+        setSelectAll(false);
+
+        Swal.fire(
+          'Deleted!',
+          `${selectedCount} product row${selectedCount > 1 ? 's' : ''} deleted successfully.`,
+          'success'
+        );
+
+        // Reload from server to ensure consistency
+        fetchProducts();
+      } catch (err) {
+        Swal.fire(
+          'Error!',
+          err?.response?.data?.error || 'Failed to delete products',
+          'error'
+        );
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
@@ -265,9 +409,19 @@ export default function ProductTable({ category = '' }) {
               />
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            {selectedRows.length > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+              >
+                Delete Selected ({getSelectedProductsCount()})
+              </button>
+            )}
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <FunnelIcon className="h-4 w-4" />
-            <span>Total: {filteredAndSortedProducts.length} Records</span>
+              <span>Total: {filteredAndSortedProducts.length} Products ({totalRows} Rows)</span>
+            </div>
           </div>
         </div>
       </div>
@@ -277,6 +431,14 @@ export default function ProductTable({ category = '' }) {
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-100">
             <tr>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">
+                <input
+                  type="checkbox"
+                  checked={selectAll}
+                  onChange={handleSelectAll}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+              </th>
               <th 
                 className="px-4 py-3 text-xs font-medium text-gray-900 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('name')}
@@ -338,60 +500,83 @@ export default function ProductTable({ category = '' }) {
             </tr>
           </thead>
           <tbody>
-            {paginatedProducts.map((product, productIndex) => {
-              // If product has sizes, create a row for each size
-              if (product.sizes && product.sizes.length > 0) {
-                return product.sizes.map((size, sizeIndex) => (
+            {paginatedProducts.map((row, rowIndex) => (
                   <tr 
-                    key={`${product.id}-${size.size}`} 
+                key={row.rowKey} 
                     className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                      (productIndex + sizeIndex) % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                  rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                     }`}
                   >
                     <td className="px-4 py-3 border-r border-gray-100">
-                      <div className="text-xs font-medium text-gray-900">{product.name}</div>
+                  <input
+                    type="checkbox"
+                    checked={selectedRows.includes(row.rowKey)}
+                    onChange={() => handleSelectRow(row.rowKey)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </td>
+                <td className="px-4 py-3 border-r border-gray-100">
+                  <div className="text-xs font-medium text-gray-900">{row.name}</div>
                     </td>
                     <td className="px-4 py-3 border-r border-gray-100">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
-                        {product.category_name || product.category || 'Uncategorized'}
+                    {row.category_name || row.category || 'Uncategorized'}
                       </span>
                     </td>
                     <td className="px-4 py-3 border-r border-gray-100">
                       <div className="text-xs font-medium text-gray-900">
-                        ₱{Number(product.original_price || 0).toFixed(2)}
+                    ₱{Number(row.original_price || 0).toFixed(2)}
                       </div>
                     </td>
                     <td className="px-4 py-3 border-r border-gray-100">
                       <div className="text-xs font-medium text-gray-900">
-                        ₱{Number(product.price).toFixed(2)}
+                    ₱{Number(row.price).toFixed(2)}
                       </div>
                     </td>
                     <td className="px-4 py-3 border-r border-gray-100">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        Number(product.stock) === 0 
+                    Number(row.stock) === 0 
                           ? 'bg-red-50 text-red-700' 
-                          : Number(product.stock) <= 5 
+                      : Number(row.stock) <= 5 
                           ? 'bg-yellow-50 text-yellow-700' 
                           : 'bg-green-50 text-green-700'
                       }`}>
-                        {product.stock}
+                    {row.stock}
                       </span>
                     </td>
                     <td className="px-4 py-3 border-r border-gray-100">
+                  {row.isSizeRow ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                        {size.size}
+                      {row.size.size}
                       </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-500">
+                      No sizes
+                      </span>
+                  )}
                     </td>
                     <td className="px-4 py-3 border-r border-gray-100">
+                  {row.isSizeRow ? (
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        Number(size.stock) === 0 
+                      Number(row.size.stock) === 0 
                           ? 'bg-red-50 text-red-700' 
-                          : Number(size.stock) <= 5 
+                        : Number(row.size.stock) <= 5 
                           ? 'bg-yellow-50 text-yellow-700' 
                           : 'bg-green-50 text-green-700'
                       }`}>
-                        {size.stock}
+                      {row.size.stock}
                       </span>
+                  ) : (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      Number(row.stock) === 0 
+                          ? 'bg-red-50 text-red-700' 
+                        : Number(row.stock) <= 5 
+                          ? 'bg-yellow-50 text-yellow-700' 
+                          : 'bg-green-50 text-green-700'
+                      }`}>
+                      {row.stock || 0}
+                      </span>
+                  )}
                     </td>
                     <td className="px-4 py-3">
                       <ActionMenu
@@ -399,94 +584,19 @@ export default function ProductTable({ category = '' }) {
                           {
                             label: 'Edit',
                             icon: PencilSquareIcon,
-                            onClick: () => handleEdit(product.id)
+                        onClick: () => handleEdit(row.id)
                           },
                           {
                             label: 'Delete',
                             icon: TrashIcon,
-                            onClick: () => handleDelete(product.id, product.name),
+                        onClick: () => handleDelete(row.id, row.name),
                             danger: true
                           }
                         ]}
                       />
                     </td>
                   </tr>
-                ));
-              } else {
-                // If product has no sizes, show base product info
-                return (
-                  <tr 
-                    key={product.id} 
-                    className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                      productIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    }`}
-                  >
-                    <td className="px-4 py-3 border-r border-gray-100">
-                      <div className="text-xs font-medium text-gray-900">{product.name}</div>
-                    </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
-                        {product.category_name || product.category || 'Uncategorized'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
-                      <div className="text-xs font-medium text-gray-900">
-                        ₱{Number(product.original_price || 0).toFixed(2)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
-                      <div className="text-xs font-medium text-gray-900">
-                        ₱{Number(product.price).toFixed(2)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        Number(product.stock) === 0 
-                          ? 'bg-red-50 text-red-700' 
-                          : Number(product.stock) <= 5 
-                          ? 'bg-yellow-50 text-yellow-700' 
-                          : 'bg-green-50 text-green-700'
-                      }`}>
-                        {product.stock}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-500">
-                        No sizes
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        Number(product.stock) === 0 
-                          ? 'bg-red-50 text-red-700' 
-                          : Number(product.stock) <= 5 
-                          ? 'bg-yellow-50 text-yellow-700' 
-                          : 'bg-green-50 text-green-700'
-                      }`}>
-                        {product.stock || 0}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <ActionMenu
-                        actions={[
-                          {
-                            label: 'Edit',
-                            icon: PencilSquareIcon,
-                            onClick: () => handleEdit(product.id)
-                          },
-                          {
-                            label: 'Delete',
-                            icon: TrashIcon,
-                            onClick: () => handleDelete(product.id, product.name),
-                            danger: true
-                          }
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                );
-              }
-            })}
+            ))}
           </tbody>
         </table>
       </div>
@@ -497,80 +607,23 @@ export default function ProductTable({ category = '' }) {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             {/* Records Info */}
             <div className="text-xs text-gray-600">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredAndSortedProducts.length)} of {filteredAndSortedProducts.length} products
+              Showing {startIndex + 1} to {Math.min(endIndex, totalRows)} of {totalRows} rows
             </div>
             
             {/* Pagination Controls */}
             <div className="flex items-center gap-2">
-              {/* Previous Button */}
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1 || totalPages <= 1}
                 className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
               >
-                Previous
+                &lt;
               </button>
               
-              {/* Page Numbers */}
-              <div className="flex items-center gap-1">
-                {/* First page */}
-                {currentPage > 3 && (
-                  <>
-                    <button
-                      onClick={() => setCurrentPage(1)}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-                    >
-                      1
-                    </button>
-                    {currentPage > 4 && <span className="text-xs text-gray-400">...</span>}
-                  </>
-                )}
-                
-                {/* Page numbers around current page */}
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  
-                  if (pageNum < 1 || pageNum > totalPages) return null;
-                  
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`px-2 py-1 text-xs border rounded-md transition-colors ${
-                        currentPage === pageNum
-                          ? 'bg-[#000C50] text-white border-[#000C50]'
-                          : 'border-gray-300 hover:bg-gray-100'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-                
-                {/* Last page */}
-                {currentPage < totalPages - 2 && (
-                  <>
-                    {currentPage < totalPages - 3 && <span className="text-xs text-gray-400">...</span>}
-                    <button
-                      onClick={() => setCurrentPage(totalPages)}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-                    >
-                      {totalPages}
-                    </button>
-                  </>
-                )}
-              </div>
+              <span className="px-3 py-1 text-xs border border-gray-300 rounded-md bg-[#000C50] text-white">
+                {currentPage}
+              </span>
               
-              {/* Next Button */}
               <button
                 onClick={() => {
                   console.log('Next clicked, currentPage:', currentPage, 'totalPages:', totalPages, 'newPage:', Math.min(totalPages, currentPage + 1));
@@ -579,7 +632,7 @@ export default function ProductTable({ category = '' }) {
                 disabled={currentPage === totalPages || totalPages <= 1}
                 className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
               >
-                Next
+                &gt;
               </button>
             </div>
           </div>

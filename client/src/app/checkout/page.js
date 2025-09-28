@@ -76,23 +76,7 @@ const CheckoutPage = () => {
   }, [searchParams]);
 
   const handleSelect = (method) => {
-    if (method === 'gcash') {
-      Swal.fire({
-        title: 'Proceed with GCash?',
-        text: 'Please proceed to the counter for GCash payment',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#000C50',
-        cancelButtonColor: '#aaa',
-        confirmButtonText: 'Yes, proceed',
-      }).then((result) => {
-        if (result.isConfirmed) {
-          setSelectedMethod('gcash');
-        }
-      });
-    } else {
-      setSelectedMethod(method);
-    }
+    setSelectedMethod(method);
   };
 
   const handleCheckout = async () => {
@@ -187,6 +171,8 @@ const CheckoutPage = () => {
         // Show thank you modal for cash payment
         setOrderId(orderId);
         setShowThankYouModal(true);
+        // Disable background scrolling
+        document.body.style.overflow = 'hidden';
       }
 
     } catch (error) {
@@ -203,6 +189,8 @@ const CheckoutPage = () => {
 
   const handleCloseThankYouModal = () => {
     setShowThankYouModal(false);
+    // Re-enable background scrolling
+    document.body.style.overflow = 'unset';
     // Redirect to dashboard after modal closes
     router.push('/dashboard');
   };

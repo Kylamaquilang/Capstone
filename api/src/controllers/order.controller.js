@@ -1,6 +1,6 @@
 import { pool } from '../database/db.js'
 import { createOrderStatusNotification } from '../utils/notification-helper.js'
-import { emitOrderUpdate, emitNewOrderAlert, createAndEmitNotification, emitUserNotification } from '../utils/socket-helper.js'
+import { emitOrderUpdate, emitNewOrderAlert, createAndEmitNotification, emitUserNotification, emitAdminDataRefresh, emitUserDataRefresh } from '../utils/socket-helper.js'
 import { sendDeliveredOrderEmail } from '../utils/emailService.js'
 
 // Helper function to create delivered order notification for admin confirmation
@@ -144,6 +144,32 @@ export const getUserOrders = async (req, res) => {
       ORDER BY created_at DESC
     `, [user_id])
 
+    // Get order items for each order to include product names
+    for (let order of orders) {
+      const [items] = await pool.query(`
+        SELECT 
+          oi.quantity, 
+          oi.unit_price,
+          oi.total_price,
+          CASE 
+            WHEN oi.product_id IS NULL THEN 'Unavailable Product'
+            ELSE p.name 
+          END as product_name, 
+          CASE 
+            WHEN oi.product_id IS NULL THEN NULL
+            ELSE p.image 
+          END as image, 
+          oi.product_id,
+          ps.size as size_name
+        FROM order_items oi
+        LEFT JOIN products p ON oi.product_id = p.id
+        LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+        WHERE oi.order_id = ?
+      `, [order.id])
+      
+      order.items = items
+    }
+
     res.json(orders)
   } catch (err) {
     console.error('User order history error:', err)
@@ -183,12 +209,18 @@ export const getAllOrders = async (req, res) => {
           oi.unit_price,
           oi.unit_cost,
           oi.total_price,
-          p.name as product_name, 
-          p.image, 
-          p.id as product_id,
+          CASE 
+            WHEN oi.product_id IS NULL THEN 'Unavailable Product'
+            ELSE p.name 
+          END as product_name, 
+          CASE 
+            WHEN oi.product_id IS NULL THEN NULL
+            ELSE p.image 
+          END as image, 
+          oi.product_id,
           ps.size as size_name
         FROM order_items oi
-        JOIN products p ON oi.product_id = p.id
+        LEFT JOIN products p ON oi.product_id = p.id
         LEFT JOIN product_sizes ps ON oi.size_id = ps.id
         WHERE oi.order_id = ?
       `, [order.id])
@@ -209,9 +241,23 @@ export const getOrderItems = async (req, res) => {
 
   try {
     const [items] = await pool.query(`
-      SELECT oi.quantity, oi.size, oi.unit_price, oi.unit_cost, oi.total_price, p.name, p.image, p.id as product_id
+      SELECT 
+        oi.quantity, 
+        oi.size, 
+        oi.unit_price, 
+        oi.unit_cost, 
+        oi.total_price, 
+        CASE 
+          WHEN oi.product_id IS NULL THEN 'Unavailable Product'
+          ELSE p.name 
+        END as name, 
+        CASE 
+          WHEN oi.product_id IS NULL THEN NULL
+          ELSE p.image 
+        END as image, 
+        oi.product_id
       FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN products p ON oi.product_id = p.id
       WHERE oi.order_id = ?
     `, [id])
 
@@ -463,6 +509,10 @@ export const updateOrderStatus = async (req, res) => {
         previousStatus: oldStatus,
         timestamp: new Date().toISOString()
       })
+      
+      // Emit data refresh signals
+      emitAdminDataRefresh(io, 'orders', { action: 'updated', orderId: id, status });
+      emitUserDataRefresh(io, userId, 'orders', { action: 'updated', orderId: id, status });
     }
     
     // If order is marked as delivered, create special notification for admin confirmation

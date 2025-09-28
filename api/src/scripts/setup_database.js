@@ -74,12 +74,14 @@ async function setupDatabase() {
     await dbConnection.execute(`
       CREATE TABLE IF NOT EXISTS categories (
         id INT PRIMARY KEY AUTO_INCREMENT,
-        name VARCHAR(100) NOT NULL UNIQUE,
+        name VARCHAR(100) NOT NULL,
         description TEXT,
-        image VARCHAR(255),
+        parent_id INT NULL,
         is_active BOOLEAN DEFAULT TRUE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_category_parent (name, parent_id)
       )
     `);
     console.log('✅ Categories table created');

@@ -6,12 +6,27 @@ import Navbar from '@/components/common/admin-navbar';
 import AddProductModal from './add-product-modal';
 import API from '@/lib/axios';
 import { useSocket } from '@/context/SocketContext';
+import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function AdminProductPage() {
   const { socket, isConnected, joinAdminRoom } = useSocket();
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+
+  const refreshCategories = useCallback(async () => {
+    try {
+      const { data } = await API.get('/categories');
+      setCategories(data);
+    } catch (err) {
+      console.error('Failed to refresh categories:', err);
+    }
+  }, []);
+
+  // Auto-refresh for categories
+  useAdminAutoRefresh(refreshCategories, 'categories');
 
   const handleAddProductSuccess = useCallback(() => {
     setShowAddProductModal(false);
@@ -30,7 +45,9 @@ export default function AdminProductPage() {
       try {
         const { data } = await API.get('/categories');
         if (isMounted) {
-          setCategories(Array.isArray(data) ? data : []);
+          // Separate main categories and subcategories
+          const mainCategories = data.filter(cat => !cat.parent_id);
+          setCategories(Array.isArray(mainCategories) ? mainCategories : []);
         }
       } catch (e) {
         console.error('Fetch categories error:', e);
@@ -40,6 +57,30 @@ export default function AdminProductPage() {
       }
     };
     fetchCategories();
+
+    // Load subcategories when main category is selected
+    const loadSubcategories = async () => {
+      if (selectedCategory) {
+        try {
+          const { data } = await API.get('/categories');
+          const categorySubcategories = data.filter(cat => cat.parent_id === Number(selectedCategory));
+          if (isMounted) {
+            setSubcategories(categorySubcategories);
+          }
+        } catch (e) {
+          console.error('Fetch subcategories error:', e);
+          if (isMounted) {
+            setSubcategories([]);
+          }
+        }
+      } else {
+        if (isMounted) {
+          setSubcategories([]);
+          setSelectedSubcategory('');
+        }
+      }
+    };
+    loadSubcategories();
 
     // Set up Socket.io listeners for real-time updates
     if (socket && isConnected) {
@@ -81,7 +122,7 @@ export default function AdminProductPage() {
     return () => {
       isMounted = false;
     };
-  }, [socket, isConnected, joinAdminRoom]);
+  }, [socket, isConnected, joinAdminRoom, selectedCategory]);
 
   return (
     <div className="min-h-screen text-black admin-page">
@@ -101,7 +142,10 @@ export default function AdminProductPage() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => setSelectedCategory('')}
+                    onClick={() => {
+                      setSelectedCategory('');
+                      setSelectedSubcategory('');
+                    }}
                     className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${
                       selectedCategory === ''
                         ? 'bg-[#000C50] text-white'
@@ -113,7 +157,10 @@ export default function AdminProductPage() {
                   {categories.map((cat) => (
                     <button
                       key={cat.id}
-                      onClick={() => setSelectedCategory(cat.name)}
+                      onClick={() => {
+                        setSelectedCategory(cat.name);
+                        setSelectedSubcategory('');
+                      }}
                       className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${
                         selectedCategory === cat.name 
                           ? 'bg-[#000C50] text-white' 
@@ -124,6 +171,25 @@ export default function AdminProductPage() {
                     </button>
                   ))}
                 </div>
+                
+                {/* Subcategory Filter */}
+                {subcategories.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
+                    {subcategories.map((sub) => (
+                      <button
+                        key={sub.id}
+                        onClick={() => setSelectedSubcategory(sub.name)}
+                        className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${
+                          selectedSubcategory === sub.name 
+                            ? 'bg-blue-600 text-white' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                        }`}
+                      >
+                        {String(sub.name).toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Add Product Button */}
                 <button 
@@ -136,7 +202,7 @@ export default function AdminProductPage() {
             </div>
 
             {/* Product Table */}
-            <ProductTable category={selectedCategory} />
+            <ProductTable category={selectedCategory} subcategory={selectedSubcategory} />
           </div>
         </div>
       </div>

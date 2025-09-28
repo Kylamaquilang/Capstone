@@ -366,81 +366,24 @@ export default function AdminNotificationPage() {
                       
                       {/* Pagination Controls */}
                       <div className="flex items-center gap-2">
-                        {/* Previous Button */}
                         <button
                           onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                           disabled={currentPage === 1 || totalPages <= 1}
                           className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
                         >
-                          Previous
+                          &lt;
                         </button>
                         
-                        {/* Page Numbers */}
-                        <div className="flex items-center gap-1">
-                          {/* First page */}
-                          {currentPage > 3 && (
-                            <>
-                              <button
-                                onClick={() => setCurrentPage(1)}
-                                className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-                              >
-                                1
-                              </button>
-                              {currentPage > 4 && <span className="text-xs text-gray-400">...</span>}
-                            </>
-                          )}
-                          
-                          {/* Page numbers around current page */}
-                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                            let pageNum;
-                            if (totalPages <= 5) {
-                              pageNum = i + 1;
-                            } else if (currentPage <= 3) {
-                              pageNum = i + 1;
-                            } else if (currentPage >= totalPages - 2) {
-                              pageNum = totalPages - 4 + i;
-                            } else {
-                              pageNum = currentPage - 2 + i;
-                            }
-                            
-                            if (pageNum < 1 || pageNum > totalPages) return null;
-                            
-                            return (
-                              <button
-                                key={pageNum}
-                                onClick={() => setCurrentPage(pageNum)}
-                                className={`px-2 py-1 text-xs border rounded-md transition-colors ${
-                                  currentPage === pageNum
-                                    ? 'bg-[#000C50] text-white border-[#000C50]'
-                                    : 'border-gray-300 hover:bg-gray-100'
-                                }`}
-                              >
-                                {pageNum}
-                              </button>
-                            );
-                          })}
-                          
-                          {/* Last page */}
-                          {currentPage < totalPages - 2 && (
-                            <>
-                              {currentPage < totalPages - 3 && <span className="text-xs text-gray-400">...</span>}
-                              <button
-                                onClick={() => setCurrentPage(totalPages)}
-                                className="px-2 py-1 text-xs border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-                              >
-                                {totalPages}
-                              </button>
-                            </>
-                          )}
-                        </div>
+                        <span className="px-3 py-1 text-xs border border-gray-300 rounded-md bg-[#000C50] text-white">
+                          {currentPage}
+                        </span>
                         
-                        {/* Next Button */}
                         <button
                           onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                           disabled={currentPage === totalPages || totalPages <= 1}
                           className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
                         >
-                          Next
+                          &gt;
                         </button>
                       </div>
                     </div>

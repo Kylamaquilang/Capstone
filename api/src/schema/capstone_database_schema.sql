@@ -57,14 +57,20 @@ CREATE TABLE users (
 -- =====================================================
 CREATE TABLE categories (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
     description TEXT,
-    image VARCHAR(255),
+    parent_id INT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
-    CONSTRAINT chk_category_name CHECK (LENGTH(name) >= 2)
+    -- Foreign key for subcategories
+    FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE,
+    
+    -- Constraints
+    CONSTRAINT chk_category_name CHECK (LENGTH(name) >= 2),
+    -- Allow same name for subcategories under different parents
+    UNIQUE KEY unique_category_parent (name, parent_id)
 );
 
 -- =====================================================
@@ -187,7 +193,7 @@ CREATE TABLE orders (
 CREATE TABLE order_items (
     id INT PRIMARY KEY AUTO_INCREMENT,
     order_id INT NOT NULL,
-    product_id INT NOT NULL,
+    product_id INT NULL,
     size_id INT NULL,
     product_name VARCHAR(200) NOT NULL,
     quantity INT NOT NULL,
@@ -200,7 +206,7 @@ CREATE TABLE order_items (
     
     -- Foreign keys
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
     FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL,
     
     -- Constraints

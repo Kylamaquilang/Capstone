@@ -5,6 +5,7 @@ import Sidebar from '@/components/common/side-bar';
 import API from '@/lib/axios';
 import ActionMenu from '@/components/common/ActionMenu';
 import { CubeIcon } from '@heroicons/react/24/outline';
+import { getImageUrl } from '@/utils/imageUtils';
 
 export default function AdminInventoryPage() {
   const [inventoryData, setInventoryData] = useState({
@@ -138,8 +139,8 @@ export default function AdminInventoryPage() {
           price: product.price
         });
         
-        // Try different possible category field names
-        const category = product.category_name || product.category || product.category_id || 'Uncategorized';
+        // Use category name directly
+        const category = product.category_name || product.category || 'Uncategorized';
         
         if (!categoryMap.has(category)) {
           categoryMap.set(category, {
@@ -247,7 +248,7 @@ export default function AdminInventoryPage() {
           price: 299.99,
           stock: 2,
           category_name: 'Shirts',
-          image: '/images/polo.png',
+          image: null,
           sizes: [
             { size: 'S', stock: 0 },
             { size: 'M', stock: 1 },
@@ -260,7 +261,7 @@ export default function AdminInventoryPage() {
           price: 199.99,
           stock: 8,
           category_name: 'Shirts',
-          image: '/images/polo.png',
+          image: null,
           sizes: [
             { size: 'S', stock: 3 },
             { size: 'M', stock: 3 },
@@ -273,7 +274,7 @@ export default function AdminInventoryPage() {
           price: 599.99,
           stock: 0,
           category_name: 'Pants',
-          image: '/images/polo.png',
+          image: null,
           sizes: [
             { size: '30', stock: 0 },
             { size: '32', stock: 0 },
@@ -582,9 +583,12 @@ export default function AdminInventoryPage() {
                            <td className="px-4 py-3 border-r border-gray-100">
                              <div className="flex items-center">
                                <img 
-                                 src={product.image || '/images/polo.png'} 
+                                 src={getImageUrl(product.image)} 
                                  alt={product.name}
                                  className="w-8 h-8 rounded object-cover mr-2"
+                                 onError={(e) => {
+                                   e.target.src = '/images/polo.png';
+                                 }}
                                />
                                <div>
                                  <div className="text-xs font-medium text-gray-900">{product.name}</div>

@@ -8,6 +8,7 @@ import {
     validateSize,
     validateStock
 } from '../utils/validation.js';
+import { emitAdminDataRefresh, emitDataRefresh } from '../utils/socket-helper.js';
 
 // Low stock threshold
 const LOW_STOCK_THRESHOLD = 5;
@@ -178,6 +179,13 @@ export const createProduct = async (req, res) => {
 
       await connection.commit();
       connection.release();
+
+      // Emit refresh signal for new product
+      const { io } = req.app.locals;
+      if (io) {
+        emitAdminDataRefresh(io, 'products', { action: 'created', productId });
+        emitDataRefresh(io, 'products', { action: 'created', productId });
+      }
 
       res.status(201).json({ 
         message: 'Product created successfully', 
@@ -510,6 +518,13 @@ export const updateProduct = async (req, res) => {
       await connection.commit();
       connection.release();
 
+      // Emit refresh signal for updated product
+      const { io } = req.app.locals;
+      if (io) {
+        emitAdminDataRefresh(io, 'products', { action: 'updated', productId: id });
+        emitDataRefresh(io, 'products', { action: 'updated', productId: id });
+      }
+
       res.json({ message: 'Product updated successfully' });
     } catch (error) {
       await connection.rollback();
@@ -537,13 +552,16 @@ export const deleteProduct = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    // Check if product is in any active cart or order
+    // Check if product is in any active cart
     const [cartItems] = await pool.query('SELECT id FROM cart_items WHERE product_id = ?', [id]);
     if (cartItems.length > 0) {
       return res.status(400).json({ 
         error: 'Cannot delete product that is in active carts' 
       });
     }
+
+    // Note: We allow deletion even if product has order history
+    // Order history will be preserved as order_items contains product_name, price, etc.
 
     // Start transaction
     const connection = await pool.getConnection();
@@ -562,6 +580,13 @@ export const deleteProduct = async (req, res) => {
 
       await connection.commit();
       connection.release();
+
+      // Emit refresh signal for deleted product
+      const { io } = req.app.locals;
+      if (io) {
+        emitAdminDataRefresh(io, 'products', { action: 'deleted', productId: id });
+        emitDataRefresh(io, 'products', { action: 'deleted', productId: id });
+      }
 
       res.json({ message: 'Product deleted successfully' });
     } catch (error) {

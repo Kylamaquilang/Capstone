@@ -8,6 +8,7 @@ import API from '@/lib/axios';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { getImageUrl } from '@/utils/imageUtils';
 import { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
 
@@ -150,7 +151,7 @@ export default function ProductPage() {
         id: Date.now(), // Temporary ID for checkout
         product_id: product.id,
         product_name: product.name,
-        product_image: product.image || '/images/polo.png',
+        product_image: getImageUrl(product.image),
         price: parseFloat(product.price),
         quantity: quantity,
         size: selectedSize || null,
@@ -220,7 +221,7 @@ export default function ProductPage() {
     );
   }
 
-  let imageUrl = '/images/polo.png';
+  let imageUrl = getImageUrl(product.image);
   if (product.image && product.image.startsWith('/')) {
     imageUrl = product.image;
   } else if (product.image && product.image.startsWith('http')) {
@@ -249,7 +250,7 @@ export default function ProductPage() {
                           height={400}
                           className="object-contain w-full h-full p-4"
                           onError={(e) => {
-                            e.target.src = '/images/polo.png';
+                            e.target.src = getImageUrl(null);
                           }}
                         />
                       </div>
