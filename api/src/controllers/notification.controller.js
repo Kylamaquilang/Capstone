@@ -27,10 +27,18 @@ export const getUnreadCount = async (req, res) => {
 
 // ✅ Get all notifications for user
 export const getNotifications = async (req, res) => {
-  const user_id = req.user.id;
-  const { page = 1, limit = 10 } = req.query;
-
   try {
+    if (!req.user) {
+      console.error('❌ getNotifications - req.user is undefined');
+      return res.status(401).json({ 
+        success: false,
+        message: 'Unauthorized - user missing' 
+      });
+    }
+
+    const user_id = req.user.id;
+    const { page = 1, limit = 10 } = req.query;
+
     const offset = (page - 1) * limit;
     
     const [notifications] = await pool.query(`

@@ -9,6 +9,7 @@ import API from '@/lib/axios';
 import Image from 'next/image';
 import Swal from 'sweetalert2';
 import { getImageUrl } from '@/utils/imageUtils';
+import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function ProductDetailPage() {
   const { name } = useParams();
@@ -30,16 +31,20 @@ export default function ProductDetailPage() {
   const fetchProduct = async () => {
     try {
       setLoading(true);
-      // First try to find by name
+      // Get all products (which includes grouped sizes)
       const { data: products } = await API.get('/products');
       const foundProduct = products.find(p => 
         p.name.toLowerCase() === decodeURIComponent(name).toLowerCase()
       );
       
       if (foundProduct) {
-        // Get detailed product info including sizes
-        const { data: detailedProduct } = await API.get(`/products/${foundProduct.id}`);
-        setProduct(detailedProduct);
+        // Use the grouped product data which includes all sizes
+        setProduct(foundProduct);
+        
+        // Auto-select "NONE" size if it's the only option
+        if (foundProduct.sizes && foundProduct.sizes.length === 1 && foundProduct.sizes[0].size === 'NONE') {
+          setSelectedSize('NONE');
+        }
       } else {
         setError('Product not found');
       }
@@ -51,9 +56,15 @@ export default function ProductDetailPage() {
     }
   };
 
+  // Auto-refresh for product details
+  useUserAutoRefresh(fetchProduct, 'products');
+
   const handleAddToCart = async () => {
-    // Only require size selection if the product has sizes available
-    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+    // Only require size selection if the product has sizes available and not just "NONE"
+    const hasMultipleSizes = product.sizes && product.sizes.length > 0 && 
+      !(product.sizes.length === 1 && product.sizes[0].size === 'NONE');
+    
+    if (hasMultipleSizes && !selectedSize) {
       Swal.fire({
         icon: 'warning',
         title: 'Size Required',
@@ -102,18 +113,40 @@ export default function ProductDetailPage() {
       }
 
       // Prepare cart data
+      console.log('🔍 Product data:', product);
+      console.log('🔍 Selected size:', selectedSize);
+      console.log('🔍 Product sizes:', product.sizes);
+      
       const cartData = {
-        product_id: product.id,
-        quantity: quantity
+        quantity: quantity,
+        product_id: product.id // Always include product_id as fallback
       };
 
-      // Only include size_id if sizes are available and selected
-      if (product.sizes && product.sizes.length > 0 && selectedSize) {
-        const sizeInfo = product.sizes.find(s => s.size === selectedSize);
-        cartData.size_id = sizeInfo.id;
+      // Handle size selection
+      if (product.sizes && product.sizes.length > 0) {
+        if (product.sizes.length === 1 && product.sizes[0].size === 'NONE') {
+          // If only "NONE" size is available, use that size
+          const sizeInfo = product.sizes[0];
+          console.log('🔍 NONE size info:', sizeInfo);
+          cartData.size_id = sizeInfo.id;
+          cartData.product_id = sizeInfo.product_id || product.id;
+        } else if (selectedSize) {
+          // If user selected a size, use that size
+          const sizeInfo = product.sizes.find(s => s.size === selectedSize);
+          console.log('🔍 Size info for selected size:', sizeInfo);
+          if (sizeInfo) {
+            cartData.size_id = sizeInfo.id;
+            cartData.product_id = sizeInfo.product_id || product.id;
+          }
+        } else {
+          // Multiple sizes available but no size selected - this should not happen due to validation above
+          console.log('❌ Multiple sizes available but no size selected');
+          throw new Error('Please select a size');
+        }
       }
 
       // Add to cart
+      console.log('🛒 Sending cart data:', cartData);
       const response = await API.post('/cart', cartData);
 
       if (response.data.success) {
@@ -136,6 +169,7 @@ export default function ProductDetailPage() {
       }
     } catch (err) {
       console.log('Error adding to cart (server might be starting):', err.message);
+      console.log('🛒 Error response:', err?.response?.data);
       
       const errorMessage = err?.response?.data?.message || err?.response?.data?.error || 'Failed to add to cart. Please try again in a moment.';
       
@@ -153,8 +187,11 @@ export default function ProductDetailPage() {
 
   // Separate function for BUY NOW that doesn't show success message
   const handleBuyNow = async () => {
-    // Only require size selection if the product has sizes available
-    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+    // Only require size selection if the product has sizes available and not just "NONE"
+    const hasMultipleSizes = product.sizes && product.sizes.length > 0 && 
+      !(product.sizes.length === 1 && product.sizes[0].size === 'NONE');
+    
+    if (hasMultipleSizes && !selectedSize) {
       Swal.fire({
         icon: 'warning',
         title: 'Size Required',
@@ -202,32 +239,30 @@ export default function ProductDetailPage() {
         }
       }
 
-      // Prepare cart data
-      const cartData = {
-        product_id: product.id,
-        quantity: quantity
-      };
-
-      // Only include size_id if sizes are available and selected
-      if (product.sizes && product.sizes.length > 0 && selectedSize) {
-        const sizeInfo = product.sizes.find(s => s.size === selectedSize);
-        cartData.size_id = sizeInfo.id;
-      }
-
       // For BUY NOW, don't add to cart - go directly to checkout
       // Create product data for direct checkout
+      let sizeInfo = null;
+      if (product.sizes && product.sizes.length > 0) {
+        if (product.sizes.length === 1 && product.sizes[0].size === 'NONE') {
+          sizeInfo = product.sizes[0];
+        } else if (selectedSize) {
+          sizeInfo = product.sizes.find(s => s.size === selectedSize);
+        }
+      }
+      
       const productItem = {
         id: Date.now(), // Temporary ID for checkout
-        product_id: product.id,
+        product_id: sizeInfo ? sizeInfo.product_id : product.id,
         product_name: product.name,
         product_image: getImageUrl(product.image) || '/images/polo.png',
-        price: parseFloat(product.price),
+        price: sizeInfo ? parseFloat(sizeInfo.price) : parseFloat(product.price),
         quantity: quantity,
-        size: selectedSize || null,
-        size_id: product.sizes && product.sizes.length > 0 && selectedSize 
-          ? product.sizes.find(s => s.size === selectedSize)?.id 
-          : null
+        size: sizeInfo ? sizeInfo.size : null,
+        size_id: sizeInfo ? sizeInfo.id : null
       };
+      
+      console.log('🛒 Product item for checkout:', productItem);
+      console.log('🔍 Size info used:', sizeInfo);
       
       // Pass the product item to checkout page
       const queryString = new URLSearchParams({
@@ -351,7 +386,8 @@ export default function ProductDetailPage() {
                   )}
 
                   {/* Size Selection */}
-                  {product.sizes && product.sizes.length > 0 && (
+                  {product.sizes && product.sizes.length > 0 && 
+                   !(product.sizes.length === 1 && product.sizes[0].size === 'NONE') && (
                     <div className="space-y-3">
                       <label className="text-sm font-medium text-gray-700">Size</label>
                       <div className="flex gap-2 flex-wrap">
@@ -399,9 +435,11 @@ export default function ProductDetailPage() {
                   <div className="space-y-3 pt-6 border-t border-gray-200">
                     <button
                       onClick={handleAddToCart}
-                      disabled={addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)}
+                      disabled={addingToCart || (product.sizes && product.sizes.length > 0 && 
+                        !(product.sizes.length === 1 && product.sizes[0].size === 'NONE') && !selectedSize)}
                       className={`w-full py-3 text-sm font-medium rounded-lg transition-colors ${
-                        addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)
+                        addingToCart || (product.sizes && product.sizes.length > 0 && 
+                          !(product.sizes.length === 1 && product.sizes[0].size === 'NONE') && !selectedSize)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-[#000C50] text-white hover:bg-gray-800'
                       }`}
@@ -411,9 +449,11 @@ export default function ProductDetailPage() {
                     
                     <button
                       onClick={handleBuyNow}
-                      disabled={addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)}
+                      disabled={addingToCart || (product.sizes && product.sizes.length > 0 && 
+                        !(product.sizes.length === 1 && product.sizes[0].size === 'NONE') && !selectedSize)}
                       className={`w-full py-3 text-sm font-medium rounded-lg transition-colors ${
-                        addingToCart || (product.sizes && product.sizes.length > 0 && !selectedSize)
+                        addingToCart || (product.sizes && product.sizes.length > 0 && 
+                          !(product.sizes.length === 1 && product.sizes[0].size === 'NONE') && !selectedSize)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-white text-gray-900 border border-bg[#000C50] hover:bg-gray-100'
                       }`}

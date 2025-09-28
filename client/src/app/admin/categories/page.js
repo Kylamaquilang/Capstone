@@ -56,6 +56,18 @@ export default function AdminCategoriesPage() {
 
     try {
       await API.put(`/categories/${editingId}`, { name: editName.trim() });
+      
+      // Show SweetAlert success message
+      await Swal.fire({
+        title: 'Success!',
+        text: 'Category updated successfully',
+        icon: 'success',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#000C50',
+        timer: 2000,
+        timerProgressBar: true
+      });
+      
       setShowEditModal(false);
       setEditingId(null);
       setEditName('');

@@ -45,7 +45,7 @@ export const validateQuantity = (quantity) => {
 // Size validation
 export const validateSize = (size) => {
   if (!size) return true; // Size is optional
-  const validSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+  const validSizes = ['NONE', 'XS', 'S', 'M', 'L', 'XL', 'XXL'];
   return validSizes.includes(size.toUpperCase());
 };
 

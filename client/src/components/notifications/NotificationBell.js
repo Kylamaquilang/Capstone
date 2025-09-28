@@ -15,6 +15,15 @@ const NotificationBell = ({ userType = 'user', userId }) => {
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
+      // Check if token exists before making request
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('🔔 No token found, skipping notifications load');
+        setNotifications([]);
+        return;
+      }
+      
+      console.log('🔔 Loading notifications with token:', token.substring(0, 20) + '...');
       const response = await API.get('/notifications');
       const notificationsData = response.data.notifications || response.data || [];
       
@@ -28,7 +37,10 @@ const NotificationBell = ({ userType = 'user', userId }) => {
       setNotifications(Array.isArray(normalizedNotifications) ? normalizedNotifications : []);
       console.log('🔔 Loaded notifications for bell:', normalizedNotifications.length);
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      console.error('🔔 Error loading notifications:', error);
+      if (error.response?.status === 401) {
+        console.log('🔔 401 error - token may be invalid or expired');
+      }
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -37,7 +49,13 @@ const NotificationBell = ({ userType = 'user', userId }) => {
 
   // Load notifications and unread count when component mounts
   useEffect(() => {
-    loadNotifications();
+    // Only load notifications if user is logged in
+    const token = localStorage.getItem('token');
+    if (token) {
+      loadNotifications();
+    } else {
+      console.log('🔔 No token found, skipping notifications load on mount');
+    }
     
     // Join user room for real-time notifications
     if (userId && isConnected && !connectionFailed) {

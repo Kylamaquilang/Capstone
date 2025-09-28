@@ -6,6 +6,7 @@ import { sendPasswordResetEmail, generateVerificationCode, sendWelcomeEmail } fr
 import { transporter } from '../utils/emailService.js'; // Added for new email functions
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+console.log('🔍 JWT_SECRET in auth controller:', JWT_SECRET ? 'Set' : 'Not set');
 const SALT_ROUNDS = 12;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 const DEFAULT_STUDENT_PASSWORD = process.env.DEFAULT_STUDENT_PASSWORD || 'cpc123';
@@ -175,6 +176,13 @@ export const signin = async (req, res) => {
 
     // Verify password
     console.log('🔍 Verifying password...');
+    console.log('🔍 Password details:', { 
+      original: `"${password}"`, 
+      trimmed: `"${password.trim()}"`, 
+      length: password.length,
+      trimmedLength: password.trim().length,
+      hashStart: user.password.substring(0, 30)
+    });
     const isMatch = await bcrypt.compare(password.trim(), user.password);
     console.log('🔍 Password match:', isMatch);
     

@@ -43,27 +43,8 @@ export default function ProductTable({ category = '', subcategory = '' }) {
         const { data } = await API.get(url);
         let products = (data && data.products) ? data.products : [];
         
-        // Since the detailed endpoint doesn't return sizes, fetch individual product details
-        // to get the actual sizes data
-        const productsWithSizes = await Promise.all(
-          products.map(async (product) => {
-            try {
-              const { data: productDetail } = await API.get(`/products/${product.id}`);
-              return {
-                ...product,
-                sizes: productDetail.sizes || []
-              };
-            } catch (err) {
-              // If individual fetch fails, return product without sizes
-              return {
-                ...product,
-                sizes: []
-              };
-            }
-          })
-        );
-        
-        setProducts(productsWithSizes);
+        // The detailed endpoint now returns sizes directly
+        setProducts(products);
         setError('');
       } catch (errDetailed) {
         // Fallback to simple endpoint

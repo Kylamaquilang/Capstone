@@ -11,6 +11,7 @@ import { getProductImageUrl } from '@/utils/imageUtils';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useSocket } from '@/context/SocketContext';
+import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function UserDashboard() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -93,7 +94,8 @@ export default function UserDashboard() {
           src: imageUrl,
           price: `₱${product.price?.toFixed(2) || '0.00'}`,
           description: product.description,
-          stock: product.stock
+          stock: product.stock,
+          sizes: product.sizes || []
         };
         
         const categoryName = product.category || 'Other';
@@ -128,6 +130,9 @@ export default function UserDashboard() {
       setProductsLoading(false);
     }
   };
+
+  // Auto-refresh for products
+  useUserAutoRefresh(fetchProducts, 'products');
 
   return (
     <ProtectedRoute>
@@ -224,6 +229,14 @@ export default function UserDashboard() {
                             <p className="text-lg font-medium text-[#000C50]">
                               {item.price}
                             </p>
+                            {/* Size Indicator */}
+                            {item.sizes && item.sizes.length > 1 && (
+                              <div className="mt-2">
+                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                  {item.sizes.length} sizes available
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </Link>

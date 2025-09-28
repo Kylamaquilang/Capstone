@@ -244,16 +244,40 @@ export const addStudentsBulk = async (req, res) => {
           console.log(`📊 Processed ${results.length} students from special format`);
           console.log('🔍 Sample processed students:', results.slice(0, 3));
         } else {
-          // Normal processing
-          // Get headers from first row
-          const headers = jsonData[0].map(h => h ? h.toString().trim().toLowerCase() : '');
-          console.log('🔍 Excel Headers:', headers);
+        // Normal processing
+        // Find the actual header row (skip title rows)
+        let headerRowIndex = -1;
+        let headers = [];
+        
+        // Look for a row that contains typical student data headers
+        for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
+          const row = jsonData[i];
+          const rowText = row.map(cell => cell ? cell.toString().trim().toLowerCase() : '').join(' ');
+          
+          // Check if this row contains typical headers
+          if (rowText.includes('no') && (rowText.includes('id') || rowText.includes('student')) && 
+              (rowText.includes('name') || rowText.includes('first') || rowText.includes('last'))) {
+            headerRowIndex = i;
+            headers = row.map(h => h ? h.toString().trim().toLowerCase() : '');
+            console.log(`🔍 Found header row at index ${i}:`, headers);
+            break;
+          }
+        }
+        
+        if (headerRowIndex === -1) {
+          // Fallback: use first row as headers
+          headers = jsonData[0].map(h => h ? h.toString().trim().toLowerCase() : '');
+          console.log('🔍 Using first row as headers (fallback):', headers);
+        }
+        
+        console.log('🔍 Excel Headers:', headers);
         
         // Enhanced header mapping with more variations
         const headerMapping = {
           'student id': 'student_id',
           'studentid': 'student_id',
           'id': 'student_id',
+          'id number': 'student_id',
           'student number': 'student_id',
           'student_no': 'student_id',
           'student_no.': 'student_id',
@@ -271,6 +295,7 @@ export const addStudentsBulk = async (req, res) => {
           'middlename': 'middle_name',
           'mname': 'middle_name',
           'middle initial': 'middle_name',
+          'm.i.': 'middle_name',
           'email address': 'email',
           'emailaddress': 'email',
           'e-mail': 'email',
@@ -360,15 +385,16 @@ export const addStudentsBulk = async (req, res) => {
           return detected;
         };
         
+        // Process data rows (start after header row)
+        const startRowIndex = headerRowIndex !== -1 ? headerRowIndex + 1 : 1;
+        
         // Try auto-detection if we have a sample row
         let autoDetectedColumns = {};
-        if (jsonData.length > 1) {
-          autoDetectedColumns = autoDetectColumns(headers, jsonData[1]);
+        if (jsonData.length > startRowIndex) {
+          autoDetectedColumns = autoDetectColumns(headers, jsonData[startRowIndex]);
           console.log('🔍 Auto-detected columns:', autoDetectedColumns);
         }
-        
-        // Process data rows
-        for (let i = 1; i < jsonData.length; i++) {
+        for (let i = startRowIndex; i < jsonData.length; i++) {
           const row = jsonData[i];
           const cleanedData = {};
           
@@ -385,6 +411,86 @@ export const addStudentsBulk = async (req, res) => {
               cleanedData[field] = row[columnIndex].toString().trim();
             }
           });
+          
+          // Handle "Course and Section" column (separate from email)
+          if (cleanedData['course and section']) {
+            const courseSectionValue = cleanedData['course and section'];
+            console.log(`🔍 Processing course and section: "${courseSectionValue}"`);
+            
+            // Parse course and section (e.g., "BSIT 4B")
+            const courseMatch = courseSectionValue.match(/^([A-Z]{4,5})\s*(\d)([A-Z])$/i);
+            if (courseMatch) {
+              const degree = courseMatch[1].toUpperCase(); // BSIT
+              const yearNum = courseMatch[2]; // 4
+              const section = courseMatch[3].toUpperCase(); // B
+              
+              const yearMap = {
+                "1": "1st Year",
+                "2": "2nd Year", 
+                "3": "3rd Year",
+                "4": "4th Year"
+              };
+              
+              cleanedData.degree = degree;
+              cleanedData.year_level = yearMap[yearNum] || '1st Year';
+              cleanedData.section = section;
+              
+              console.log(`🔍 Parsed: degree="${degree}", year_level="${cleanedData.year_level}", section="${section}"`);
+            } else {
+              // Fallback: try to extract just the degree
+              const degreeMatch = courseSectionValue.match(/^([A-Z]{4,5})/i);
+              if (degreeMatch) {
+                cleanedData.degree = degreeMatch[1].toUpperCase();
+                cleanedData.year_level = '1st Year'; // Default
+                cleanedData.section = 'A'; // Default
+                console.log(`🔍 Fallback parsing: degree="${cleanedData.degree}"`);
+              }
+            }
+            
+            // Remove the combined field
+            delete cleanedData['course and section'];
+          }
+          
+          // Handle combined "Course and Email Address" column (if it exists)
+          if (cleanedData['course and email address']) {
+            const combinedValue = cleanedData['course and email address'];
+            console.log(`🔍 Processing combined column: "${combinedValue}"`);
+            
+            // Split by space to separate course and email
+            const parts = combinedValue.split(' ');
+            if (parts.length >= 2) {
+              // First part is course with year and section (e.g., "BSIT 4B")
+              const coursePart = parts[0];
+              // Last part is email
+              const emailPart = parts[parts.length - 1];
+              
+              // Extract degree, year, and section from course part
+              // Format: "BSIT 4B" or "BSIT4B" or "BSIT 4 B"
+              const courseMatch = coursePart.match(/^([A-Z]{4,5})\s*(\d+)\s*([A-Z])?/i);
+              if (courseMatch) {
+                cleanedData.degree = courseMatch[1].toUpperCase(); // BSIT
+                const yearNum = parseInt(courseMatch[2]); // 4
+                cleanedData.year_level = `${yearNum}${yearNum === 1 ? 'st' : yearNum === 2 ? 'nd' : yearNum === 3 ? 'rd' : 'th'} Year`;
+                cleanedData.section = courseMatch[3] || 'A'; // B or default to A
+              } else {
+                // Fallback: try to extract just the degree
+                const degreeMatch = coursePart.match(/^([A-Z]{4,5})/i);
+                if (degreeMatch) {
+                  cleanedData.degree = degreeMatch[1].toUpperCase();
+                  cleanedData.year_level = '1st Year'; // Default
+                  cleanedData.section = 'A'; // Default
+                }
+              }
+              
+              // Set email
+              if (emailPart.includes('@')) {
+                cleanedData.email = emailPart;
+              }
+              
+              // Remove the combined field
+              delete cleanedData['course and email address'];
+            }
+          }
           
           // Set default values if not provided
           if (!cleanedData.status) {
@@ -436,6 +542,8 @@ export const addStudentsBulk = async (req, res) => {
       try {
         console.log('📊 Processing CSV file...');
         
+        // Read CSV file to get headers first
+        const csvData = [];
         await new Promise((resolve, reject) => {
           fs.createReadStream(req.file.path)
             .pipe(csv({
@@ -443,23 +551,187 @@ export const addStudentsBulk = async (req, res) => {
               skipLinesWithError: true
             }))
             .on('data', (data) => {
-              // Clean and validate CSV data
-              const cleanedData = {};
-              Object.keys(data).forEach(key => {
-                const cleanKey = key.trim().toLowerCase();
-                const cleanValue = data[key] ? data[key].trim() : '';
-                cleanedData[cleanKey] = cleanValue;
-              });
-              results.push(cleanedData);
+              csvData.push(data);
             })
             .on('end', () => {
-              console.log(`📊 Found ${results.length} rows in CSV file`);
               resolve();
             })
             .on('error', (error) => {
               reject(error);
             });
         });
+        
+        if (csvData.length === 0) {
+          throw new Error('No data found in CSV file');
+        }
+        
+        // Get headers from first row
+        const headers = Object.keys(csvData[0]).map(h => h ? h.toString().trim().toLowerCase() : '');
+        console.log('🔍 CSV Headers:', headers);
+        console.log('🔍 First few rows of raw CSV data:');
+        csvData.slice(0, 3).forEach((row, index) => {
+          console.log(`Row ${index + 1}:`, row);
+        });
+        
+        // Enhanced header mapping for CSV
+        const csvHeaderMapping = {
+          'no': 'row_number',
+          'id number': 'student_id',
+          'student id': 'student_id',
+          'studentid': 'student_id',
+          'id': 'student_id',
+          'student number': 'student_id',
+          'last name': 'last_name',
+          'lastname': 'last_name',
+          'lname': 'last_name',
+          'surname': 'last_name',
+          'first name': 'first_name',
+          'firstname': 'first_name',
+          'fname': 'first_name',
+          'given name': 'first_name',
+          'm.i.': 'middle_name',
+          'middle initial': 'middle_name',
+          'middle name': 'middle_name',
+          'middlename': 'middle_name',
+          'mname': 'middle_name',
+          'course and email address': 'course_and_email',
+          'course': 'degree',
+          'program': 'degree',
+          'course/program': 'degree',
+          'email address': 'email',
+          'emailaddress': 'email',
+          'e-mail': 'email',
+          'email_addr': 'email'
+        };
+        
+        // Process each row
+        for (let i = 0; i < csvData.length; i++) {
+          const row = csvData[i];
+          const cleanedData = {};
+          
+          // Debug: Show raw row data for first few rows
+          if (i < 3) {
+            console.log(`🔍 Raw CSV row ${i + 1}:`, row);
+            console.log(`🔍 Raw row keys:`, Object.keys(row));
+          }
+          
+          // Map headers to cleaned data
+          Object.keys(row).forEach(key => {
+            const cleanKey = key.trim().toLowerCase();
+            const mappedKey = csvHeaderMapping[cleanKey] || cleanKey;
+            const cleanValue = row[key] ? row[key].trim() : '';
+            cleanedData[mappedKey] = cleanValue;
+            
+            // Debug: Show mapping for first few rows
+            if (i < 3) {
+              console.log(`  ${key} -> ${mappedKey}: "${cleanValue}"`);
+            }
+          });
+          
+          // Handle "Course and Section" column (separate from email)
+          if (cleanedData['course and section']) {
+            const courseSectionValue = cleanedData['course and section'];
+            console.log(`🔍 Processing course and section: "${courseSectionValue}"`);
+            
+            // Parse course and section (e.g., "BSIT 4B")
+            const courseMatch = courseSectionValue.match(/^([A-Z]{4,5})\s*(\d)([A-Z])$/i);
+            if (courseMatch) {
+              const degree = courseMatch[1].toUpperCase(); // BSIT
+              const yearNum = courseMatch[2]; // 4
+              const section = courseMatch[3].toUpperCase(); // B
+              
+              const yearMap = {
+                "1": "1st Year",
+                "2": "2nd Year", 
+                "3": "3rd Year",
+                "4": "4th Year"
+              };
+              
+              cleanedData.degree = degree;
+              cleanedData.year_level = yearMap[yearNum] || '1st Year';
+              cleanedData.section = section;
+              
+              console.log(`🔍 Parsed: degree="${degree}", year_level="${cleanedData.year_level}", section="${section}"`);
+            } else {
+              // Fallback: try to extract just the degree
+              const degreeMatch = courseSectionValue.match(/^([A-Z]{4,5})/i);
+              if (degreeMatch) {
+                cleanedData.degree = degreeMatch[1].toUpperCase();
+                cleanedData.year_level = '1st Year'; // Default
+                cleanedData.section = 'A'; // Default
+                console.log(`🔍 Fallback parsing: degree="${cleanedData.degree}"`);
+              }
+            }
+            
+            // Remove the combined field
+            delete cleanedData['course and section'];
+          }
+          
+          // Handle combined "Course and Email Address" column (if it exists)
+          if (cleanedData.course_and_email) {
+            const combinedValue = cleanedData.course_and_email;
+            console.log(`🔍 Processing combined column: "${combinedValue}"`);
+            
+            // Split by space to separate course and email
+            const parts = combinedValue.split(' ');
+            if (parts.length >= 2) {
+              // First part is course with year and section (e.g., "BSIT 4B")
+              const coursePart = parts[0];
+              // Last part is email
+              const emailPart = parts[parts.length - 1];
+              
+              // Extract degree, year, and section from course part
+              // Format: "BSIT 4B" or "BSIT4B" or "BSIT 4 B"
+              const courseMatch = coursePart.match(/^([A-Z]{4,5})\s*(\d+)\s*([A-Z])?/i);
+              if (courseMatch) {
+                cleanedData.degree = courseMatch[1].toUpperCase(); // BSIT
+                const yearNum = parseInt(courseMatch[2]); // 4
+                cleanedData.year_level = `${yearNum}${yearNum === 1 ? 'st' : yearNum === 2 ? 'nd' : yearNum === 3 ? 'rd' : 'th'} Year`;
+                cleanedData.section = courseMatch[3] || 'A'; // B or default to A
+              } else {
+                // Fallback: try to extract just the degree
+                const degreeMatch = coursePart.match(/^([A-Z]{4,5})/i);
+                if (degreeMatch) {
+                  cleanedData.degree = degreeMatch[1].toUpperCase();
+                  cleanedData.year_level = '1st Year'; // Default
+                  cleanedData.section = 'A'; // Default
+                }
+              }
+              
+              // Set email
+              if (emailPart.includes('@')) {
+                cleanedData.email = emailPart;
+              }
+              
+              // Remove the combined field
+              delete cleanedData.course_and_email;
+            }
+          }
+          
+          // Set default values if not provided
+          if (!cleanedData.status) {
+            cleanedData.status = 'regular'; // Default status
+          }
+          if (!cleanedData.year_level) {
+            cleanedData.year_level = '1st Year'; // Default year level
+          }
+          if (!cleanedData.section) {
+            cleanedData.section = 'A'; // Default section
+          }
+          
+          // Debug: Show first few processed rows
+          if (i < 3) {
+            console.log(`🔍 Processing CSV row ${i + 1}:`, {
+              originalData: row,
+              cleanedData: cleanedData,
+              availableFields: Object.keys(cleanedData)
+            });
+          }
+          
+          results.push(cleanedData);
+        }
+        
+        console.log(`📊 Found ${results.length} rows in CSV file`);
         
       } catch (csvError) {
         console.error('❌ Error reading CSV file:', csvError);

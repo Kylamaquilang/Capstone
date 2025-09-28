@@ -4,6 +4,7 @@ import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
 import { useSocket } from '@/context/SocketContext';
+import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 import ActionMenu from '@/components/common/ActionMenu';
 import { EyeIcon, PencilSquareIcon, UserMinusIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import AddStudentModal from '@/components/user/AddStudentModal';
@@ -53,6 +54,9 @@ export default function AdminUsersPage() {
       setLoading(false);
     }
   };
+
+  // Auto-refresh for users
+  useAdminAutoRefresh(fetchUsers, 'users');
 
   useEffect(() => {
     fetchUsers();
@@ -458,10 +462,10 @@ export default function AdminUsersPage() {
             ) : (
               <div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[1200px]">
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">
+                      <th className="w-12 px-2 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
@@ -475,21 +479,17 @@ export default function AdminUsersPage() {
                             className="rounded border-gray-300 text-[#000C50] focus:ring-[#000C50] focus:ring-2"
                             title={selectedUsers.size === users.length ? "Deselect all users" : "Select all users"}
                           />
-                          <span className="text-xs text-gray-500 hidden sm:inline">
-                            {selectedUsers.size === users.length ? 'All' : ''}
-                          </span>
                         </div>
                       </th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stud ID</th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Name</th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Email</th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Role</th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Degree</th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Year</th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Section</th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Status</th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Active</th>
-                      <th className="px-2 sm:px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
+                      <th className="w-24 px-3 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stud ID</th>
+                      <th className="w-48 px-3 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Name</th>
+                      <th className="w-64 px-3 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Email</th>
+                      <th className="w-20 px-3 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Role</th>
+                      <th className="w-24 px-3 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Degree</th>
+                      <th className="w-20 px-3 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Year</th>
+                      <th className="w-16 px-3 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Section</th>
+                      <th className="w-20 px-3 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Status</th>
+                      <th className="w-24 px-3 py-3 text-xs font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -497,7 +497,7 @@ export default function AdminUsersPage() {
                       <tr key={user.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                         index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                       } ${selectedUsers.has(user.id) ? 'bg-blue-50' : ''}`}>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
+                        <td className="w-12 px-2 py-3 border-r border-gray-100">
                           <input
                             type="checkbox"
                             checked={selectedUsers.has(user.id)}
@@ -505,42 +505,43 @@ export default function AdminUsersPage() {
                             className="rounded border-gray-300 text-[#000C50] focus:ring-[#000C50] focus:ring-2"
                           />
                         </td>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
+                        <td className="w-24 px-3 py-3 border-r border-gray-100">
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 font-mono">
                             {user.student_id || 'N/A'}
                           </span>
                         </td>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
-                          <div>
+                        <td className="w-48 px-3 py-3 border-r border-gray-100">
+                          <div className="truncate" title={user.name || 'N/A'}>
                             <div className="text-xs font-medium text-gray-900">{user.name || 'N/A'}</div>
                           </div>
                         </td>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
-                          <div className="text-xs text-gray-900">{user.email || 'N/A'}</div>
+                        <td className="w-64 px-3 py-3 border-r border-gray-100">
+                          <div className="truncate text-xs text-gray-900" title={user.email || 'N/A'}>
+                            {user.email || 'N/A'}
+                          </div>
                         </td>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">{getRoleBadge(user.role)}</td>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
+                        <td className="w-20 px-3 py-3 border-r border-gray-100">{getRoleBadge(user.role)}</td>
+                        <td className="w-24 px-3 py-3 border-r border-gray-100">
                           <div className="text-xs">
                             <div className="font-medium text-gray-900">{user.degree || 'N/A'}</div>
                           </div>
                         </td>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
+                        <td className="w-20 px-3 py-3 border-r border-gray-100">
                           <div className="text-xs">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">
                               {user.year_level || 'N/A'}
                             </span>
                           </div>
                         </td>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">
+                        <td className="w-16 px-3 py-3 border-r border-gray-100">
                           <div className="text-xs">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-600">
                               {user.section || 'N/A'}
                             </span>
                           </div>
                         </td>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">{getStatusBadge(user.status)}</td>
-                        <td className="px-2 sm:px-4 py-3 border-r border-gray-100">{getActiveStatusBadge(user.is_active)}</td>
-                        <td className="px-2 sm:px-4 py-3">
+                        <td className="w-20 px-3 py-3 border-r border-gray-100">{getActiveStatusBadge(user.is_active)}</td>
+                        <td className="w-24 px-3 py-3">
                           <ActionMenu
                             actions={[
                               {

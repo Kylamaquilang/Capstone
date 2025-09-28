@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import jwt from 'jsonwebtoken';
 
 // Import routes
 import authRoutes from './src/routes/auth.routes.js';
@@ -38,6 +39,7 @@ const io = new Server(server, {
       'http://127.0.0.1:3001'
     ],
     methods: ['GET', 'POST'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
     credentials: true
   },
   transports: ['websocket', 'polling'],
@@ -135,10 +137,48 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
+// Socket.io authentication middleware
+io.use((socket, next) => {
+  // Get token from auth object, headers, or query
+  const authToken = socket.handshake.auth?.token
+                || socket.handshake.headers?.authorization
+                || socket.handshake.query?.token;
+
+  console.log('🔍 Socket auth - Token from handshake:', authToken ? 'Present' : 'Missing');
+  console.log('🔍 Socket auth - Handshake auth:', socket.handshake.auth);
+  console.log('🔍 Socket auth - Handshake headers:', socket.handshake.headers);
+
+  if (!authToken) {
+    console.log('❌ Socket auth - No token provided');
+    return next(new Error('Authentication error: No token provided'));
+  }
+
+  try {
+    // Extract token from Bearer format if present
+    const token = authToken.startsWith('Bearer ') 
+      ? authToken.split(' ')[1] 
+      : authToken;
+
+    // Verify JWT token
+    const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+    console.log('🔍 JWT_SECRET in server socket:', JWT_SECRET ? 'Set' : 'Not set');
+    const payload = jwt.verify(token, JWT_SECRET);
+    
+    // Attach user info to socket
+    socket.user = payload;
+    console.log('✅ Socket auth - Token verified for user:', payload.id);
+    return next();
+  } catch (err) {
+    console.log('❌ Socket auth - Invalid token:', err.message);
+    return next(new Error('Authentication error: Invalid token'));
+  }
+});
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log(`🔌 User connected: ${socket.id}`);
   console.log(`🔌 Socket transport: ${socket.conn.transport.name}`);
+  console.log(`👤 Authenticated user: ${socket.user?.id || 'Unknown'}`);
 
   // Join user to their personal room for notifications
   socket.on('join-user-room', (userId) => {

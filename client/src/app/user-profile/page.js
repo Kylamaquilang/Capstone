@@ -57,34 +57,28 @@ export default function UserProfilePage() {
     contact_number: ''
   });
 
-  // Decode token to extract user info
+  // Use auth context for user info
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!authUser) return;
 
-    try {
-      const decoded = JSON.parse(atob(token.split('.')[1]));
-      const initials = decoded.name
-        ? decoded.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-        : '??';
+    const initials = authUser.name
+      ? authUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+      : '??';
 
-      setProfile({
-        name: decoded.name || '',
-        student_id: decoded.student_id || '',
-        email: decoded.email || '',
-        contact_number: decoded.contact_number || '',
-        initials,
-        profile_image: decoded.profile_image || null,
-        role: decoded.role || '',
-        degree: decoded.degree || '',
-        status: decoded.status || '',
-        is_active: decoded.is_active || true,
-        created_at: decoded.created_at || new Date().toISOString()
-      });
-    } catch (err) {
-      console.error('Invalid token:', err);
-    }
-  }, []);
+    setProfile({
+      name: authUser.name || '',
+      student_id: authUser.student_id || '',
+      email: authUser.email || '',
+      contact_number: authUser.contact_number || '',
+      initials,
+      profile_image: authUser.profile_image || null,
+      role: authUser.role || '',
+      degree: authUser.degree || '',
+      status: authUser.status || '',
+      is_active: authUser.is_active || true,
+      created_at: authUser.created_at || new Date().toISOString()
+    });
+  }, [authUser]);
 
   // Fetch user's profile and orders
   const fetchData = useCallback(async () => {
@@ -140,9 +134,43 @@ export default function UserProfilePage() {
     setError('');
     setSuccess('');
 
+    console.log('🔍 Submitting profile update:', formData);
+    console.log('🔍 Current user from auth context:', authUser);
+    console.log('🔍 Current user token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+
+    // Check if token exists before making request
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('❌ Profile update - No token found');
+      setError('Please log in to update your profile');
+      return;
+    }
+
     try {
-      await API.put('/users/profile', formData);
-      setSuccess('Profile updated successfully');
+      console.log('🔍 Profile update - Making request with token');
+      console.log('🔍 Profile update - Token value:', token.substring(0, 20) + '...');
+      console.log('🔍 Profile update - Form data:', formData);
+      
+      // Make request with explicit headers to ensure token is sent
+      const response = await API.put('/users/profile', formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      console.log('✅ Profile update response:', response.data);
+      
+      // Show SweetAlert success message
+      await Swal.fire({
+        title: 'Success!',
+        text: 'Profile updated successfully',
+        icon: 'success',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#000C50',
+        timer: 2000,
+        timerProgressBar: true
+      });
+      
       setEditing(false);
       
       // Refresh profile data
@@ -155,7 +183,18 @@ export default function UserProfilePage() {
           : '??'
       }));
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to update profile');
+      console.error('❌ Profile update error:', err);
+      console.error('❌ Error response:', err?.response?.data);
+      console.error('❌ Error status:', err?.response?.status);
+      if (err.response?.status === 403) {
+        console.log('🔍 Profile update - 403 error, token may be invalid');
+        setError('Authentication failed. Please log in again.');
+      } else if (err.response?.status === 401) {
+        console.log('🔍 Profile update - 401 error, unauthorized');
+        setError('Unauthorized. Please log in again.');
+      } else {
+        setError(err?.response?.data?.error || 'Failed to update profile');
+      }
     }
   };
 
@@ -187,7 +226,16 @@ export default function UserProfilePage() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      setSuccess('Profile image updated successfully');
+      // Show SweetAlert success message
+      await Swal.fire({
+        title: 'Success!',
+        text: 'Profile image updated successfully',
+        icon: 'success',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#000C50',
+        timer: 2000,
+        timerProgressBar: true
+      });
       
       // Refresh profile data
       const { data: profileData } = await API.get('/users/profile');

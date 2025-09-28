@@ -3,6 +3,7 @@ import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
+import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 import { getImageUrl } from '@/utils/imageUtils';
 import {
   Chart as ChartJS,
@@ -427,6 +428,9 @@ export default function AdminSalesPage() {
   useEffect(() => {
     fetchSalesData();
   }, [dateRange, groupBy]);
+
+  // Auto-refresh for sales
+  useAdminAutoRefresh(fetchSalesData, 'sales');
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-PH', {

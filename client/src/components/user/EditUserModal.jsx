@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
+import Swal from 'sweetalert2';
 
 export default function EditUserModal({ isOpen, onClose, onSuccess, user }) {
   const [form, setForm] = useState({ 
@@ -40,11 +41,20 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }) {
     try {
       setSubmitting(true);
       await API.put(`/users/${user.id}`, form);
-      setSuccess('User updated successfully');
+      
+      // Show SweetAlert success message
+      await Swal.fire({
+        title: 'Success!',
+        text: 'User updated successfully',
+        icon: 'success',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#000C50',
+        timer: 2000,
+        timerProgressBar: true
+      });
+      
       onSuccess?.();
-      setTimeout(() => {
-        onClose();
-      }, 1500);
+      onClose();
     } catch (err) {
       setError(err?.response?.data?.error || 'Failed to update user');
     } finally {

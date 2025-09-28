@@ -1,12 +1,17 @@
 import { pool } from '../database/db.js';
 import { validateId, validateQuantity } from '../utils/validation.js';
-import { emitCartUpdate } from '../utils/socket-helper.js';
+import { emitCartUpdate, emitDataRefresh, emitUserDataRefresh } from '../utils/socket-helper.js';
 
 // ✅ Add to Cart
 export const addToCart = async (req, res) => {
   const { product_id, quantity, size_id } = req.body;
   
+  console.log('🛒 Add to cart request body:', req.body);
+  console.log('🛒 Add to cart request user:', req.user);
+  console.log('🛒 Add to cart request headers:', req.headers);
+  
   if (!req.user || !req.user.id) {
+    console.log('❌ Authentication failed - no user found');
     return res.status(401).json({ 
       error: 'Unauthorized',
       message: 'Please log in to add items to cart'
@@ -16,6 +21,7 @@ export const addToCart = async (req, res) => {
   const user_id = req.user.id;
 
   if (!product_id || quantity == null) {
+    console.log('❌ Missing required fields:', { product_id, quantity });
     return res.status(400).json({ 
       error: 'Missing required fields',
       message: 'Product ID and quantity are required'
@@ -57,7 +63,10 @@ export const addToCart = async (req, res) => {
 
     const [stockRows] = await pool.query(stockQuery, stockParams);
     
+    console.log('🔍 Stock query result:', stockRows);
+    
     if (stockRows.length === 0) {
+      console.log('❌ No stock rows found');
       return res.status(404).json({ 
         error: 'Product not found',
         message: 'The selected product or size is not available'
@@ -67,7 +76,10 @@ export const addToCart = async (req, res) => {
     const productInfo = stockRows[0];
     const availableStock = productInfo.stock;
 
+    console.log('📦 Available stock:', availableStock, 'Requested quantity:', quantity);
+
     if (availableStock < quantity) {
+      console.log('❌ Insufficient stock');
       return res.status(400).json({
         error: 'Insufficient stock',
         message: `Only ${availableStock} left in stock`
@@ -84,9 +96,10 @@ export const addToCart = async (req, res) => {
     const newQty = currentQty + quantity;
 
     if (newQty > availableStock) {
+      console.log('❌ New quantity exceeds available stock');
       return res.status(400).json({
-        error: 'Insufficient stock',
-        message: `Only ${availableStock - currentQty} left in stock`
+        error: 'Out of Stock',
+        message: `Selected size is out of stock or insufficient quantity`
       });
     }
 
@@ -130,6 +143,12 @@ export const addToCart = async (req, res) => {
       })
     }
 
+    // Emit refresh signals
+    if (io) {
+      emitDataRefresh(io, 'cart', { action: 'added', productId: product_id });
+      emitUserDataRefresh(io, user_id, 'cart', { action: 'added', productId: product_id });
+    }
+
     res.status(201).json({ 
       success: true,
       message: 'Product added to cart successfully',
@@ -162,9 +181,16 @@ export const addToCart = async (req, res) => {
 
 // ✅ View Cart
 export const getCart = async (req, res) => {
-  const user_id = req.user.id;
-
   try {
+    if (!req.user) {
+      console.error('❌ getCart - req.user is undefined');
+      return res.status(401).json({ 
+        success: false,
+        message: 'Unauthorized - user missing' 
+      });
+    }
+
+    const user_id = req.user.id;
     const [items] = await pool.query(`
       SELECT 
         c.id, 
@@ -266,6 +292,13 @@ export const updateCart = async (req, res) => {
       [quantity, size_id || null, id]
     );
 
+    // Emit refresh signals
+    const io = req.app.get('io');
+    if (io) {
+      emitDataRefresh(io, 'cart', { action: 'updated', cartItemId: id });
+      emitUserDataRefresh(io, req.user.id, 'cart', { action: 'updated', cartItemId: id });
+    }
+
     res.json({ 
       success: true,
       message: 'Cart item updated successfully'
@@ -309,7 +342,9 @@ export const deleteCartItem = async (req, res) => {
         productId: cartItem[0].product_id,
         quantity: cartItem[0].quantity,
         sizeId: cartItem[0].size_id
-      })
+      });
+      emitDataRefresh(io, 'cart', { action: 'removed', cartItemId: id });
+      emitUserDataRefresh(io, user_id, 'cart', { action: 'removed', cartItemId: id });
     }
 
     res.json({ 
@@ -331,6 +366,13 @@ export const clearCart = async (req, res) => {
 
   try {
     await pool.query(`DELETE FROM cart_items WHERE user_id = ?`, [user_id]);
+    // Emit refresh signals
+    const io = req.app.get('io');
+    if (io) {
+      emitDataRefresh(io, 'cart', { action: 'cleared' });
+      emitUserDataRefresh(io, user_id, 'cart', { action: 'cleared' });
+    }
+
     res.json({ 
       success: true,
       message: 'Cart cleared successfully'

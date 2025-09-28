@@ -18,7 +18,8 @@ const getApiBaseUrl = () => {
  * @returns {string} - The full URL for the image
  */
 export const getImageUrl = (imagePath) => {
-  if (!imagePath) {
+  if (!imagePath || imagePath === 'null' || imagePath === 'undefined') {
+    console.log('No image path provided, using default');
     return '/images/polo.png'; // default fallback
   }
   
@@ -29,16 +30,22 @@ export const getImageUrl = (imagePath) => {
   
   // If it already starts with '/uploads/', return as is with API base URL
   if (imagePath.startsWith('/uploads/')) {
-    return `${getApiBaseUrl()}${imagePath}`;
+    const fullUrl = `${getApiBaseUrl()}${imagePath}`;
+    console.log('Generated uploads URL:', fullUrl);
+    return fullUrl;
   }
   
   // If it starts with '/', prepend the API base URL
   if (imagePath.startsWith('/')) {
-    return `${getApiBaseUrl()}${imagePath}`;
+    const fullUrl = `${getApiBaseUrl()}${imagePath}`;
+    console.log('Generated absolute URL:', fullUrl);
+    return fullUrl;
   }
   
   // Otherwise, assume it's a raw filename and prepend /uploads/
-  return `${getApiBaseUrl()}/uploads/${imagePath}`;
+  const fullUrl = `${getApiBaseUrl()}/uploads/${imagePath}`;
+  console.log('Generated filename URL:', fullUrl);
+  return fullUrl;
 };
 
 /**

@@ -1,11 +1,12 @@
 import { pool } from '../database/db.js'
 import { createOrderStatusNotification, createAdminOrderNotification } from '../utils/notification-helper.js'
-import { emitUserNotification, emitAdminNotification, emitInventoryUpdate, emitNewOrder } from '../utils/socket-helper.js'
+import { emitUserNotification, emitAdminNotification, emitInventoryUpdate, emitNewOrder, emitDataRefresh, emitAdminDataRefresh, emitUserDataRefresh } from '../utils/socket-helper.js'
 
 
 export const checkout = async (req, res) => {
   const user_id = req.user.id
   const { payment_method, pay_at_counter, cart_item_ids, products } = req.body
+  const io = req.app.get('io');
 
   console.log('🛒 Checkout request:', { user_id, payment_method, pay_at_counter, cart_item_ids, products });
 
@@ -24,17 +25,36 @@ export const checkout = async (req, res) => {
       // Process direct products (BUY NOW flow)
       cartItems = [];
       for (const product of products) {
+        console.log('🔍 Processing product for checkout:', product);
+        
+        // If product_id is missing but size_id is present, look up the product_id
+        let product_id = product.product_id;
+        if (!product_id && product.size_id) {
+          console.log('🔍 Missing product_id, looking up from size_id:', product.size_id);
+          const [sizeLookup] = await pool.query(`
+            SELECT product_id FROM product_sizes WHERE id = ? AND is_active = 1
+          `, [product.size_id]);
+          
+          if (sizeLookup.length > 0) {
+            product_id = sizeLookup[0].product_id;
+            console.log('🔍 Found product_id from size:', product_id);
+          }
+        }
+        
         const [productData] = await pool.query(`
           SELECT p.id as product_id, p.stock, p.price, ps.id as size_id, ps.stock as size_stock, ps.price as size_price
           FROM products p
           LEFT JOIN product_sizes ps ON p.id = ps.product_id AND ps.id = ?
           WHERE p.id = ?
-        `, [product.size_id || null, product.product_id]);
+        `, [product.size_id || null, product_id]);
+        
+        console.log('🔍 Product query result:', productData);
         
         if (productData.length === 0) {
+          console.log('❌ Product not found in checkout:', product);
           return res.status(404).json({ 
             error: 'Product not found',
-            message: `Product ID ${product.product_id} not found`
+            message: `Product ID ${product_id} not found`
           });
         }
         
@@ -272,7 +292,6 @@ export const checkout = async (req, res) => {
 
     // Emit inventory updates and new order to admin
     try {
-      const io = req.app.get('io');
       if (io) {
         // Emit inventory updates for each product
         for (const item of items) {
@@ -310,7 +329,6 @@ export const checkout = async (req, res) => {
       console.log('✅ User notification created');
       
       // Emit real-time notification to user
-      const io = req.app.get('io');
       if (io) {
         emitUserNotification(io, user_id, {
           title: userNotification.title,
@@ -334,7 +352,6 @@ export const checkout = async (req, res) => {
       console.log('✅ Admin notification created');
       
       // Emit real-time notification to admin
-      const io = req.app.get('io');
       if (io) {
         emitAdminNotification(io, {
           title: adminNotification.title,
@@ -353,6 +370,15 @@ export const checkout = async (req, res) => {
     } catch (notificationError) {
       console.error('❌ Error creating admin notification:', notificationError);
       // Don't fail the checkout if notification fails
+    }
+
+    // Emit refresh signals
+    if (io) {
+      emitDataRefresh(io, 'orders', { action: 'created', orderId });
+      emitAdminDataRefresh(io, 'orders', { action: 'created', orderId });
+      emitUserDataRefresh(io, user_id, 'orders', { action: 'created', orderId });
+      emitDataRefresh(io, 'cart', { action: 'cleared' });
+      emitUserDataRefresh(io, user_id, 'cart', { action: 'cleared' });
     }
 
     console.log('🎉 Checkout completed successfully, sending response...');

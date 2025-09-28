@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import API from '@/lib/axios';
+import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 import ActionMenu from '@/components/common/ActionMenu';
 import { CubeIcon } from '@heroicons/react/24/outline';
 import { getImageUrl } from '@/utils/imageUtils';
@@ -353,6 +354,9 @@ export default function AdminInventoryPage() {
   useEffect(() => {
     fetchInventoryData();
   }, []);
+
+  // Auto-refresh for inventory
+  useAdminAutoRefresh(fetchInventoryData, 'inventory');
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-PH', {

@@ -14,7 +14,7 @@ export const createCategory = async (req, res) => {
     const [result] = await pool.query(`INSERT INTO categories (name) VALUES (?)`, [name])
     
     // Emit refresh signal for new category
-    const { io } = req.app.locals;
+    const io = req.app.get('io');
     if (io) {
       emitAdminDataRefresh(io, 'categories', { action: 'created', categoryId: result.insertId });
       emitDataRefresh(io, 'categories', { action: 'created', categoryId: result.insertId });
@@ -55,7 +55,7 @@ export const updateCategory = async (req, res) => {
     await pool.query(`UPDATE categories SET name = ? WHERE id = ?`, [name, id])
     
     // Emit refresh signal for updated category
-    const { io } = req.app.locals;
+    const io = req.app.get('io');
     if (io) {
       emitAdminDataRefresh(io, 'categories', { action: 'updated', categoryId: id });
       emitDataRefresh(io, 'categories', { action: 'updated', categoryId: id });
@@ -83,7 +83,7 @@ export const deleteCategory = async (req, res) => {
     await pool.query(`UPDATE categories SET is_active = 0, deleted_at = NOW() WHERE id = ?`, [id])
     
     // Emit refresh signal for deleted category
-    const { io } = req.app.locals;
+    const io = req.app.get('io');
     if (io) {
       emitAdminDataRefresh(io, 'categories', { action: 'deleted', categoryId: id });
       emitDataRefresh(io, 'categories', { action: 'deleted', categoryId: id });

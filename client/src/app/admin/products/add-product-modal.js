@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
+import Swal from 'sweetalert2';
 
 export default function AddProductModal({ onClose, onSuccess }) {
   const [name, setName] = useState('');
@@ -14,43 +15,20 @@ export default function AddProductModal({ onClose, onSuccess }) {
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
   const [categories, setCategories] = useState([]);
-  const [subcategories, setSubcategories] = useState([]);
-  const [subcategoryId, setSubcategoryId] = useState('');
-  const [sizes, setSizes] = useState([{ size: 'S', stock: '', price: '' }]);
+  const [sizes, setSizes] = useState([{ size: 'NONE' }]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const loadCategories = async () => {
       try {
         const { data } = await API.get('/categories');
-        // Separate main categories and subcategories
-        const mainCategories = data.filter(cat => !cat.parent_id);
-        setCategories(mainCategories);
+        setCategories(data);
       } catch {
         setCategories([]);
       }
     };
     loadCategories();
   }, []);
-
-  // Load subcategories when main category is selected
-  useEffect(() => {
-    const loadSubcategories = async () => {
-      if (categoryId) {
-        try {
-          const { data } = await API.get('/categories');
-          const categorySubcategories = data.filter(cat => cat.parent_id === Number(categoryId));
-          setSubcategories(categorySubcategories);
-        } catch {
-          setSubcategories([]);
-        }
-      } else {
-        setSubcategories([]);
-        setSubcategoryId('');
-      }
-    };
-    loadSubcategories();
-  }, [categoryId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -99,12 +77,13 @@ export default function AddProductModal({ onClose, onSuccess }) {
 
       // Prepare sizes data
       const sizesData = sizes.filter(sizeItem => 
-        sizeItem.size && sizeItem.stock && Number(sizeItem.stock) >= 0
+        sizeItem.size && sizeItem.size.trim() !== ''
       ).map(sizeItem => ({
-        size: sizeItem.size,
-        stock: Number(sizeItem.stock),
-        price: sizeItem.price ? Number(sizeItem.price) : Number(price)
+        size: sizeItem.size
       }));
+
+      console.log('🔍 Form sizes:', sizes);
+      console.log('🔍 Processed sizes data:', sizesData);
 
       const productData = {
         name: name.trim(),
@@ -112,15 +91,26 @@ export default function AddProductModal({ onClose, onSuccess }) {
         price: Number(price),
         original_price: Number(costPrice),
         stock: Number(stock),
-        category_id: (subcategoryId || categoryId) ? Number(subcategoryId || categoryId) : null,
+        category_id: categoryId ? Number(categoryId) : null,
         image: finalImageUrl,
         sizes: sizesData.length > 0 ? sizesData : undefined
       };
 
+      console.log('🔍 Product data being sent:', productData);
+
       await API.post('/products', productData);
       
-      // Show success message
-      alert('Product created successfully!');
+      // Show SweetAlert success message
+      await Swal.fire({
+        title: 'Success!',
+        text: 'Product created successfully',
+        icon: 'success',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#000C50',
+        timer: 2000,
+        timerProgressBar: true
+      });
+      
       onSuccess();
       
       // Reset form
@@ -130,10 +120,9 @@ export default function AddProductModal({ onClose, onSuccess }) {
       setCostPrice('');
       setStock('');
       setCategoryId('');
-      setSubcategoryId('');
       setFile(null);
       setPreviewUrl('');
-      setSizes([{ size: 'S', stock: '', price: '' }]);
+      setSizes([{ size: 'NONE' }]);
     } catch (err) {
       console.error('Error creating product:', err);
       
@@ -160,7 +149,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
   };
 
   const addSize = () => {
-    setSizes([...sizes, { size: 'S', stock: '', price: '' }]);
+    setSizes([...sizes, { size: 'NONE' }]);
   };
 
   const removeSize = (index) => {
@@ -290,25 +279,6 @@ export default function AddProductModal({ onClose, onSuccess }) {
                 </select>
               </div>
 
-              {/* Subcategory Field - Always visible but disabled by default */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subcategory</label>
-                <select
-                  value={subcategoryId}
-                  onChange={(e) => setSubcategoryId(e.target.value)}
-                  disabled={subcategories.length === 0}
-                  className={`w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    subcategories.length === 0 ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''
-                  }`}
-                >
-                  <option value="">
-                    {subcategories.length === 0 ? 'No subcategories available' : 'Select subcategory'}
-                  </option>
-                  {subcategories.map((sub) => (
-                    <option key={sub.id} value={sub.id}>{sub.name}</option>
-                  ))}
-                </select>
-              </div>
 
               {/* Product Sizes */}
               <div>
@@ -330,27 +300,10 @@ export default function AddProductModal({ onClose, onSuccess }) {
                         onChange={(e) => updateSize(index, 'size', e.target.value)}
                         className="border border-gray-300 px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        {['XS','S','M','L','XL','XXL'].map((s) => (
+                        {['NONE','XS','S','M','L','XL','XXL'].map((s) => (
                           <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
-                      <input
-                        type="number"
-                        value={sizeItem.stock}
-                        onChange={(e) => updateSize(index, 'stock', e.target.value)}
-                        placeholder="Stock"
-                        min="0"
-                        className="border border-gray-300 px-2 py-1 rounded-md text-xs w-20 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <input
-                        type="number"
-                        value={sizeItem.price}
-                        onChange={(e) => updateSize(index, 'price', e.target.value)}
-                        placeholder="Price (optional)"
-                        min="0"
-                        step="0.01"
-                        className="border border-gray-300 px-2 py-1 rounded-md text-xs w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
                       {sizes.length > 1 && (
                         <button
                           type="button"
@@ -363,9 +316,6 @@ export default function AddProductModal({ onClose, onSuccess }) {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Leave price empty to use base price. Stock is required for each size.
-                </p>
               </div>
             </div>
 

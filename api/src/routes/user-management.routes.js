@@ -41,15 +41,15 @@ const upload = multer({
   }
 });
 
-// Admin routes (admin only)
+// User routes (authenticated users) - MUST come before parameterized routes
+router.get('/profile', verifyToken, getUserProfile);
+router.put('/profile', verifyToken, updateUserProfile);
+router.put('/profile/image', verifyToken, upload.single('image'), updateUserProfileImage);
+
+// Admin routes (admin only) - parameterized routes come after specific routes
 router.get('/all', verifyToken, isAdmin, getAllUsersWithStatus);
 router.put('/:id', verifyToken, isAdmin, updateUser);
 router.patch('/:userId/status', verifyToken, isAdmin, toggleUserStatus);
 router.delete('/:userId', verifyToken, isAdmin, deleteUser);
-
-// User routes (authenticated users)
-router.get('/profile', verifyToken, getUserProfile);
-router.put('/profile', verifyToken, updateUserProfile);
-router.put('/profile/image', verifyToken, upload.single('image'), updateUserProfileImage);
 
 export default router;

@@ -35,22 +35,93 @@ export const getAllProductsSimple = async (req, res) => {
         c.name as category
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      ORDER BY p.created_at DESC
+      WHERE p.is_active = 1 AND p.deleted_at IS NULL
+      ORDER BY p.name, p.created_at DESC
     `);
 
-    // Transform products to match frontend expectations
-    const transformedProducts = products.map(product => ({
+    // Get sizes for each product
+    const productsWithSizes = await Promise.all(
+      products.map(async (product) => {
+        try {
+          const [sizes] = await pool.query(
+            `SELECT id, size, stock, price, is_active 
+             FROM product_sizes 
+             WHERE product_id = ? AND is_active = 1 
+             ORDER BY 
+               CASE size 
+                 WHEN 'NONE' THEN 0
+                 WHEN 'XS' THEN 1 
+                 WHEN 'S' THEN 2 
+                 WHEN 'M' THEN 3 
+                 WHEN 'L' THEN 4 
+                 WHEN 'XL' THEN 5 
+                 WHEN 'XXL' THEN 6 
+                 ELSE 7 
+               END`,
+            [product.id]
+          );
+          
+          return {
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            price: parseFloat(product.price),
+            stock: parseInt(product.stock),
+            image_url: product.image ? product.image : null,
+            image: product.image ? product.image : null,
+            category: product.category || 'Other',
+            sizes: sizes.map(size => ({
+              id: size.id,
+              size: size.size,
+              stock: parseInt(size.stock),
+              price: parseFloat(size.price)
+            }))
+          };
+        } catch (error) {
+          console.error(`Error fetching sizes for product ${product.id}:`, error);
+          return {
       id: product.id,
       name: product.name,
       description: product.description,
       price: parseFloat(product.price),
       stock: parseInt(product.stock),
-      image_url: product.image ? product.image : null, // Return raw filename, let frontend handle URL
-      image: product.image ? product.image : null, // Return raw filename, let frontend handle URL
-      category: product.category || 'Other'
-    }));
+            image_url: product.image ? product.image : null,
+            image: product.image ? product.image : null,
+            category: product.category || 'Other',
+            sizes: []
+          };
+        }
+      })
+    );
 
-    res.json(transformedProducts);
+    // Group products by name
+    const groupedProducts = {};
+    productsWithSizes.forEach(product => {
+      if (!groupedProducts[product.name]) {
+        groupedProducts[product.name] = {
+          ...product,
+          sizes: []
+        };
+      }
+      
+      // Add sizes from this product to the grouped product
+      if (product.sizes && product.sizes.length > 0) {
+        groupedProducts[product.name].sizes.push(...product.sizes);
+      } else {
+        // If no sizes, add a default "NONE" size
+        groupedProducts[product.name].sizes.push({
+          id: `default-${product.id}`,
+          size: 'NONE',
+          stock: product.stock,
+          price: product.price
+        });
+      }
+    });
+
+    // Convert grouped products back to array
+    const finalProducts = Object.values(groupedProducts);
+
+    res.json(finalProducts);
   } catch (err) {
     console.error('Get Products Simple Error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -61,6 +132,8 @@ export const getAllProductsSimple = async (req, res) => {
 export const createProduct = async (req, res) => {
   try {
     const { name, description, price, original_price, stock, sizes, category_id, image } = req.body;
+    
+    console.log('🔍 Received product data:', { name, description, price, original_price, stock, sizes, category_id, image });
 
     // Enhanced validation
     if (!validateName(name)) {
@@ -107,46 +180,7 @@ export const createProduct = async (req, res) => {
       }
     }
 
-    // Check if product with exact same name already exists
-    const [existing] = await pool.query(
-      'SELECT id, name FROM products WHERE LOWER(name) = LOWER(?)',
-      [name.trim()]
-    );
-
-    if (existing.length > 0) {
-      // Generate suggested alternative names
-      const baseName = name.trim();
-      const suggestions = [];
-      
-      // Try adding numbers
-      for (let i = 1; i <= 5; i++) {
-        const suggestedName = `${baseName} ${i}`;
-        const [checkSuggestion] = await pool.query(
-          'SELECT id FROM products WHERE LOWER(name) = LOWER(?)',
-          [suggestedName]
-        );
-        if (checkSuggestion.length === 0) {
-          suggestions.push(suggestedName);
-        }
-      }
-      
-      // Try adding "NEW" prefix
-      const newName = `NEW ${baseName}`;
-      const [checkNew] = await pool.query(
-        'SELECT id FROM products WHERE LOWER(name) = LOWER(?)',
-        [newName]
-      );
-      if (checkNew.length === 0) {
-        suggestions.push(newName);
-      }
-      
-      return res.status(409).json({ 
-        error: 'Product with this name already exists',
-        message: `A product named "${existing[0].name}" already exists. Please choose a different name.`,
-        existingProduct: existing[0],
-        suggestions: suggestions.slice(0, 3) // Return up to 3 suggestions
-      });
-    }
+    // Allow duplicate product names - they will be grouped by name in the frontend
 
     // Start transaction
     const connection = await pool.getConnection();
@@ -170,18 +204,35 @@ export const createProduct = async (req, res) => {
 
       const productId = productResult.insertId;
 
-      // Note: product_sizes table doesn't exist in current database structure
-      // Size information is not stored separately - products only have base stock
-      // If sizes are provided, we'll just log them for future reference
+      // Store sizes in product_sizes table
+      console.log('🔍 Processing sizes:', sizes);
       if (sizes && Array.isArray(sizes) && sizes.length > 0) {
-        console.log(`Product ${productId} created with ${sizes.length} sizes, but sizes are not stored in current database structure`);
+        for (const sizeItem of sizes) {
+          console.log('🔍 Processing size item:', sizeItem);
+          if (sizeItem.size && sizeItem.size.trim() !== '') {
+            await connection.query(
+              `INSERT INTO product_sizes (product_id, size, stock, price, is_active) 
+               VALUES (?, ?, ?, ?, TRUE)`,
+              [
+                productId,
+                sizeItem.size.trim(),
+                parseInt(stock) || 0, // Use product's base stock for each size
+                parseFloat(price) // Use product's base price for each size
+              ]
+            );
+            console.log(`✅ Size ${sizeItem.size} stored for product ${productId}`);
+          }
+        }
+        console.log(`Product ${productId} created with ${sizes.length} sizes stored in product_sizes table`);
+      } else {
+        console.log('🔍 No sizes to store for product', productId);
       }
 
       await connection.commit();
       connection.release();
 
       // Emit refresh signal for new product
-      const { io } = req.app.locals;
+      const io = req.app.get('io');
       if (io) {
         emitAdminDataRefresh(io, 'products', { action: 'created', productId });
         emitDataRefresh(io, 'products', { action: 'created', productId });
@@ -262,11 +313,46 @@ export const getAllProducts = async (req, res) => {
       [...queryParams, validLimit, offset]
     );
 
-    // Since product_sizes table doesn't exist, return products without sizes
-    const productsWithSizes = products.map(product => ({
+    // Get sizes for each product
+    const productsWithSizes = await Promise.all(
+      products.map(async (product) => {
+        try {
+          const [sizes] = await pool.query(
+            `SELECT id, size, stock, price, is_active 
+             FROM product_sizes 
+             WHERE product_id = ? AND is_active = 1 
+             ORDER BY 
+               CASE size 
+                 WHEN 'NONE' THEN 0
+                 WHEN 'XS' THEN 1 
+                 WHEN 'S' THEN 2 
+                 WHEN 'M' THEN 3 
+                 WHEN 'L' THEN 4 
+                 WHEN 'XL' THEN 5 
+                 WHEN 'XXL' THEN 6 
+                 ELSE 7 
+               END`,
+            [product.id]
+          );
+          
+          return {
+            ...product,
+            sizes: sizes.map(size => ({
+              id: size.id,
+              size: size.size,
+              stock: parseInt(size.stock),
+              price: parseFloat(size.price)
+            }))
+          };
+        } catch (error) {
+          console.error(`Error fetching sizes for product ${product.id}:`, error);
+          return {
       ...product,
-      sizes: [] // No sizes available in current database structure
-    }));
+            sizes: []
+          };
+        }
+      })
+    );
 
     res.json({
       products: productsWithSizes,
@@ -309,7 +395,19 @@ export const getProductById = async (req, res) => {
     // Try to get product sizes if the table exists, otherwise set empty array
     try {
       const [sizes] = await pool.query(
-        'SELECT * FROM product_sizes WHERE product_id = ?',
+        `SELECT * FROM product_sizes 
+         WHERE product_id = ? AND is_active = 1 
+         ORDER BY 
+           CASE size 
+             WHEN 'NONE' THEN 0
+             WHEN 'XS' THEN 1 
+             WHEN 'S' THEN 2 
+             WHEN 'M' THEN 3 
+             WHEN 'L' THEN 4 
+             WHEN 'XL' THEN 5 
+             WHEN 'XXL' THEN 6 
+             ELSE 7 
+           END`,
         [id]
       );
       product.sizes = sizes;
@@ -429,16 +527,7 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Check if name is being changed and if it conflicts with existing product
-    if (name && name !== existing[0].name) {
-      const [nameConflict] = await pool.query(
-        'SELECT id FROM products WHERE name = ? AND id != ?',
-        [name.trim(), id]
-      );
-      if (nameConflict.length > 0) {
-        return res.status(409).json({ error: 'Product with this name already exists' });
-      }
-    }
+    // Allow duplicate product names - they will be grouped by name in the frontend
 
     // Start transaction
     const connection = await pool.getConnection();
@@ -502,18 +591,12 @@ export const updateProduct = async (req, res) => {
         // Insert new sizes
         for (const sizeData of sizes) {
           if (!validateSize(sizeData.size)) {
-            throw new Error(`Invalid size: ${sizeData.size}. Valid sizes are: XS, S, M, L, XL, XXL`);
+            throw new Error(`Invalid size: ${sizeData.size}. Valid sizes are: NONE, XS, S, M, L, XL, XXL`);
           }
-
-          if (!validateStock(sizeData.stock)) {
-            throw new Error(`Invalid stock quantity for size ${sizeData.size}`);
-          }
-
-          const sizePrice = sizeData.price || price || existing[0].price;
 
           await connection.query(
-            `INSERT INTO product_sizes (product_id, size, stock, price) VALUES (?, ?, ?, ?)`,
-            [id, sizeData.size.toUpperCase(), parseInt(sizeData.stock), parseFloat(sizePrice)]
+            `INSERT INTO product_sizes (product_id, size, stock, price, is_active) VALUES (?, ?, ?, ?, TRUE)`,
+            [id, sizeData.size.toUpperCase(), parseInt(stock) || 0, parseFloat(price), 1]
           );
         }
       }
@@ -522,7 +605,7 @@ export const updateProduct = async (req, res) => {
       connection.release();
 
       // Emit refresh signal for updated product
-      const { io } = req.app.locals;
+      const io = req.app.get('io');
       if (io) {
         emitAdminDataRefresh(io, 'products', { action: 'updated', productId: id });
         emitDataRefresh(io, 'products', { action: 'updated', productId: id });
@@ -585,7 +668,7 @@ export const deleteProduct = async (req, res) => {
       connection.release();
 
       // Emit refresh signal for deleted product
-      const { io } = req.app.locals;
+      const io = req.app.get('io');
       if (io) {
         emitAdminDataRefresh(io, 'products', { action: 'deleted', productId: id });
         emitDataRefresh(io, 'products', { action: 'deleted', productId: id });

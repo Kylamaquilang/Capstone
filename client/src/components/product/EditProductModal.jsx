@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
+import Swal from 'sweetalert2';
 
 export default function EditProductModal({ isOpen, onClose, productId, onSuccess }) {
   const [product, setProduct] = useState(null);
@@ -20,7 +21,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
-  const [sizes, setSizes] = useState([{ size: 'S', stock: '', price: '' }]);
+  const [sizes, setSizes] = useState([{ size: 'NONE' }]);
 
   useEffect(() => {
     if (isOpen && productId) {
@@ -48,12 +49,10 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       // Handle sizes
       if (data.sizes && data.sizes.length > 0) {
         setSizes(data.sizes.map(size => ({
-          size: size.size,
-          stock: size.stock.toString(),
-          price: size.price ? size.price.toString() : ''
+          size: size.size
         })));
       } else {
-        setSizes([{ size: 'S', stock: data.stock?.toString() || '', price: '' }]);
+        setSizes([{ size: 'NONE' }]);
       }
     } catch (err) {
       setError('Failed to load product');
@@ -119,11 +118,9 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
 
       // Prepare sizes data
       const sizesData = sizes.filter(sizeItem => 
-        sizeItem.size && sizeItem.stock && Number(sizeItem.stock) >= 0
+        sizeItem.size && sizeItem.size.trim() !== ''
       ).map(sizeItem => ({
-        size: sizeItem.size,
-        stock: Number(sizeItem.stock),
-        price: sizeItem.price ? Number(sizeItem.price) : Number(price)
+        size: sizeItem.size
       }));
 
       const productData = {
@@ -138,6 +135,17 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       };
 
       await API.put(`/products/${productId}`, productData);
+      
+      // Show SweetAlert success message
+      await Swal.fire({
+        title: 'Success!',
+        text: 'Product updated successfully',
+        icon: 'success',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#000C50',
+        timer: 2000,
+        timerProgressBar: true
+      });
       
       onSuccess?.();
       onClose();
@@ -167,7 +175,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
   };
 
   const addSize = () => {
-    setSizes([...sizes, { size: 'S', stock: '', price: '' }]);
+    setSizes([...sizes, { size: 'NONE' }]);
   };
 
   const removeSize = (index) => {
@@ -379,29 +387,10 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                               disabled={saving}
                               className="border border-gray-300 px-2 py-1 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              {['XS','S','M','L','XL','XXL'].map((s) => (
+                              {['NONE','XS','S','M','L','XL','XXL'].map((s) => (
                                 <option key={s} value={s}>{s}</option>
                               ))}
                             </select>
-                            <input
-                              type="number"
-                              value={sizeItem.stock}
-                              onChange={(e) => updateSize(index, 'stock', e.target.value)}
-                              placeholder="Stock"
-                              min="0"
-                              disabled={saving}
-                              className="border border-gray-300 px-2 py-1 rounded text-sm w-20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            />
-                            <input
-                              type="number"
-                              value={sizeItem.price}
-                              onChange={(e) => updateSize(index, 'price', e.target.value)}
-                              placeholder="Price (optional)"
-                              min="0"
-                              step="0.01"
-                              disabled={saving}
-                              className="border border-gray-300 px-2 py-1 rounded text-sm w-24 disabled:opacity-50 disabled:cursor-not-allowed"
-                            />
                             {sizes.length > 1 && (
                               <button
                                 type="button"
@@ -415,9 +404,6 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                           </div>
                         ))}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Leave price empty to use base price. Stock is required for each size.
-                      </p>
                     </div>
                   </div>
 

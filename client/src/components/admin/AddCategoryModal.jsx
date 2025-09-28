@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
+import Swal from 'sweetalert2';
 
 export default function AddCategoryModal({ isOpen, onClose, onSuccess }) {
   const [categoryName, setCategoryName] = useState('');
@@ -17,6 +18,17 @@ export default function AddCategoryModal({ isOpen, onClose, onSuccess }) {
     try {
       await API.post('/categories', {
         name: categoryName.trim()
+      });
+
+      // Show SweetAlert success message
+      await Swal.fire({
+        title: 'Success!',
+        text: 'Category added successfully',
+        icon: 'success',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#000C50',
+        timer: 2000,
+        timerProgressBar: true
       });
 
       // Reset form

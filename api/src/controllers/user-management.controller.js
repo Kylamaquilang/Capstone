@@ -1,5 +1,6 @@
 import { pool } from '../database/db.js';
 import { verifyToken } from '../middleware/auth.middleware.js';
+import { emitDataRefresh, emitAdminDataRefresh } from '../utils/socket-helper.js';
 
 // ✅ Get all users with status management
 export const getAllUsersWithStatus = async (req, res) => {
@@ -82,6 +83,12 @@ export const toggleUserStatus = async (req, res) => {
 // ✅ Update user profile image
 export const updateUserProfileImage = async (req, res) => {
   try {
+    // Defensive check for req.user
+    if (!req.user) {
+      console.log('❌ updateUserProfileImage - req.user is undefined');
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
     const { id } = req.user;
     
     if (!req.file) {
@@ -109,6 +116,12 @@ export const updateUserProfileImage = async (req, res) => {
 // ✅ Get user profile
 export const getUserProfile = async (req, res) => {
   try {
+    // Defensive check for req.user
+    if (!req.user) {
+      console.log('❌ getUserProfile - req.user is undefined');
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
     const { id } = req.user;
 
     const [users] = await pool.query(
@@ -147,6 +160,14 @@ export const getUserProfile = async (req, res) => {
 // ✅ Update user profile
 export const updateUserProfile = async (req, res) => {
   try {
+    console.log('🔍 Profile update request:', { user: req.user, body: req.body });
+    
+    // Defensive check for req.user
+    if (!req.user) {
+      console.log('❌ updateUserProfile - req.user is undefined');
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
     const { id } = req.user;
     const { name, contact_number, email } = req.body;
 
@@ -257,6 +278,13 @@ export const updateUser = async (req, res) => {
       updateValues
     );
 
+    // Emit refresh signals
+    const io = req.app.get('io');
+    if (io) {
+      emitDataRefresh(io, 'users', { action: 'updated', userId: id });
+      emitAdminDataRefresh(io, 'users', { action: 'updated', userId: id });
+    }
+
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     console.error('Update user error:', error.message);
@@ -287,6 +315,13 @@ export const deleteUser = async (req, res) => {
       'UPDATE users SET is_active = 0, deleted_at = NOW() WHERE id = ?',
       [userId]
     );
+
+    // Emit refresh signals
+    const io = req.app.get('io');
+    if (io) {
+      emitDataRefresh(io, 'users', { action: 'deleted', userId });
+      emitAdminDataRefresh(io, 'users', { action: 'deleted', userId });
+    }
 
     res.status(200).json({ 
       message: `User ${user.name} deleted successfully`,

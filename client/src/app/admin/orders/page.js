@@ -2,9 +2,10 @@
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import API from '@/lib/axios';
 import { useSocket } from '@/context/SocketContext';
+import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 import { 
   ClockIcon, 
   CogIcon, 
@@ -165,6 +166,41 @@ export default function AdminOrdersPage() {
     return icons[status] || <ClockIcon {...iconProps} className="h-5 w-5 text-gray-500" />;
   };
 
+  const loadOrders = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Check if token exists before making request
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.log('📋 Admin orders - No token found, skipping orders load');
+        setOrders([]);
+        setFilteredOrders([]);
+        setError('Please log in to view orders');
+        return;
+      }
+      
+      console.log('📋 Admin orders - Loading orders with token');
+      const { data } = await API.get('/orders/admin');
+      setOrders(data || []);
+      setFilteredOrders(data || []);
+    } catch (err) {
+      console.error('📋 Admin orders - Fetch orders error:', err);
+      if (err.response?.status === 401) {
+        console.log('📋 Admin orders - 401 error, token may be invalid');
+        setError('Authentication failed. Please log in again.');
+      } else {
+        setError('Failed to load orders');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Auto-refresh for orders
+  useAdminAutoRefresh(loadOrders, 'orders');
+
   useEffect(() => {
     let isMounted = true;
     
@@ -179,27 +215,6 @@ export default function AdminOrdersPage() {
     setSearchTerm('');
     setStatusFilter('');
     setPaymentStatusFilter('');
-    
-    const loadOrders = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const { data } = await API.get('/orders/admin');
-        if (isMounted) {
-          setOrders(data || []);
-          setFilteredOrders(data || []);
-        }
-      } catch (err) {
-        console.error('Fetch orders error:', err);
-        if (isMounted) {
-          setError('Failed to load orders');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
 
     loadOrders();
 
@@ -257,7 +272,7 @@ export default function AdminOrdersPage() {
     return () => {
       isMounted = false;
     };
-  }, [socket, isConnected, joinAdminRoom]);
+  }, [socket, isConnected, joinAdminRoom, loadOrders]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);

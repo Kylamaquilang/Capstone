@@ -41,6 +41,12 @@ export const AuthProvider = ({ children }) => {
   const login = (userData, token) => {
     setUser(userData);
     localStorage.setItem('token', token);
+    
+    // Trigger socket reconnection after login
+    setTimeout(() => {
+      const event = new CustomEvent('socket-reconnect');
+      window.dispatchEvent(event);
+    }, 100);
   };
 
   const logout = () => {

@@ -10,7 +10,9 @@ export const verifyToken = (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
+    console.log('🔍 JWT_SECRET in verifyToken middleware:', JWT_SECRET ? 'Set' : 'Not set');
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {

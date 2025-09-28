@@ -8,6 +8,7 @@ import { useNotifications } from '@/context/NotificationContext';
 import API from '@/lib/axios';
 import Swal from 'sweetalert2';
 import { getImageUrl } from '@/utils/imageUtils';
+import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function CartPage() {
   const { updateCartCount } = useNotifications();
@@ -51,6 +52,9 @@ export default function CartPage() {
       setLoading(false);
     }
   };
+
+  // Auto-refresh for cart
+  useUserAutoRefresh(fetchCart, 'cart');
 
   const handleRemove = async (id) => {
     try {

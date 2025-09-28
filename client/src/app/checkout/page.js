@@ -11,6 +11,7 @@ import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
 import { BanknotesIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import { getImageUrl } from '@/utils/imageUtils';
+import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 
 const CheckoutPage = () => {
   const { user } = useAuth();
@@ -30,6 +31,7 @@ const CheckoutPage = () => {
     if (itemsParam) {
       try {
         const selectedItems = JSON.parse(itemsParam);
+        console.log('🛒 Parsed selected items from URL:', selectedItems);
         setCartItems(selectedItems);
         
         // Calculate total from selected items
@@ -187,6 +189,9 @@ const CheckoutPage = () => {
     }
   };
 
+  // Auto-refresh for checkout (though not typically needed)
+  // useUserAutoRefresh(() => {}, 'checkout');
+
   const handleCloseThankYouModal = () => {
     setShowThankYouModal(false);
     // Re-enable background scrolling
@@ -257,7 +262,11 @@ const CheckoutPage = () => {
                         height={64}
                         className="w-full h-full object-cover"
                         onError={(e) => {
+                          console.log('Image failed to load:', e.target.src);
                           e.target.src = '/images/polo.png';
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully:', item.product_name);
                         }}
                       />
                     </div>

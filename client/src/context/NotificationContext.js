@@ -17,23 +17,45 @@ export function NotificationProvider({ children }) {
       
       // Fetch cart count
       try {
-        const cartResponse = await API.get('/cart');
-        if (cartResponse.data.success) {
-          setCartCount(cartResponse.data.total_items || 0);
+        // Check if token exists before making request
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.log('🛒 NotificationContext - No token found, skipping cart count');
+          setCartCount(0);
+        } else {
+          console.log('🛒 NotificationContext - Fetching cart count with token');
+          const cartResponse = await API.get('/cart');
+          if (cartResponse.data.success) {
+            setCartCount(cartResponse.data.total_items || 0);
+          }
         }
       } catch (error) {
-        console.log('Cart fetch error (server might be starting):', error.message);
+        console.log('🛒 NotificationContext - Cart fetch error:', error.message);
+        if (error.response?.status === 401) {
+          console.log('🛒 NotificationContext - 401 error, token may be invalid');
+        }
         setCartCount(0);
       }
 
       // Fetch notification count
       try {
-        const notificationResponse = await API.get('/notifications/unread-count');
-        if (notificationResponse.data.success) {
-          setNotificationCount(notificationResponse.data.count || 0);
+        // Check if token exists before making request
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.log('🔔 NotificationContext - No token found, skipping unread count');
+          setNotificationCount(0);
+        } else {
+          console.log('🔔 NotificationContext - Fetching unread count with token');
+          const notificationResponse = await API.get('/notifications/unread-count');
+          if (notificationResponse.data.success) {
+            setNotificationCount(notificationResponse.data.count || 0);
+          }
         }
       } catch (error) {
-        console.log('Notification fetch error (server might be starting):', error.message);
+        console.log('🔔 NotificationContext - Notification fetch error:', error.message);
+        if (error.response?.status === 401) {
+          console.log('🔔 NotificationContext - 401 error, token may be invalid');
+        }
         setNotificationCount(0);
       }
     } catch (error) {
