@@ -40,12 +40,44 @@ export default function AdminOrdersPage() {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  
+  // Get unique values for filter options from orders data
+  const getUniqueSections = () => {
+    const sections = [...new Set(orders.map(order => order.section).filter(Boolean))];
+    return sections.sort();
+  };
+  
+  const getUniqueDepartments = () => {
+    const departments = [...new Set(orders.map(order => order.degree).filter(Boolean))];
+    return departments.sort();
+  };
+  
+  const getUniqueYearLevels = () => {
+    const yearLevels = [...new Set(orders.map(order => order.year_level).filter(Boolean))];
+    return yearLevels.sort();
+  };
+
+  const getUniqueOrderStatuses = () => {
+    const statuses = [...new Set(orders.map(order => order.status).filter(Boolean))];
+    return statuses.sort();
+  };
+
+  const getUniquePaymentStatuses = () => {
+    const statuses = [...new Set(orders.map(order => order.payment_status).filter(Boolean))];
+    return statuses.sort();
+  };
+
+  const getUniquePaymentMethods = () => {
+    const methods = [...new Set(orders.map(order => order.payment_method).filter(Boolean))];
+    return methods.sort();
+  };
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
       setError('');
       const { data } = await API.get('/orders/admin');
+      console.log('📋 Admin orders - API response:', data);
       setOrders(data || []);
       setFilteredOrders(data || []);
     } catch (err) {
@@ -55,6 +87,7 @@ export default function AdminOrdersPage() {
       setLoading(false);
     }
   };
+
 
   // Filter orders based on search term and status filter
   useEffect(() => {
@@ -195,6 +228,7 @@ export default function AdminOrdersPage() {
       
       console.log('📋 Admin orders - Loading orders with token');
       const { data } = await API.get('/orders/admin');
+      console.log('📋 Admin orders - API response:', data);
       setOrders(data || []);
       setFilteredOrders(data || []);
     } catch (err) {
@@ -322,7 +356,7 @@ export default function AdminOrdersPage() {
             <div className="p-3 sm:p-4 border-b border-gray-200">
               <div className="flex flex-col gap-3">
                 {/* Search Bar */}
-                <div className="flex-1">
+                <div className="w-80">
                   <input
                     type="text"
                     placeholder="Search by name, student ID, email, or order ID..."
@@ -332,93 +366,85 @@ export default function AdminOrdersPage() {
                   />
                 </div>
                 
-                {/* Filter Controls */}
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                  <div className="sm:w-48">
+                {/* All Filter Controls in One Line */}
+                <div className="flex flex-nowrap gap-1 overflow-x-auto">
+                  <div className="w-32 flex-shrink-0">
                     <select
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-gray-300 rounded-md px-1 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="">All Order Statuses</option>
-                      <option value="pending">Pending</option>
-                      <option value="processing">Processing</option>
-                      <option value="ready_for_pickup">For Pickup</option>
-                      <option value="delivered">Delivered</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="refunded">Refunded</option>
+                      <option value="">Order Status</option>
+                      {getUniqueOrderStatuses().map(status => (
+                        <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}</option>
+                      ))}
                     </select>
                   </div>
-                  <div className="sm:w-48">
+                  <div className="w-32 flex-shrink-0">
                     <select
                       value={paymentStatusFilter}
                       onChange={(e) => setPaymentStatusFilter(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-gray-300 rounded-md px-1 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="">All Payment Statuses</option>
-                      <option value="unpaid">Unpaid</option>
-                      <option value="pending">Pending</option>
-                      <option value="paid">Paid</option>
-                      <option value="failed">Failed</option>
-                      <option value="cancelled">Cancelled</option>
+                      <option value="">Payment Status</option>
+                      {getUniquePaymentStatuses().map(status => (
+                        <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                      ))}
                     </select>
                   </div>
-                  <div className="sm:w-48">
+                  <div className="w-28 flex-shrink-0">
                     <select
                       value={paymentMethodFilter}
                       onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-gray-300 rounded-md px-1 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="">All Payment Methods</option>
-                      <option value="gcash">GCash</option>
-                      <option value="cash">Pay at Counter</option>
+                      <option value="">Payment Methods</option>
+                      {getUniquePaymentMethods().map(method => (
+                        <option key={method} value={method}>
+                          {method === 'gcash' ? 'GCash' : 
+                           method === 'cash' ? 'Pay at Counter' : 
+                           method.charAt(0).toUpperCase() + method.slice(1)}
+                        </option>
+                      ))}
                     </select>
                   </div>
-                  <div className="sm:w-48">
+                  <div className="w-28 flex-shrink-0">
                     <select
                       value={departmentFilter}
                       onChange={(e) => setDepartmentFilter(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-gray-300 rounded-md px-1 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="">All Departments</option>
-                      <option value="BEED">BEED</option>
-                      <option value="BSED">BSED</option>
-                      <option value="BSIT">BSIT</option>
-                      <option value="BSHM">BSHM</option>
+                      <option value="">Departments</option>
+                      {getUniqueDepartments().map(dept => (
+                        <option key={dept} value={dept}>{dept.toUpperCase()}</option>
+                      ))}
                     </select>
                   </div>
-                </div>
-                
-                {/* Year and Section Filters */}
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                  <div className="sm:w-48">
+                  <div className="w-28 flex-shrink-0">
                     <select
                       value={yearFilter}
                       onChange={(e) => setYearFilter(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-gray-300 rounded-md px-1 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="">All Year Levels</option>
-                      <option value="1st Year">1st Year</option>
-                      <option value="2nd Year">2nd Year</option>
-                      <option value="3rd Year">3rd Year</option>
-                      <option value="4th Year">4th Year</option>
+                      <option value="">Year Levels</option>
+                      {getUniqueYearLevels().map(year => (
+                        <option key={year} value={year}>{year.toUpperCase()}</option>
+                      ))}
                     </select>
                   </div>
-                  <div className="sm:w-48">
+                  <div className="w-28 flex-shrink-0">
                     <select
                       value={sectionFilter}
                       onChange={(e) => setSectionFilter(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full border border-gray-300 rounded-md px-1 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
-                      <option value="">All Sections</option>
-                      <option value="A">Section A</option>
-                      <option value="B">Section B</option>
-                      <option value="C">Section C</option>
-                      <option value="D">Section D</option>
-                      <option value="E">Section E</option>
+                      <option value="">Sections</option>
+                      {getUniqueSections().map(section => (
+                        <option key={section} value={section}>Section {section.toUpperCase()}</option>
+                      ))}
                     </select>
                   </div>
-                  <div className="sm:w-32">
+                  <div className="w-24 flex-shrink-0">
                     <button
                       onClick={() => {
                         setSearchTerm('');
@@ -429,9 +455,9 @@ export default function AdminOrdersPage() {
                         setYearFilter('');
                         setSectionFilter('');
                       }}
-                      className="w-full bg-gray-100 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      className="w-full bg-gray-100 text-gray-700 px-1 py-1.5 rounded-md text-xs hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
                     >
-                      Clear Filters
+                      Clear
                     </button>
                   </div>
                 </div>
@@ -485,7 +511,7 @@ export default function AdminOrdersPage() {
                                   
                                   return uniqueProducts.slice(0, 3).map((productName, idx) => (
                                     <div key={idx} className="text-gray-900">
-                                      <span className="font-medium">{productName}</span>
+                                      <span className="font-medium uppercase">{productName}</span>
                                     </div>
                                   ));
                                 })()}
@@ -507,12 +533,12 @@ export default function AdminOrdersPage() {
                         </td>
                         <td className="px-4 py-3 border-r border-gray-100">
                           <div>
-                            <div className="text-xs font-medium text-gray-900">{order.user_name}</div>
+                            <div className="text-xs font-medium text-gray-900 uppercase">{order.user_name}</div>
                           </div>
                         </td>
                         <td className="px-4 py-3 border-r border-gray-100">
                           <div className="text-center">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 uppercase">
                               {order.degree || 'N/A'}
                             </span>
                           </div>
@@ -533,11 +559,11 @@ export default function AdminOrdersPage() {
                           <div className="flex flex-col space-y-1">
                             <div className="flex items-center space-x-2">
                               {order.payment_method === 'gcash' ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 uppercase">
                                   GCash
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 uppercase">
                                   Cash
                                 </span>
                               )}
@@ -547,19 +573,19 @@ export default function AdminOrdersPage() {
                         <td className="px-4 py-3 border-r border-gray-100">
                           <div className="flex items-center space-x-2">
                             {order.payment_status === 'paid' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 uppercase">
                                 Paid
                               </span>
                             ) : order.payment_status === 'pending' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700 uppercase">
                                 Pending
                               </span>
                             ) : order.payment_status === 'failed' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 uppercase">
                                 Failed
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 uppercase">
                                 Unpaid
                               </span>
                             )}
@@ -567,7 +593,7 @@ export default function AdminOrdersPage() {
                         </td>
                         <td className="px-4 py-3 border-r border-gray-100">
                           <div className="flex items-center space-x-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)}`}>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)} uppercase`}>
                               {order.status === 'ready_for_pickup' ? 'For Pickup' : order.status.replace('_', ' ')}
                             </span>
                           </div>

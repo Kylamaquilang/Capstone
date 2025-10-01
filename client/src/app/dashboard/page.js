@@ -208,22 +208,17 @@ export default function UserDashboard() {
                                 e.target.src = '/images/polo.png';
                               }}
                             />
-                            {/* Stock Badge */}
+                            {/* Stock Badge - Only show Out of Stock */}
                             {item.stock <= 0 && (
                               <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                                 Out of Stock
-                              </div>
-                            )}
-                            {item.stock > 0 && item.stock <= 5 && (
-                              <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
-                                Low Stock
                               </div>
                             )}
                           </div>
                           
                           {/* Product Info */}
                           <div className="text-center">
-                            <h3 className="font-semibold text-gray-900 text-lg mb-2 line-clamp-2">
+                            <h3 className="font-semibold text-gray-900 text-lg mb-2 line-clamp-2 uppercase">
                               {item.name}
                             </h3>
                             <p className="text-lg font-medium text-[#000C50]">

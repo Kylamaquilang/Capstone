@@ -40,11 +40,14 @@
   gap: 0.5rem !important;
 }
 
-/* Smaller icon */
+/* Properly sized icon */
 .swal2-icon {
-  width: 48px !important;
-  height: 48px !important;
+  width: 60px !important;
+  height: 60px !important;
   margin: 0.5rem auto 1rem !important;
+  border-width: 3px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .swal2-icon.swal2-success {
@@ -67,44 +70,90 @@
   border-color: #6B7280 !important;
 }
 
-/* Smaller success icon */
+/* Success icon elements */
 .swal2-success-ring {
-  width: 48px !important;
-  height: 48px !important;
+  width: 60px !important;
+  height: 60px !important;
+  opacity: 1 !important;
 }
 
 .swal2-success-fix {
-  width: 48px !important;
-  height: 48px !important;
+  width: 60px !important;
+  height: 60px !important;
+  opacity: 1 !important;
 }
 
-/* Smaller error icon */
+.swal2-success-line {
+  height: 3px !important;
+  opacity: 1 !important;
+}
+
+.swal2-success-line-long {
+  width: 25px !important;
+  opacity: 1 !important;
+}
+
+.swal2-success-line-tip {
+  width: 8px !important;
+  opacity: 1 !important;
+}
+
+/* Error icon elements */
 .swal2-error {
-  width: 48px !important;
-  height: 48px !important;
+  width: 60px !important;
+  height: 60px !important;
+  opacity: 1 !important;
 }
 
 .swal2-x-mark {
-  width: 48px !important;
-  height: 48px !important;
+  width: 60px !important;
+  height: 60px !important;
+  opacity: 1 !important;
 }
 
-/* Smaller warning icon */
+.swal2-x-mark-line-left,
+.swal2-x-mark-line-right {
+  height: 3px !important;
+  opacity: 1 !important;
+}
+
+/* Warning icon elements */
 .swal2-warning {
-  width: 48px !important;
-  height: 48px !important;
+  width: 60px !important;
+  height: 60px !important;
+  opacity: 1 !important;
 }
 
-/* Smaller info icon */
+.swal2-warning-dot {
+  width: 6px !important;
+  height: 6px !important;
+  opacity: 1 !important;
+}
+
+/* Info icon elements */
 .swal2-info {
-  width: 48px !important;
-  height: 48px !important;
+  width: 60px !important;
+  height: 60px !important;
+  opacity: 1 !important;
 }
 
-/* Smaller question icon */
+.swal2-info-dot {
+  width: 6px !important;
+  height: 6px !important;
+  opacity: 1 !important;
+}
+
+/* Question icon elements */
 .swal2-question {
-  width: 48px !important;
-  height: 48px !important;
+  width: 60px !important;
+  height: 60px !important;
+  opacity: 1 !important;
+}
+
+.swal2-question-mark {
+  font-size: 24px !important;
+  font-weight: bold !important;
+  opacity: 1 !important;
 }
 
 /* Reduce overall popup size */
@@ -208,5 +257,7 @@
     height: 32px !important;
   }
 }
+
+
 
 

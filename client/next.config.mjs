@@ -28,6 +28,12 @@ const nextConfig = {
       },
     ],
   },
+  webpack: (config) => {
+    config.resolve.extensionAlias = {
+      '.js': ['.js', '.jsx'],
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

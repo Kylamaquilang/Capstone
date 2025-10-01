@@ -22,7 +22,9 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+    // Trim whitespace and ensure clean values
+    const cleanValue = typeof value === 'string' ? value.trim() : value;
+    setForm((f) => ({ ...f, [name]: cleanValue }));
   };
 
   const handleSubmit = async (e) => {
@@ -31,8 +33,22 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
     setSuccess('');
     try {
       setSubmitting(true);
-      await API.post('/students/add', form);
-      setSuccess('Student added successfully');
+      console.log('🔍 Form data being sent:', form);
+      console.log('🔍 Status value:', form.status);
+      console.log('🔍 Status type:', typeof form.status);
+      console.log('🔍 Status length:', form.status?.length);
+      console.log('🔍 Status char codes:', form.status?.split('').map(c => c.charCodeAt(0)));
+      
+      // Ensure status is clean before sending
+      const cleanForm = {
+        ...form,
+        status: form.status?.trim().toLowerCase()
+      };
+      console.log('🔍 Clean form data:', cleanForm);
+      
+      const response = await API.post('/students/add', cleanForm);
+      const message = response.data.message || 'Student added successfully';
+      setSuccess(message);
       setForm({ 
         student_id: '',
         first_name: '', 
@@ -266,7 +282,6 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
                   >
                     <option value="regular">Regular</option>
                     <option value="irregular">Irregular</option>
-                    <option value="transferee">Transferee</option>
                   </select>
                 </div>
               </div>

@@ -510,7 +510,7 @@ export default function AdminUsersPage() {
                     >
                       <option value="">All Departments</option>
                       {allDepartments.sort().map(dept => (
-                        <option key={dept} value={dept}>{dept}</option>
+                        <option key={dept} value={dept}>{dept.toUpperCase()}</option>
                       ))}
                     </select>
                   </div>
@@ -525,7 +525,7 @@ export default function AdminUsersPage() {
                     >
                       <option value="">All Sections</option>
                       {uniqueSections.map(section => (
-                        <option key={section} value={section}>{section}</option>
+                        <option key={section} value={section}>{section.toUpperCase()}</option>
                       ))}
                     </select>
                   </div>
@@ -540,7 +540,7 @@ export default function AdminUsersPage() {
                     >
                       <option value="">All Year Levels</option>
                       {allYearLevels.sort().map(year => (
-                        <option key={year} value={year}>{year}</option>
+                        <option key={year} value={year}>{year.toUpperCase()}</option>
                       ))}
                     </select>
                   </div>
@@ -633,7 +633,7 @@ export default function AdminUsersPage() {
                         </td>
                         <td className="w-48 px-3 py-3 border-r border-gray-100">
                           <div className="truncate" title={user.name || 'N/A'}>
-                            <div className="text-xs font-medium text-gray-900">{user.name || 'N/A'}</div>
+                            <div className="text-xs font-medium text-gray-900 uppercase">{user.name || 'N/A'}</div>
                           </div>
                         </td>
                         <td className="w-64 px-3 py-3 border-r border-gray-100">
@@ -644,19 +644,19 @@ export default function AdminUsersPage() {
                         <td className="w-20 px-3 py-3 border-r border-gray-100">{getRoleBadge(user.role)}</td>
                         <td className="w-24 px-3 py-3 border-r border-gray-100">
                           <div className="text-xs">
-                            <div className="font-medium text-gray-900">{user.degree || 'N/A'}</div>
+                            <div className="font-medium text-gray-900 uppercase">{user.degree || 'N/A'}</div>
                           </div>
                         </td>
                         <td className="w-20 px-3 py-3 border-r border-gray-100">
                           <div className="text-xs">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 uppercase">
                               {user.year_level || 'N/A'}
                             </span>
                           </div>
                         </td>
                         <td className="w-16 px-3 py-3 border-r border-gray-100">
                           <div className="text-xs">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-600">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-600 uppercase">
                               {user.section || 'N/A'}
                             </span>
                           </div>

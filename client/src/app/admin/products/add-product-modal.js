@@ -63,10 +63,28 @@ export default function AddProductModal({ onClose, onSuccess }) {
         return;
       }
 
-      // Validate that total size stock does not exceed base stock
+      // Validate that total size stock matches base stock exactly
       if (!isSizeStockValid()) {
         const totalSizeStock = getTotalSizeStock();
-        alert(`Total size stock (${totalSizeStock}) cannot exceed base stock (${stock}). Please adjust the size quantities.`);
+        const baseStock = Number(stock);
+        
+        if (totalSizeStock > baseStock) {
+          await Swal.fire({
+            title: 'Stock Mismatch Warning!',
+            text: `Total size stock (${totalSizeStock}) exceeds base stock (${baseStock}). The total size stock should not exceed the base stock.`,
+            icon: 'warning',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#F59E0B'
+          });
+        } else if (totalSizeStock < baseStock) {
+          await Swal.fire({
+            title: 'Stock Mismatch Warning!',
+            text: `Total size stock (${totalSizeStock}) is below base stock (${baseStock}). The total size stock should match the base stock.`,
+            icon: 'warning',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#F59E0B'
+          });
+        }
         setLoading(false);
         return;
       }
@@ -183,11 +201,11 @@ export default function AddProductModal({ onClose, onSuccess }) {
     }, 0);
   };
 
-  // Check if total size stock exceeds base stock
+  // Check if total size stock matches base stock exactly
   const isSizeStockValid = () => {
     const baseStock = Number(stock) || 0;
     const totalSizeStock = getTotalSizeStock();
-    return totalSizeStock <= baseStock;
+    return totalSizeStock === baseStock;
   };
 
   // Get remaining stock available for sizes
@@ -290,7 +308,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
                   >
                     <option value="" disabled>Select category</option>
                     {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>
                     ))}
                   </select>
                 </div>
@@ -334,19 +352,19 @@ export default function AddProductModal({ onClose, onSuccess }) {
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-gray-600">Total Size Stock:</span>
-                        <span className={`font-medium ${getTotalSizeStock() > Number(stock) ? 'text-red-600' : 'text-green-600'}`}>
+                        <span className={`font-medium ${getTotalSizeStock() !== Number(stock) ? 'text-red-600' : 'text-green-600'}`}>
                           {getTotalSizeStock()}
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-gray-600">Remaining:</span>
-                        <span className={`font-medium ${getRemainingStock() < 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                        <span className={`font-medium ${getRemainingStock() !== 0 ? 'text-red-600' : 'text-green-600'}`}>
                           {getRemainingStock()}
                         </span>
                       </div>
                       {!isSizeStockValid() && (
                         <div className="mt-1 text-xs text-red-600 font-medium">
-                          ⚠️ Total size stock exceeds base stock
+                          ⚠️ Total size stock must match base stock exactly
                         </div>
                       )}
                     </div>
@@ -373,7 +391,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
                             value={sizeItem.stock}
                             onChange={(e) => updateSize(index, 'stock', e.target.value)}
                             className={`w-full border px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                              getTotalSizeStock() > Number(stock) ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                              getTotalSizeStock() !== Number(stock) ? 'border-red-300 bg-red-50' : 'border-gray-300'
                             }`}
                             placeholder="0"
                             min="0"

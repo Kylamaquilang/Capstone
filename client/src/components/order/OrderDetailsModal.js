@@ -200,7 +200,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
                                   />
                                 )}
                                 <div>
-                                  <div className="text-sm font-medium">
+                                  <div className="text-sm font-medium uppercase">
                                     {item.product_name || item.name || 'Unknown Product'}
                                   </div>
                                 </div>

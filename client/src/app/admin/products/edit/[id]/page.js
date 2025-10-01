@@ -226,7 +226,7 @@ export default function EditProductPage() {
                     <option value="">Select category</option>
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
-                        {category.name}
+                        {category.name.toUpperCase()}
                       </option>
                     ))}
                   </select>

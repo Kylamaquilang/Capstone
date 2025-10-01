@@ -12,6 +12,7 @@ export default function AdminNotificationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('orders');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [processingOrder, setProcessingOrder] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -22,10 +23,10 @@ export default function AdminNotificationPage() {
       // Try admin endpoint first, fallback to regular endpoint
       let response;
       try {
-        response = await API.get('/api/notifications/admin');
+        response = await API.get('/notifications/admin');
       } catch (adminError) {
         console.log('Admin endpoint failed, trying regular endpoint:', adminError.response?.status);
-        response = await API.get('/api/notifications');
+        response = await API.get('/notifications');
       }
       
       const notifications = response.data.notifications || [];
@@ -101,7 +102,7 @@ export default function AdminNotificationPage() {
 
   const handleMarkAsRead = async (notificationId) => {
     try {
-      await API.put(`/api/notifications/${notificationId}/read`);
+      await API.put(`/notifications/${notificationId}/read`);
       
       // Update the notification in the local state
       setNotifications(prev => 
@@ -127,7 +128,7 @@ export default function AdminNotificationPage() {
       // Mark each notification as read individually
       const results = await Promise.allSettled(
         unreadNotifications.map(notification => 
-          API.put(`/api/notifications/${notification.id}/read`)
+          API.put(`/notifications/${notification.id}/read`)
         )
       );
       
@@ -192,11 +193,18 @@ export default function AdminNotificationPage() {
     }
   }, [socket, isConnected, joinAdminRoom]);
 
+  // Filter notifications by status
+  const filteredNotifications = notifications.filter(notification => {
+    if (statusFilter === 'unread') return !notification.is_read;
+    if (statusFilter === 'read') return notification.is_read;
+    return true; // 'all'
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(notifications.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedNotifications = notifications.slice(startIndex, endIndex);
+  const paginatedNotifications = filteredNotifications.slice(startIndex, endIndex);
 
   return (
     <div className="min-h-screen text-black admin-page">
@@ -204,55 +212,62 @@ export default function AdminNotificationPage() {
       <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
         <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">NOTIFICATIONS</h2>
-              {notifications.filter(n => !n.is_read).length > 0 && (
-                <button
-                  onClick={handleMarkAllAsRead}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  ✓ Mark All as Read
-                </button>
-              )}
-            </div>
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              {/* Header */}
+              <div className="mb-6 bg-gray-50 p-4 rounded-lg -mx-6 -mt-6">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h1 className="text-xl font-bold text-gray-900">Notifications</h1>
+                    <p className="text-gray-600 text-xs mt-1">Manage your notifications and stay updated.</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-gray-500">
+                      {notifications.filter(n => !n.is_read).length} unread
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter by Status */}
+              <div className="mb-4">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-gray-700">Filter by Status:</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        statusFilter === 'all'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('unread')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        statusFilter === 'unread'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Unread
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('read')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        statusFilter === 'read'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Read
+                    </button>
+                  </div>
+                </div>
+              </div>
             
-            {/* Tab Navigation */}
-            <div className="flex gap-2 mb-8">
-              <button
-                onClick={() => setActiveTab('orders')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeTab === 'orders' 
-                    ? 'bg-[#000C50] text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className="text-lg">📦</span>
-                  <span>Order Notifications</span>
-                  <span className="bg-white text-[#000C50] px-2 py-1 rounded-full text-xs font-bold">
-                    {notifications.length}
-                  </span>
-                </span>
-              </button>
-              
-              <button
-                onClick={() => setActiveTab('lowStock')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeTab === 'lowStock' 
-                    ? 'bg-[#000C50] text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className="text-lg">⚠️</span>
-                  <span>Low Stock Alerts</span>
-                  <span className="bg-white text-[#000C50] px-2 py-1 rounded-full text-xs font-bold">
-                    {lowStock.length}
-                  </span>
-                </span>
-              </button>
-            </div>
 
             {loading ? (
               <div className="flex justify-center items-center py-12">
@@ -271,97 +286,108 @@ export default function AdminNotificationPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {activeTab === 'orders' ? (
-                  paginatedNotifications.length > 0 ? (
-                    paginatedNotifications.map((notification) => {
-                        // Extract order ID from the message
-                        const orderIdMatch = notification.message.match(/Order #(\d+)/);
-                        const orderId = orderIdMatch ? orderIdMatch[1] : null;
+                {paginatedNotifications.length > 0 ? (
+                  paginatedNotifications.map((notification) => {
+                    // Extract order ID from the message
+                    const orderIdMatch = notification.message.match(/Order #(\d+)/);
+                    const orderId = orderIdMatch ? orderIdMatch[1] : null;
+                    
+                    return (
+                      <div
+                        key={notification.id}
+                        className="flex items-start gap-3 p-4 border-b border-gray-100 last:border-b-0"
+                      >
+                        {/* Notification indicator dot */}
+                        <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                          notification.is_read ? 'bg-gray-400' : 'bg-blue-500'
+                        }`}></div>
                         
-                        return (
-                          <div
-                            key={notification.id}
-                            className={`p-4 rounded-lg border transition-all duration-200 hover:shadow-sm ${
-                              notification.is_read
-                                ? 'bg-gray-50 border-gray-200'
-                                : 'bg-white border-gray-300 shadow-sm'
-                            }`}
+                        {/* Notification content */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 text-xs mb-1">
+                            {notification.title}
+                          </h3>
+                          <p className="text-gray-600 text-xs mb-2 leading-relaxed">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(notification.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {/* Mark as Read Button (only for unread notifications) */}
+                          {!notification.is_read && (
+                            <button
+                              onClick={() => handleMarkAsRead(notification.id)}
+                              className="p-1 text-gray-600 hover:text-green-600 hover:bg-green-100 rounded transition-colors"
+                              title="Mark as read"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </button>
+                          )}
+                          
+                          {/* Order Action Buttons for Delivered Confirmation Notifications */}
+                          {notification.type === 'delivered_confirmation' && orderId && (
+                            <>
+                              <button
+                                onClick={() => handleOrderReceived(orderId)}
+                                disabled={processingOrder === orderId}
+                                className="bg-green-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {processingOrder === orderId ? 'Processing...' : '✅ Order Received'}
+                              </button>
+                              <button
+                                onClick={() => handleOrderCancel(orderId)}
+                                disabled={processingOrder === orderId}
+                                className="bg-red-600 text-white px-2 py-1 rounded text-xs font-medium hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {processingOrder === orderId ? 'Processing...' : '❌ Cancel Order'}
+                              </button>
+                            </>
+                          )}
+                          
+                          {/* Delete button */}
+                          <button
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this notification?')) {
+                                // Add delete functionality here
+                                console.log('Delete notification:', notification.id);
+                              }
+                            }}
+                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Delete notification"
                           >
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className={`w-2 h-2 rounded-full ${
-                                    notification.is_read ? 'bg-gray-400' : 'bg-green-500'
-                                  }`}></div>
-                                  <h3 className="font-medium text-gray-900 text-sm">
-                                    {notification.title}
-                                  </h3>
-                                  {!notification.is_read && (
-                                    <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-medium">
-                                      NEW
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-gray-600 text-sm mb-2 leading-relaxed">
-                                  {notification.message}
-                                </p>
-                                <p className="text-xs text-gray-500 mb-3">
-                                  {new Date(notification.created_at).toLocaleString()}
-                                </p>
-                                
-                                {/* Action Buttons */}
-                                <div className="flex gap-2 flex-wrap">
-                                  {/* Mark as Read Button (only for unread notifications) */}
-                                  {!notification.is_read && (
-                                    <button
-                                      onClick={() => handleMarkAsRead(notification.id)}
-                                      className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-blue-700 transition-colors"
-                                    >
-                                      ✓ Mark as Read
-                                    </button>
-                                  )}
-                                  
-                                  {/* Order Action Buttons for Delivered Confirmation Notifications */}
-                                  {notification.type === 'delivered_confirmation' && orderId && (
-                                    <>
-                                      <button
-                                        onClick={() => handleOrderReceived(orderId)}
-                                        disabled={processingOrder === orderId}
-                                        className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                                      >
-                                        {processingOrder === orderId ? 'Processing...' : '✅ Order Received'}
-                                      </button>
-                                      <button
-                                        onClick={() => handleOrderCancel(orderId)}
-                                        disabled={processingOrder === orderId}
-                                        className="bg-red-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                                      >
-                                        {processingOrder === orderId ? 'Processing...' : '❌ Cancel Order'}
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                  ) : (
-                    <div className="text-center py-12">
-                      <div className="text-gray-400 text-4xl mb-4">📦</div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No order notifications</h3>
-                      <p className="text-gray-500">Order notifications will appear here when customers place orders.</p>
-                    </div>
-                  )
-                ) : null}
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-gray-400 text-2xl mb-3">📦</div>
+                    <h3 className="text-sm font-medium text-gray-900 mb-2">No notifications</h3>
+                    <p className="text-xs text-gray-500">
+                      {statusFilter === 'all' 
+                        ? 'No notifications available.' 
+                        : `No ${statusFilter} notifications.`}
+                    </p>
+                  </div>
+                )}
                 
-                {/* Pagination for orders tab */}
-                {activeTab === 'orders' && notifications.length > 0 && (
-                  <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 mt-4">
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                {/* Pagination */}
+                {filteredNotifications.length > 0 && (
+                  <div className="px-3 py-2 border-t border-gray-200 bg-gray-50 mt-3">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
                       {/* Records Info */}
                       <div className="text-xs text-gray-600">
-                        Showing {startIndex + 1} to {Math.min(endIndex, notifications.length)} of {notifications.length} notifications
+                        Showing {startIndex + 1} to {Math.min(endIndex, filteredNotifications.length)} of {filteredNotifications.length} notifications
                       </div>
                       
                       {/* Pagination Controls */}
@@ -369,19 +395,19 @@ export default function AdminNotificationPage() {
                         <button
                           onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                           disabled={currentPage === 1 || totalPages <= 1}
-                          className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                          className="px-2 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
                         >
                           &lt;
                         </button>
                         
-                        <span className="px-3 py-1 text-xs border border-gray-300 rounded-md bg-[#000C50] text-white">
+                        <span className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-blue-600 text-white">
                           {currentPage}
                         </span>
                         
                         <button
                           onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                           disabled={currentPage === totalPages || totalPages <= 1}
-                          className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                          className="px-2 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
                         >
                           &gt;
                         </button>
@@ -389,60 +415,9 @@ export default function AdminNotificationPage() {
                     </div>
                   </div>
                 )}
-
-                {activeTab === 'low-stock' ? (
-                  <div className="bg-white border border-gray-300 overflow-hidden rounded-lg">
-                    <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-blue-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Product Name
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Category
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Current Stock
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {lowStock.map((p, index) => (
-                            <tr key={p.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
-                              <td className="px-6 py-4">
-                                <div className="text-sm font-medium text-gray-900">{p.name}</div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                  {p.category_name || 'N/A'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${
-                                  p.stock === 0 
-                                    ? 'bg-red-100 text-red-800' 
-                                    : 'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                  {p.stock}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {lowStock.length === 0 && (
-                        <div className="text-center py-12">
-                          <div className="text-gray-400 text-4xl mb-4">⚠️</div>
-                          <h3 className="text-lg font-medium text-gray-900 mb-2">No low stock alerts</h3>
-                          <p className="text-gray-500">All products have sufficient stock levels.</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>

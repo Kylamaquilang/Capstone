@@ -26,6 +26,10 @@ export const addStudent = async (req, res) => {
       status 
     } = req.body;
 
+    console.log('🔍 Received student data:', req.body);
+    console.log('🔍 Status value:', status);
+    console.log('🔍 Status type:', typeof status);
+
     // Validation
     if (!student_id || !first_name || !last_name || !email || !degree || !status) {
       return res.status(400).json({ 
@@ -66,13 +70,26 @@ export const addStudent = async (req, res) => {
 
     // Validate status
     const validStatuses = ['regular', 'irregular'];
-    if (!validStatuses.includes(status)) {
+    console.log('🔍 Validating status:', status);
+    console.log('🔍 Status type:', typeof status);
+    console.log('🔍 Status length:', status?.length);
+    console.log('🔍 Status char codes:', status?.split('').map(c => c.charCodeAt(0)));
+    console.log('🔍 Valid statuses:', validStatuses);
+    console.log('🔍 Status includes check:', validStatuses.includes(status));
+    
+    // Clean the status value
+    const cleanStatus = status?.trim().toLowerCase();
+    console.log('🔍 Clean status:', cleanStatus);
+    console.log('🔍 Clean status includes check:', validStatuses.includes(cleanStatus));
+    
+    if (!validStatuses.includes(cleanStatus)) {
+      console.log('❌ Status validation failed for:', status, '-> cleaned:', cleanStatus);
       return res.status(400).json({ 
         error: 'Invalid status. Must be either "regular" or "irregular"' 
       });
     }
 
-    // Check if student already exists with this email (excluding soft-deleted users)
+    // Check if student already exists with this email (only active users)
     const [existingEmail] = await pool.query('SELECT * FROM users WHERE email = ? AND is_active = 1', [email.trim()]);
     if (existingEmail.length > 0) {
       return res.status(409).json({ 
@@ -80,11 +97,84 @@ export const addStudent = async (req, res) => {
       });
     }
 
-    // Check if student already exists with this student_id (excluding soft-deleted users)
+    // Check if student already exists with this student_id (only active users)
     const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ? AND is_active = 1', [student_id.trim()]);
     if (existingStudentId.length > 0) {
       return res.status(409).json({ 
         error: 'Student ID already exists' 
+      });
+    }
+
+    // Check if there's a soft-deleted user with the same email or student_id
+    // If so, reactivate that user instead of creating a new one
+    const [deletedUser] = await pool.query(
+      'SELECT * FROM users WHERE (email = ? OR student_id = ?) AND is_active = 0', 
+      [email.trim(), student_id.trim()]
+    );
+
+    if (deletedUser.length > 0) {
+      const userToReactivate = deletedUser[0];
+      console.log('🔄 Reactivating soft-deleted user:', userToReactivate.id);
+      
+      // Create full name
+      const fullName = `${first_name} ${middle_name ? middle_name + ' ' : ''}${last_name}${suffix ? ' ' + suffix : ''}`;
+
+      // Hash default password
+      const hashedPassword = await bcrypt.hash(DEFAULT_STUDENT_PASSWORD, SALT_ROUNDS);
+
+      // Reactivate the user with new data
+      await pool.query(
+        `UPDATE users SET 
+          student_id = ?, 
+          email = ?, 
+          name = ?, 
+          password = ?, 
+          first_name = ?,
+          last_name = ?,
+          middle_name = ?,
+          suffix = ?,
+          degree = ?,
+          year_level = ?,
+          section = ?,
+          status = ?,
+          is_active = 1,
+          must_change_password = 1,
+          updated_at = NOW()
+        WHERE id = ?`,
+        [
+          student_id.trim(),
+          email.trim(),
+          fullName,
+          hashedPassword,
+          first_name.trim(),
+          last_name.trim(),
+          middle_name?.trim() || null,
+          suffix?.trim() || null,
+          degree,
+          year_level || null,
+          section?.trim() || null,
+          cleanStatus,
+          userToReactivate.id
+        ]
+      );
+
+      // Send welcome email
+      try {
+        await sendWelcomeEmail(email.trim(), fullName, student_id.trim(), DEFAULT_STUDENT_PASSWORD);
+      } catch (emailError) {
+        console.warn('Failed to send welcome email:', emailError.message);
+      }
+
+      return res.status(200).json({ 
+        message: 'Student reactivated successfully',
+        student: {
+          id: userToReactivate.id,
+          student_id: student_id.trim(),
+          name: fullName,
+          email: email.trim(),
+          degree,
+          status: cleanStatus
+        }
       });
     }
 
@@ -127,7 +217,7 @@ export const addStudent = async (req, res) => {
         degree,
         year_level || null,
         section?.trim() || null,
-        status,
+        cleanStatus,
       ]
     );
 
@@ -146,7 +236,7 @@ export const addStudent = async (req, res) => {
         name: fullName,
         email: email.trim(),
         degree,
-        status
+        status: cleanStatus
       }
     });
   } catch (error) {

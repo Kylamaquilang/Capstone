@@ -87,43 +87,6 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
     }
   };
 
-  const markAsUnread = async (notificationId) => {
-    try {
-      // Try API call first
-      try {
-        const response = await fetch(`/api/notifications/${notificationId}/unread`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        if (response.ok) {
-          // Update local state
-          const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
-          const updatedNotifications = notificationsArray.map(notification =>
-            notification.id === notificationId
-              ? { ...notification, read: false }
-              : notification
-          );
-          setLocalNotifications(updatedNotifications);
-          return;
-        }
-      } catch (apiError) {
-        console.log('API not available, updating locally:', apiError.message);
-      }
-      
-      // Fallback to local update
-      const notificationsArray = Array.isArray(localNotifications) ? localNotifications : [];
-      const updatedNotifications = notificationsArray.map(notification =>
-        notification.id === notificationId
-          ? { ...notification, read: false }
-          : notification
-      );
-      setLocalNotifications(updatedNotifications);
-    } catch (error) {
-      console.error('Error marking notification as unread:', error);
-    }
-  };
 
   const deleteNotification = async (notificationId) => {
     try {
@@ -243,7 +206,7 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
 
                     {/* Action Buttons */}
                     <div className="flex items-center space-x-2 mt-2">
-                      {!notification.read ? (
+                      {!notification.read && (
                         <button
                           onClick={() => markAsRead(notification.id)}
                           className="p-1 text-gray-600 hover:text-gray-800 hover:bg-blue-100 rounded transition-colors"
@@ -251,16 +214,6 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => markAsUnread(notification.id)}
-                          className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
-                          title="Mark as unread"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                           </svg>
                         </button>
                       )}

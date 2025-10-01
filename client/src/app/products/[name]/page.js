@@ -411,10 +411,10 @@ export default function ProductDetailPage() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full uppercase tracking-wide">
-                        {product.category || 'Product'}
+                        {(product.category || 'Product').toUpperCase()}
                       </span>
                     </div>
-                    <h1 className="text-xl font-medium text-gray-900 leading-tight">{product.name}</h1>
+                    <h1 className="text-xl font-medium text-gray-900 leading-tight uppercase">{product.name}</h1>
                     <div className="text-2xl font-medium text-gray-900">
                       ₱{getCurrentPrice().toFixed(2)}
                     </div>

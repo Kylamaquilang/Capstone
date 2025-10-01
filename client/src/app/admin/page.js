@@ -216,7 +216,7 @@ export default function AdminDashboardPage() {
                     {stats.lowStockProducts.map((product) => (
                       <div key={product.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{product.name}</p>
+                          <p className="text-sm font-medium text-gray-900 uppercase">{product.name}</p>
                           <p className="text-xs text-gray-600">Stock: {product.stock}</p>
                         </div>
                         <div className="text-right">

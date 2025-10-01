@@ -501,10 +501,10 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                   />
                 </td>
                 <td className="px-4 py-3 border-r border-gray-100">
-                  <div className="text-xs font-medium text-gray-900">{row.name}</div>
+                  <div className="text-xs font-medium text-gray-900 uppercase">{row.name}</div>
                     </td>
                     <td className="px-4 py-3 border-r border-gray-100">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 uppercase">
                     {row.category_name || row.category || 'Uncategorized'}
                       </span>
                     </td>

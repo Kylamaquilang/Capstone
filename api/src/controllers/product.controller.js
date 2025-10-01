@@ -30,8 +30,12 @@ export const getAllProductsSimple = async (req, res) => {
         p.name,
         p.description,
         p.price,
+        p.original_price,
         p.stock,
         p.image,
+        p.created_at,
+        p.last_restock_date,
+        c.name as category_name,
         c.name as category
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
@@ -63,12 +67,21 @@ export const getAllProductsSimple = async (req, res) => {
           
           return {
             id: product.id,
+            product_code: `PRD${String(product.id).padStart(3, '0')}`,
             name: product.name,
             description: product.description,
             price: parseFloat(product.price),
+            original_price: parseFloat(product.original_price || 0),
             stock: parseInt(product.stock),
             image_url: product.image ? product.image : null,
             image: product.image ? product.image : null,
+            unit_of_measure: 'pcs',
+            supplier: 'N/A',
+            reorder_level: 5,
+            updated_by: 'N/A',
+            created_at: product.created_at,
+            last_restock_date: product.last_restock_date,
+            category_name: product.category_name,
             category: product.category || 'Other',
             sizes: sizes.map(size => ({
               id: size.id,
@@ -80,13 +93,22 @@ export const getAllProductsSimple = async (req, res) => {
         } catch (error) {
           console.error(`Error fetching sizes for product ${product.id}:`, error);
           return {
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      price: parseFloat(product.price),
-      stock: parseInt(product.stock),
+            id: product.id,
+            product_code: `PRD${String(product.id).padStart(3, '0')}`,
+            name: product.name,
+            description: product.description,
+            price: parseFloat(product.price),
+            original_price: parseFloat(product.original_price || 0),
+            stock: parseInt(product.stock),
             image_url: product.image ? product.image : null,
             image: product.image ? product.image : null,
+            unit_of_measure: 'pcs',
+            supplier: 'N/A',
+            reorder_level: 5,
+            updated_by: 'N/A',
+            created_at: product.created_at,
+            last_restock_date: product.last_restock_date,
+            category_name: product.category_name,
             category: product.category || 'Other',
             sizes: []
           };
@@ -232,7 +254,7 @@ export const createProduct = async (req, res) => {
             [
               productId,
               sizeItem.size.trim(),
-              parseInt(sizeItem.stock) || 0, // Use size-specific stock
+              parseInt(sizeItem.stock) || parseInt(stock), // Use size-specific stock or fallback to base stock
               parseFloat(sizeItem.price) || parseFloat(price) // Use size-specific price or fallback to base price
             ]
           );
@@ -646,7 +668,7 @@ export const updateProduct = async (req, res) => {
 
           await connection.query(
             `INSERT INTO product_sizes (product_id, size, stock, price, is_active) VALUES (?, ?, ?, ?, TRUE)`,
-            [id, sizeData.size.toUpperCase(), parseInt(sizeData.stock) || 0, parseFloat(sizeData.price) || parseFloat(price), 1]
+            [id, sizeData.size.toUpperCase(), parseInt(sizeData.stock) || parseInt(stock), parseFloat(sizeData.price) || parseFloat(price), 1]
           );
         }
       }
@@ -740,7 +762,8 @@ export const deleteProduct = async (req, res) => {
 // ✅ Get Low Stock Products (for Admin Alerts)
 export const getLowStockProducts = async (req, res) => {
   try {
-    const [products] = await pool.query(`
+    // First get products with low base stock
+    const [baseStockProducts] = await pool.query(`
       SELECT p.*, c.name AS category_name 
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
@@ -748,11 +771,20 @@ export const getLowStockProducts = async (req, res) => {
       ORDER BY p.stock ASC
     `, [LOW_STOCK_THRESHOLD]);
 
-    // Get product sizes for each product
+    // Get all products with their sizes to check for size-specific low stock
+    const [allProducts] = await pool.query(`
+      SELECT p.*, c.name AS category_name 
+      FROM products p 
+      LEFT JOIN categories c ON p.category_id = c.id 
+      WHERE p.is_active = 1
+      ORDER BY p.stock ASC
+    `);
+
+    // Get product sizes for all products
     const productsWithSizes = await Promise.all(
-      products.map(async (product) => {
+      allProducts.map(async (product) => {
         const [sizes] = await pool.query(
-          'SELECT * FROM product_sizes WHERE product_id = ?',
+          'SELECT * FROM product_sizes WHERE product_id = ? AND is_active = 1',
           [product.id]
         );
         return {
@@ -762,10 +794,25 @@ export const getLowStockProducts = async (req, res) => {
       })
     );
 
+    // Filter for products with low stock (either base stock or any size stock)
+    const lowStockProducts = productsWithSizes.filter(product => {
+      // Check base stock
+      if (Number(product.stock) <= LOW_STOCK_THRESHOLD) {
+        return true;
+      }
+      
+      // Check if any size has low stock
+      if (product.sizes && product.sizes.length > 0) {
+        return product.sizes.some(size => Number(size.stock) <= LOW_STOCK_THRESHOLD);
+      }
+      
+      return false;
+    });
+
     res.json({
-      products: productsWithSizes,
+      products: lowStockProducts,
       threshold: LOW_STOCK_THRESHOLD,
-      count: products.length
+      count: lowStockProducts.length
     });
   } catch (error) {
     console.error('Low Stock Check Error:', error.message);

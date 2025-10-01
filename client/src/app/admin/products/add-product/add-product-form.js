@@ -253,7 +253,7 @@ export default function AddProductForm() {
             >
               <option value="">Select category</option>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>
               ))}
             </select>
           </div>

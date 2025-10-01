@@ -47,7 +47,7 @@ export default function Navbar() {
     return (
       <div className="relative">
         {children}
-        <span className="absolute -top-2 -right-2 bg-gray-200 text-black text-xs font-normal px-1.5 py-0.5 rounded-full">
+        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-normal w-5 h-5 flex items-center justify-center rounded-full">
           {count > 99 ? '99+' : count}
         </span>
       </div>

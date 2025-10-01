@@ -64,6 +64,7 @@ CREATE TABLE categories (
 
 CREATE TABLE products (
     id INT PRIMARY KEY AUTO_INCREMENT,
+    product_code VARCHAR(50) UNIQUE,
     name VARCHAR(200) NOT NULL,
     description TEXT,
     price DECIMAL(10,2) NOT NULL,
@@ -75,6 +76,10 @@ CREATE TABLE products (
     size VARCHAR(20),
     color VARCHAR(50),
     brand VARCHAR(100),
+    unit_of_measure VARCHAR(20) DEFAULT 'pcs',
+    supplier VARCHAR(200),
+    reorder_level INT DEFAULT 5,
+    updated_by VARCHAR(100),
 
     is_active BOOLEAN DEFAULT TRUE,
     reorder_point INT DEFAULT 5,
@@ -91,7 +96,8 @@ CREATE TABLE products (
     CONSTRAINT chk_product_name CHECK (LENGTH(name) >= 2),
     CONSTRAINT chk_price CHECK (price > 0),
     CONSTRAINT chk_stock CHECK (stock >= 0),
-    CONSTRAINT chk_reorder_point CHECK (reorder_point >= 0)
+    CONSTRAINT chk_reorder_point CHECK (reorder_point >= 0),
+    CONSTRAINT chk_reorder_level CHECK (reorder_level >= 0)
 );
 
 CREATE TABLE product_sizes (
@@ -111,6 +117,29 @@ CREATE TABLE product_sizes (
     CONSTRAINT chk_size_stock CHECK (stock >= 0),
     CONSTRAINT chk_size_price CHECK (price IS NULL OR price > 0),
     UNIQUE KEY unique_product_size (product_id, size)
+);
+
+CREATE TABLE stock_movements (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    product_id INT NOT NULL,
+    user_id INT NOT NULL,
+    movement_type ENUM('stock_in', 'stock_out') NOT NULL,
+    quantity INT NOT NULL,
+    reason VARCHAR(100) NOT NULL,
+    supplier VARCHAR(200),
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    
+
+    CONSTRAINT chk_movement_quantity CHECK (quantity > 0),
+    INDEX idx_stock_movements_product (product_id),
+    INDEX idx_stock_movements_user (user_id),
+    INDEX idx_stock_movements_type (movement_type),
+    INDEX idx_stock_movements_date (created_at)
 );
 
 

@@ -20,7 +20,7 @@ import {
 
 export default function AdminReportsPage() {
   const { socket, isConnected, joinAdminRoom } = useSocket();
-  const [activeTab, setActiveTab] = useState('low-stock');
+  const [activeTab, setActiveTab] = useState('inventory');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -32,36 +32,105 @@ export default function AdminReportsPage() {
   });
 
   // Report data states
-  const [lowStockData, setLowStockData] = useState([]);
+  const [inventoryData, setInventoryData] = useState([]);
+  const [restockData, setRestockData] = useState([]);
   const [salesData, setSalesData] = useState({});
-  const [revenueData, setRevenueData] = useState({});
 
-  // Fetch low stock products
-  const fetchLowStockProducts = async () => {
+  // Fetch inventory data
+  const fetchInventoryData = async () => {
     try {
       setLoading(true);
       setError('');
-      const response = await API.get('/products/low-stock');
-      setLowStockData(response.data.products || []);
-    } catch (err) {
-      console.error('Low stock error:', err);
       
-      // Handle different error types gracefully
-      if (err.response?.status === 400) {
-        setError('Invalid request parameters for low stock data');
-      } else if (err.response?.status === 401) {
-        setError('Authentication required to access low stock data');
-      } else if (err.response?.status === 403) {
-        setError('Admin access required for low stock data');
-      } else if (err.response?.status === 404) {
-        setError('Low stock endpoint not found');
-      } else if (err.response?.status >= 500) {
-        setError('Server error while fetching low stock data');
-      } else {
-        setError('Failed to fetch low stock products');
+      console.log('Fetching inventory data for reports...');
+      
+      // Get all products with detailed information
+      let allProducts = [];
+      let productsWithSizes = [];
+      
+      // Step 1: Get all products
+      try {
+        console.log('Fetching all products...');
+        const productsRes = await API.get('/products');
+        allProducts = productsRes.data || [];
+        
+        if (allProducts.length === 0) {
+          console.log('No products found in database');
+          setInventoryData([]);
+          setError('No products found. Add some products to see inventory data.');
+          return;
+        }
+        
+        console.log(`Found ${allProducts.length} products`);
+      } catch (productsErr) {
+        console.error('Failed to fetch products:', productsErr.message);
+        throw productsErr;
       }
       
-      setLowStockData([]);
+      // Step 2: Try to get detailed product data with sizes
+      try {
+        console.log('Fetching detailed product data with sizes...');
+        const detailedRes = await API.get('/products/detailed');
+        const detailedProducts = detailedRes.data || [];
+        
+        if (Array.isArray(detailedProducts) && detailedProducts.length > 0) {
+          // Fetch individual product details to get accurate sizes
+          productsWithSizes = await Promise.all(
+            detailedProducts.map(async (product) => {
+              try {
+                const { data: productDetail } = await API.get(`/products/${product.id}`);
+                return {
+                  ...product,
+                  sizes: productDetail.sizes || []
+                };
+              } catch (err) {
+                return {
+                  ...product,
+                  sizes: []
+                };
+              }
+            })
+          );
+          console.log(`Enhanced ${productsWithSizes.length} products with size data`);
+        } else {
+          // Use basic products data
+          productsWithSizes = allProducts.map(product => ({
+            ...product,
+            sizes: []
+          }));
+          console.log('Using basic product data (no size details available)');
+        }
+      } catch (detailedErr) {
+        console.log('Detailed products API failed, using basic product data:', detailedErr.message);
+        productsWithSizes = allProducts.map(product => ({
+          ...product,
+          sizes: []
+        }));
+      }
+      
+      console.log('Setting inventory data for reports:', productsWithSizes.length);
+      setInventoryData(productsWithSizes);
+      
+    } catch (err) {
+      console.error('Inventory error:', err);
+      setError('Failed to fetch inventory data');
+      setInventoryData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch restock data
+  const fetchRestockData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      // For now, we'll use a placeholder since restock history endpoint doesn't exist yet
+      setRestockData([]);
+    } catch (err) {
+      console.error('Restock error:', err);
+      setError('Failed to fetch restock data');
+      setRestockData([]);
     } finally {
       setLoading(false);
     }
@@ -122,114 +191,18 @@ export default function AdminReportsPage() {
   };
 
 
-  // Fetch revenue and profit data
-  const fetchRevenueData = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Try to get revenue data from sales performance endpoint first
-      try {
-        const params = new URLSearchParams();
-        if (dateFilter.startDate) params.append('start_date', dateFilter.startDate);
-        if (dateFilter.endDate) params.append('end_date', dateFilter.endDate);
-        if (dateFilter.period) params.append('group_by', dateFilter.period);
-        
-        const response = await API.get(`/orders/sales-performance/public?${params}`);
-        const salesData = response.data || {};
-        
-        // Transform sales performance data to revenue format
-        setRevenueData({
-          salesData: salesData.salesData || [],
-          topProducts: salesData.topProducts || [],
-          summary: {
-            total_orders: salesData.summary?.total_orders || 0,
-            total_revenue: salesData.summary?.total_revenue || 0,
-            total_cost: 0, // Not available in sales performance
-            total_profit: 0, // Not available in sales performance
-            overall_profit_margin: 0 // Not available in sales performance
-          }
-        });
-        
-        console.log('Revenue data loaded from sales performance endpoint');
-        return;
-      } catch (analyticsError) {
-        console.log('Sales analytics endpoint not available, using fallback data');
-      }
-      
-      // Fallback: Use basic orders data
-      try {
-        const ordersResponse = await API.get('/orders/admin');
-        const orders = ordersResponse.data || [];
-        
-        // Calculate basic revenue metrics
-        const totalOrders = orders.length;
-        const totalRevenue = orders.reduce((sum, order) => sum + (parseFloat(order.total_amount) || 0), 0);
-        const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-        
-        setRevenueData({
-          salesData: [],
-          topProducts: [],
-          summary: {
-            total_orders: totalOrders,
-            total_revenue: totalRevenue,
-            total_cost: 0,
-            total_profit: 0,
-            overall_profit_margin: 0
-          }
-        });
-        
-        console.log('Revenue data calculated from basic orders');
-        return;
-      } catch (ordersError) {
-        console.error('Failed to fetch orders data:', ordersError);
-      }
-      
-      // Final fallback
-      setRevenueData({
-        salesData: [],
-        topProducts: [],
-        summary: {
-          total_orders: 0,
-          total_revenue: 0,
-          total_cost: 0,
-          total_profit: 0,
-          overall_profit_margin: 0
-        }
-      });
-      
-    } catch (err) {
-      console.error('Revenue data error:', err);
-      setError('Unable to load revenue data at this time');
-      
-      // Set fallback data structure
-      setRevenueData({
-        salesData: [],
-        topProducts: [],
-        summary: {
-          total_orders: 0,
-          total_revenue: 0,
-          total_cost: 0,
-          total_profit: 0,
-          overall_profit_margin: 0
-        }
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Auto-refresh for reports
   useAdminAutoRefresh(() => {
     switch (activeTab) {
-      case 'low-stock':
-        fetchLowStockProducts();
+      case 'inventory':
+        fetchInventoryData();
+        break;
+      case 'restock':
+        fetchRestockData();
         break;
       case 'sales':
         fetchSalesData();
-        break;
-      case 'revenue':
-        fetchRevenueData();
         break;
       default:
         break;
@@ -239,8 +212,11 @@ export default function AdminReportsPage() {
   // Load data based on active tab
   useEffect(() => {
     switch (activeTab) {
-      case 'low-stock':
-        fetchLowStockProducts();
+      case 'inventory':
+        fetchInventoryData();
+        break;
+      case 'restock':
+        fetchRestockData();
         break;
       case 'sales':
         // Set default start date to 2025-01-01 for sales report
@@ -248,9 +224,6 @@ export default function AdminReportsPage() {
           setDateFilter(prev => ({ ...prev, startDate: '2025-01-01' }));
         }
         fetchSalesData();
-        break;
-      case 'revenue':
-        fetchRevenueData();
         break;
       default:
         break;
@@ -266,61 +239,71 @@ export default function AdminReportsPage() {
       // Join admin room for real-time updates
       joinAdminRoom();
 
-      // Listen for product updates (affects low stock reports)
+      // Listen for product updates (affects inventory reports)
       const handleProductUpdate = (productData) => {
         console.log('📦 Real-time product update received in reports:', productData);
-        if (isMounted && activeTab === 'low-stock') {
-          fetchLowStockProducts();
+        if (isMounted && (activeTab === 'inventory' || activeTab === 'restock')) {
+          if (activeTab === 'inventory') {
+            fetchInventoryData();
+          }
+          if (activeTab === 'restock') {
+            fetchRestockData();
+          }
         }
       };
 
-      // Listen for new products (affects low stock reports)
+      // Listen for new products (affects inventory reports)
       const handleNewProduct = (productData) => {
         console.log('📦 Real-time new product received in reports:', productData);
-        if (isMounted && activeTab === 'low-stock') {
-          fetchLowStockProducts();
+        if (isMounted && (activeTab === 'inventory' || activeTab === 'restock')) {
+          if (activeTab === 'inventory') {
+            fetchInventoryData();
+          }
+          if (activeTab === 'restock') {
+            fetchRestockData();
+          }
         }
       };
 
-      // Listen for product deletions (affects low stock reports)
+      // Listen for product deletions (affects inventory reports)
       const handleProductDelete = (productData) => {
         console.log('🗑️ Real-time product deletion received in reports:', productData);
-        if (isMounted && activeTab === 'low-stock') {
-          fetchLowStockProducts();
+        if (isMounted && (activeTab === 'inventory' || activeTab === 'restock')) {
+          if (activeTab === 'inventory') {
+            fetchInventoryData();
+          }
+          if (activeTab === 'restock') {
+            fetchRestockData();
+          }
         }
       };
 
-      // Listen for inventory updates (affects low stock reports)
+      // Listen for inventory updates (affects inventory reports)
       const handleInventoryUpdate = (inventoryData) => {
         console.log('📦 Real-time inventory update received in reports:', inventoryData);
-        if (isMounted && activeTab === 'low-stock') {
-          fetchLowStockProducts();
+        if (isMounted && (activeTab === 'inventory' || activeTab === 'restock')) {
+          if (activeTab === 'inventory') {
+            fetchInventoryData();
+          }
+          if (activeTab === 'restock') {
+            fetchRestockData();
+          }
         }
       };
 
-      // Listen for order updates (affects sales and revenue reports)
+      // Listen for order updates (affects sales reports)
       const handleOrderUpdate = (orderData) => {
         console.log('📦 Real-time order update received in reports:', orderData);
-        if (isMounted && (activeTab === 'sales' || activeTab === 'revenue')) {
-          if (activeTab === 'sales') {
+        if (isMounted && activeTab === 'sales') {
             fetchSalesData();
-          }
-          if (activeTab === 'revenue') {
-            fetchRevenueData();
-          }
         }
       };
 
-      // Listen for new orders (affects sales and revenue reports)
+      // Listen for new orders (affects sales reports)
       const handleNewOrder = (orderData) => {
         console.log('🛒 Real-time new order received in reports:', orderData);
-        if (isMounted && (activeTab === 'sales' || activeTab === 'revenue')) {
-          if (activeTab === 'sales') {
+        if (isMounted && activeTab === 'sales') {
             fetchSalesData();
-          }
-          if (activeTab === 'revenue') {
-            fetchRevenueData();
-          }
         }
       };
 
@@ -330,14 +313,14 @@ export default function AdminReportsPage() {
         if (isMounted) {
           // Refresh all reports when admin notifications arrive
           switch (activeTab) {
-            case 'low-stock':
-              fetchLowStockProducts();
+            case 'inventory':
+              fetchInventoryData();
+              break;
+            case 'restock':
+              fetchRestockData();
               break;
             case 'sales':
               fetchSalesData();
-              break;
-            case 'revenue':
-              fetchRevenueData();
               break;
             default:
               break;
@@ -644,80 +627,125 @@ export default function AdminReportsPage() {
   // Helper functions for download
   const getReportTitle = () => {
     switch (activeTab) {
-      case 'low-stock': return 'Low Stock Items Report';
+      case 'inventory': return 'Inventory Report';
+      case 'restock': return 'Restock Report';
       case 'sales': return 'Sales Report';
-      case 'revenue': return 'Revenue & Profit Report';
       default: return 'Business Report';
     }
   };
 
   const getReportDescription = () => {
     switch (activeTab) {
-      case 'low-stock': return 'Products with stock levels below threshold';
+      case 'inventory': return 'Current stock levels of all products';
+      case 'restock': return 'History of restocked items';
       case 'sales': return `Sales performance by ${dateFilter.period}`;
-      case 'revenue': return 'Financial performance analysis';
       default: return 'Business analytics report';
     }
   };
 
   const getReportData = () => {
     switch (activeTab) {
-      case 'low-stock': return lowStockData;
+      case 'inventory': return inventoryData;
+      case 'restock': return restockData;
       case 'sales': return salesData;
-      case 'revenue': return revenueData;
       default: return {};
     }
   };
 
   const generateReportHTML = (data) => {
     switch (activeTab) {
-      case 'low-stock':
-        return generateLowStockHTML(data);
+      case 'inventory':
+        return generateInventoryHTML(data);
+      case 'restock':
+        return generateRestockHTML(data);
       case 'sales':
         return generateSalesHTML(data);
-      case 'revenue':
-        return generateRevenueHTML(data);
       default:
         return '<div class="no-data">No data available</div>';
     }
   };
 
-  const generateLowStockHTML = (data) => {
+  const generateInventoryHTML = (data) => {
     if (!Array.isArray(data) || data.length === 0) {
-      return '<div class="no-data">No low stock products found</div>';
+      return '<div class="no-data">No inventory data found</div>';
     }
 
     return `
       <table>
         <thead>
           <tr>
-            <th>Product</th>
+            <th>Product ID</th>
+            <th>Product Name</th>
             <th>Category</th>
-            <th>Current Stock</th>
-            <th>Price</th>
+            <th>Size/Variant</th>
+            <th>Unit</th>
+            <th>Qty in Stock</th>
+            <th>Reorder Level</th>
+            <th>Cost Price</th>
+            <th>Selling Price</th>
+            <th>Supplier</th>
             <th>Status</th>
+            <th>Date Added</th>
+            <th>Last Restock</th>
+            <th>Updated By</th>
           </tr>
         </thead>
         <tbody>
           ${data.map(product => `
             <tr>
-              <td>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  ${product.image ? `<img src="${process.env.NEXT_PUBLIC_API_URL}/uploads/${product.image}" alt="${product.name}" class="product-image" />` : ''}
-                  <div>
-                    <div style="font-weight: 500;">${product.name}</div>
-                    ${product.description ? `<div style="font-size: 11px; color: #666;">${product.description}</div>` : ''}
-                  </div>
-                </div>
-              </td>
+              <td style="font-family: monospace;">${product.product_code || `PRD${String(product.id).padStart(3, '0')}`}</td>
+              <td style="font-weight: 500;">${product.name}</td>
               <td>${product.category_name || product.category || 'N/A'}</td>
-              <td style="text-align: center; font-weight: 500;">${product.stock}</td>
-              <td style="text-align: right;">${formatCurrency(product.price)}</td>
+              <td>${product.sizes && product.sizes.length > 0 ? product.sizes.map(size => size.size).join(', ') : 'N/A'}</td>
+              <td>${product.unit_of_measure || 'pcs'}</td>
+              <td style="text-align: center; font-weight: 500;">${product.stock || 0}</td>
+              <td style="text-align: center;">${product.reorder_level || 5}</td>
+              <td style="text-align: right;">${formatCurrency(product.original_price || 0)}</td>
+              <td style="text-align: right;">${formatCurrency(product.price || 0)}</td>
+              <td>${product.supplier || 'N/A'}</td>
               <td>
-                <span class="status-badge ${product.stock === 0 ? 'status-out-of-stock' : 'status-low-stock'}">
-                  ${product.stock === 0 ? 'Out of Stock' : 'Low Stock'}
+                <span class="status-badge ${product.stock === 0 ? 'status-out-of-stock' : product.stock <= (product.reorder_level || 5) ? 'status-low-stock' : 'status-good'}">
+                  ${product.stock === 0 ? 'Out of Stock' : product.stock <= (product.reorder_level || 5) ? 'Low Stock' : 'In Stock'}
                 </span>
               </td>
+              <td>${product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}</td>
+              <td>${product.last_restock_date ? new Date(product.last_restock_date).toLocaleDateString() : 'N/A'}</td>
+              <td>${product.updated_by || 'N/A'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  };
+
+  const generateRestockHTML = (data) => {
+    if (!Array.isArray(data) || data.length === 0) {
+      return '<div class="no-data">No restock data found</div>';
+    }
+
+    return `
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Product</th>
+            <th>Quantity</th>
+            <th>Supplier</th>
+            <th>Admin</th>
+            <th>Stock Before</th>
+            <th>Stock After</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.map(item => `
+            <tr>
+              <td>${formatDate(item.date)}</td>
+              <td>${item.product_name}</td>
+              <td style="text-align: center;">${item.quantity}</td>
+              <td>${item.supplier || 'N/A'}</td>
+              <td>${item.admin_name || 'N/A'}</td>
+              <td style="text-align: center;">${item.stock_before}</td>
+              <td style="text-align: center;">${item.stock_after}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -925,21 +953,50 @@ export default function AdminReportsPage() {
   };
 
   // Generate DOC content for each report type (keeping for print functionality)
-  const generateLowStockDoc = (data) => {
-    if (!data.products || !Array.isArray(data.products) || data.products.length === 0) {
-      return 'No low stock products found.\n';
+  const generateInventoryDoc = (data) => {
+    if (!Array.isArray(data) || data.length === 0) {
+      return 'No inventory data found.\n';
     }
 
-    let content = 'LOW STOCK PRODUCTS\n';
-    content += '==================\n\n';
+    let content = 'INVENTORY REPORT\n';
+    content += '================\n\n';
     
-    data.products.forEach((product, index) => {
+    data.forEach((product, index) => {
       content += `${index + 1}. ${product.name}\n`;
-      content += `   Product ID: ${product.id}\n`;
-      content += `   Category: ${product.category_name || 'N/A'}\n`;
-      content += `   Current Stock: ${product.stock}\n`;
-      content += `   Price: ${formatCurrency(product.price)}\n`;
-      content += `   Status: ${product.stock === 0 ? 'Out of Stock' : 'Low Stock'}\n\n`;
+      content += `   Product ID: ${product.product_code || `PRD${String(product.id).padStart(3, '0')}`}\n`;
+      content += `   Category: ${product.category_name || product.category || 'N/A'}\n`;
+      content += `   Size/Variant: ${product.sizes && product.sizes.length > 0 ? product.sizes.map(size => size.size).join(', ') : 'N/A'}\n`;
+      content += `   Unit: ${product.unit_of_measure || 'pcs'}\n`;
+      content += `   Qty in Stock: ${product.stock || 0}\n`;
+      content += `   Reorder Level: ${product.reorder_level || 5}\n`;
+      content += `   Cost Price: ${formatCurrency(product.original_price || 0)}\n`;
+      content += `   Selling Price: ${formatCurrency(product.price || 0)}\n`;
+      content += `   Supplier: ${product.supplier || 'N/A'}\n`;
+      content += `   Status: ${product.stock === 0 ? 'Out of Stock' : product.stock <= (product.reorder_level || 5) ? 'Low Stock' : 'In Stock'}\n`;
+      content += `   Date Added: ${product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}\n`;
+      content += `   Last Restock: ${product.last_restock_date ? new Date(product.last_restock_date).toLocaleDateString() : 'N/A'}\n`;
+      content += `   Updated By: ${product.updated_by || 'N/A'}\n\n`;
+    });
+    
+    return content;
+  };
+
+  const generateRestockDoc = (data) => {
+    if (!Array.isArray(data) || data.length === 0) {
+      return 'No restock data found.\n';
+    }
+
+    let content = 'RESTOCK REPORT\n';
+    content += '==============\n\n';
+    
+    data.forEach((item, index) => {
+      content += `${index + 1}. ${item.product_name}\n`;
+      content += `   Date: ${formatDate(item.date)}\n`;
+      content += `   Quantity: ${item.quantity}\n`;
+      content += `   Supplier: ${item.supplier || 'N/A'}\n`;
+      content += `   Admin: ${item.admin_name || 'N/A'}\n`;
+      content += `   Stock Before: ${item.stock_before}\n`;
+      content += `   Stock After: ${item.stock_after}\n\n`;
     });
     
     return content;
@@ -966,25 +1023,6 @@ export default function AdminReportsPage() {
   };
 
 
-  const generateRevenueDoc = (data) => {
-    if (!data.salesData || !Array.isArray(data.salesData) || data.salesData.length === 0) {
-      return 'No revenue data available.\n';
-    }
-
-    let content = 'REVENUE & PROFIT REPORT\n';
-    content += '=======================\n\n';
-    
-    data.salesData.forEach((item, index) => {
-      content += `${index + 1}. ${formatDate(item.date)}\n`;
-      content += `   Orders: ${item.total_orders}\n`;
-      content += `   Revenue: ${formatCurrency(item.total_revenue)}\n`;
-      content += `   Cost: ${formatCurrency(item.total_cost)}\n`;
-      content += `   Profit: ${formatCurrency(item.total_profit)}\n`;
-      content += `   Margin: ${item.profit_margin_percent}%\n\n`;
-    });
-    
-    return content;
-  };
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -1004,9 +1042,9 @@ export default function AdminReportsPage() {
   };
 
   const tabs = [
-    { id: 'low-stock', label: 'Low Stock Items', icon: ExclamationTriangleIcon },
-    { id: 'sales', label: 'Sales Reports', icon: ChartBarIcon },
-    { id: 'revenue', label: 'Revenue & Profit', icon: CurrencyDollarIcon }
+    { id: 'inventory', label: 'Inventory Report', icon: CubeIcon },
+    { id: 'restock', label: 'Restock Report', icon: ExclamationTriangleIcon },
+    { id: 'sales', label: 'Sales Report', icon: ChartBarIcon }
   ];
 
   return (
@@ -1135,16 +1173,16 @@ export default function AdminReportsPage() {
 
             {!loading && !error && (
               <>
-                {/* Low Stock Report */}
-                {activeTab === 'low-stock' && (
+                {/* Inventory Report */}
+                {activeTab === 'inventory' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     {/* Header Section */}
                     <div className="px-6 py-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
                       <div className="flex justify-between items-center">
                         <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Low Stock Items</h3>
+                          <h3 className="text-xl font-semibold text-gray-900">Inventory Report</h3>
                           <p className="text-sm text-gray-600 mt-1">
-                            {Array.isArray(lowStockData) ? `${lowStockData.length} products` : '0 products'} with stock levels below threshold
+                            Current stock levels of all products
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -1179,75 +1217,90 @@ export default function AdminReportsPage() {
                             <th className="px-6 py-4 text-left">
                               <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                             </th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product ID</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size/Variant</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty in Stock</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Reorder Level</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cost Price</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Selling Price</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Base Stock</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date Added</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Restock</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Updated By</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {Array.isArray(lowStockData) && lowStockData.length > 0 ? (
-                            lowStockData.map((product, index) => (
+                          {Array.isArray(inventoryData) && inventoryData.length > 0 ? (
+                            inventoryData.map((product, index) => (
                               <tr key={product.id} className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                                 <td className="px-6 py-4">
                                   <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                 </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex-shrink-0 h-12 w-12 rounded-lg overflow-hidden bg-gray-100">
-                                      {product.image ? (
-                                        <img className="h-12 w-12 object-cover" src={`${process.env.NEXT_PUBLIC_API_URL}/uploads/${product.image}`} alt={product.name} />
-                                      ) : (
-                                        <div className="h-12 w-12 bg-gray-200 flex items-center justify-center">
-                                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                          </svg>
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div>
-                                      <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                                      <div className="text-xs text-gray-500">ID: {product.id}</div>
-                                    </div>
-                                  </div>
+                                <td className="px-6 py-4 text-sm font-mono text-gray-900">
+                                  {product.product_code || `PRD${String(product.id).padStart(3, '0')}`}
                                 </td>
                                 <td className="px-6 py-4">
-                                  <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                  <div className="text-sm font-medium text-gray-900 uppercase">{product.name}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full uppercase">
                                     {product.category_name || product.category || 'N/A'}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">₱{product.cost_price?.toFixed(2) || '0.00'}</td>
-                                <td className="px-6 py-4 text-sm font-medium text-gray-900">₱{product.price?.toFixed(2) || '0.00'}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{product.base_stock || 'N/A'}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{product.size || 'N/A'}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {product.sizes && product.sizes.length > 0 
+                                    ? product.sizes.map(size => size.size).join(', ') 
+                                    : 'N/A'
+                                  }
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {product.unit_of_measure || 'pcs'}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900 text-center font-medium">
+                                  {product.stock || 0}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900 text-center">
+                                  {product.reorder_level || 5}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">₱{Number(product.original_price || 0).toFixed(2)}</td>
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900">₱{Number(product.price || 0).toFixed(2)}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {product.supplier || 'N/A'}
+                                </td>
                                 <td className="px-6 py-4">
                                   <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${
                                     product.stock === 0 
                                       ? 'bg-red-100 text-red-800' 
-                                      : product.stock <= 5
+                                      : product.stock <= (product.reorder_level || 5)
                                       ? 'bg-yellow-100 text-yellow-800'
                                       : 'bg-green-100 text-green-800'
                                   }`}>
-                                    {product.stock}
+                                    {product.stock === 0 
+                                      ? 'Out of Stock' 
+                                      : product.stock <= (product.reorder_level || 5)
+                                      ? 'Low Stock'
+                                      : 'In Stock'
+                                    }
                                   </span>
                                 </td>
-                                <td className="px-6 py-4">
-                                  <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
-                                  </button>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {product.last_restock_date ? new Date(product.last_restock_date).toLocaleDateString() : 'N/A'}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {product.updated_by || 'N/A'}
                                 </td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan="9" className="px-6 py-12 text-center">
+                              <td colSpan="15" className="px-6 py-12 text-center">
                                 <div className="flex flex-col items-center gap-3">
                                   <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1255,8 +1308,8 @@ export default function AdminReportsPage() {
                                     </svg>
                                   </div>
                                   <div>
-                                    <p className="text-sm font-medium text-gray-900">No low stock products found</p>
-                                    <p className="text-xs text-gray-500">All products are well stocked</p>
+                                    <p className="text-sm font-medium text-gray-900">No inventory data found</p>
+                                    <p className="text-xs text-gray-500">No products available</p>
                                   </div>
                                 </div>
                               </td>
@@ -1280,7 +1333,114 @@ export default function AdminReportsPage() {
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="text-sm text-gray-600">
-                            {Array.isArray(lowStockData) && lowStockData.length > 0 ? `1-${Math.min(10, lowStockData.length)} of ${lowStockData.length}` : '0 of 0'}
+                            {Array.isArray(inventoryData) && inventoryData.length > 0 ? `1-${Math.min(10, inventoryData.length)} of ${inventoryData.length}` : '0 of 0'}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                  </button>
+                            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Restock Report */}
+                {activeTab === 'restock' && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    {/* Header Section */}
+                    <div className="px-6 py-5 bg-gradient-to-r from-orange-50 to-red-50 border-b border-gray-100">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h3 className="text-xl font-semibold text-gray-900">Restock Report</h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            History of restocked items
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {/* Download Button */}
+                          <button
+                            onClick={handleDownload}
+                            className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 shadow-sm"
+                          >
+                            <ArrowDownTrayIcon className="h-4 w-4" />
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50/50">
+                          <tr>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Admin</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock Before</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock After</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {Array.isArray(restockData) && restockData.length > 0 ? (
+                            restockData.map((item, index) => (
+                              <tr key={index} className={`hover:bg-orange-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                <td className="px-6 py-4 text-sm text-gray-900">{formatDate(item.date)}</td>
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900 uppercase">{item.product_name}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900 text-center">{item.quantity}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{item.supplier || 'N/A'}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900">{item.admin_name || 'N/A'}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900 text-center">{item.stock_before}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900 text-center">{item.stock_after}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="7" className="px-6 py-12 text-center">
+                                <div className="flex flex-col items-center gap-3">
+                                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                    </svg>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900">No restock data found</p>
+                                    <p className="text-xs text-gray-500">No restock history available</p>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-gray-600">Rows per page:</span>
+                          <select className="text-sm border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                            <option>10</option>
+                            <option>25</option>
+                            <option>50</option>
+                            <option>100</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-gray-600">
+                            {Array.isArray(restockData) && restockData.length > 0 ? `1-${Math.min(10, restockData.length)} of ${restockData.length}` : '0 of 0'}
                           </span>
                           <div className="flex items-center gap-1">
                             <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
@@ -1309,7 +1469,7 @@ export default function AdminReportsPage() {
                         <div>
                           <h3 className="text-xl font-semibold text-gray-900">Sales Report</h3>
                           <p className="text-sm text-gray-600 mt-1">
-                            {salesData.salesData && Array.isArray(salesData.salesData) ? `${salesData.salesData.length} periods` : '0 periods'} of sales performance by {dateFilter.period}
+                            Products sold, quantities, and revenue within a specific period
                           </p>
                         </div>
                         <div className="flex items-center gap-3">

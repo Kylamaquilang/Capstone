@@ -1,5 +1,5 @@
 'use client';
-import { BellIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { BellIcon, ArrowRightOnRectangleIcon, XMarkIcon, CheckIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,6 +12,7 @@ export default function AdminNavbar() {
   const [recentNotifications, setRecentNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [localNotifications, setLocalNotifications] = useState([]);
   const dropdownRef = useRef(null);
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -28,7 +29,7 @@ export default function AdminNavbar() {
       }
       
       console.log('🔔 Admin navbar - Fetching unread count with token');
-      const { data } = await API.get('/api/notifications/unread-count');
+      const { data } = await API.get('/notifications/unread-count');
       setUnreadCount(data.count || 0);
       setApiAvailable(true);
     } catch (err) {
@@ -57,14 +58,26 @@ export default function AdminNavbar() {
       const token = localStorage.getItem('token');
       if (!token) {
         setRecentNotifications([]);
+        setLocalNotifications([]);
         return;
       }
       
-      const { data } = await API.get('/api/notifications/recent?limit=5');
-      setRecentNotifications(data.notifications || []);
+      const { data } = await API.get('/notifications/recent?limit=5');
+      const notificationsData = data.notifications || data || [];
+      
+      // Normalize notification data to handle both API and frontend field names
+      const normalizedNotifications = notificationsData.map(notification => ({
+        ...notification,
+        read: notification.is_read !== undefined ? !!notification.is_read : notification.read,
+        timestamp: notification.created_at || notification.timestamp
+      }));
+      
+      setRecentNotifications(normalizedNotifications);
+      setLocalNotifications(normalizedNotifications);
     } catch (err) {
       console.error('Failed to fetch recent notifications:', err);
       setRecentNotifications([]);
+      setLocalNotifications([]);
     } finally {
       setLoadingNotifications(false);
     }
@@ -97,16 +110,27 @@ export default function AdminNavbar() {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      // Check if the click is outside the dropdown and not on a button
+      if (dropdownRef.current && 
+          !dropdownRef.current.contains(event.target) &&
+          !event.target.closest('button')) {
         setShowDropdown(false);
       }
     };
 
+    if (showDropdown) {
+      // Use a small delay to prevent immediate closing
+      const timeoutId = setTimeout(() => {
     document.addEventListener('mousedown', handleClickOutside);
+      }, 100);
+      
     return () => {
+        clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+    }
+  }, [showDropdown]);
+
 
   const handleNotificationClick = () => {
     if (showDropdown) {
@@ -128,6 +152,53 @@ export default function AdminNavbar() {
     }
   };
 
+  const handleDeleteNotification = async (notificationId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🔔 Delete clicked for notification:', notificationId);
+    
+    try {
+      await API.delete(`/notifications/${notificationId}`);
+      
+      // Remove from local state
+      const updatedNotifications = localNotifications.filter(notification => notification.id !== notificationId);
+      setLocalNotifications(updatedNotifications);
+      setRecentNotifications(updatedNotifications);
+      
+      // Refresh unread count
+      fetchUnreadCount();
+    } catch (err) {
+      console.error('❌ Failed to delete notification:', err);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('🔔 Mark as read clicked for notification:', notificationId);
+    
+    try {
+      const response = await API.put(`/notifications/${notificationId}/read`);
+      console.log('✅ Mark as read response:', response.data);
+      
+      // Update local state using normalized field names
+      const updatedNotifications = localNotifications.map(notification =>
+        notification.id === notificationId
+          ? { ...notification, read: true, is_read: true }
+          : notification
+      );
+      
+      setLocalNotifications(updatedNotifications);
+      setRecentNotifications(updatedNotifications);
+      
+      // Refresh unread count
+      fetchUnreadCount();
+    } catch (err) {
+      console.error('❌ Failed to mark notification as read:', err);
+    }
+  };
+
+
   const formatNotificationTime = (createdAt) => {
     const now = new Date();
     const notificationTime = new Date(createdAt);
@@ -137,6 +208,19 @@ export default function AdminNavbar() {
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high':
+        return 'text-red-600';
+      case 'medium':
+        return 'text-yellow-600';
+      case 'low':
+        return 'text-blue-600';
+      default:
+        return 'text-gray-600';
+    }
   };
 
   const handleLogout = () => {
@@ -172,42 +256,134 @@ export default function AdminNavbar() {
           
             {/* Notification Dropdown */}
             {showDropdown && (
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Recent Notifications</h3>
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[400px] overflow-hidden">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-gray-200 bg-white">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowDropdown(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                      title="Close notifications"
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 
-                <div className="max-h-80 overflow-y-auto">
+                {/* Notifications List */}
+                <div className="max-h-[400px] overflow-y-auto pb-16">
                   {loadingNotifications ? (
-                    <div className="p-4 text-center">
-                      <div className="text-sm text-gray-500">Loading...</div>
+                    <div className="px-6 py-8 text-center text-gray-500">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                      <p className="mt-3 text-sm">Loading notifications...</p>
                     </div>
-                  ) : recentNotifications.length > 0 ? (
-                    recentNotifications.map((notification) => (
-                      <div key={notification.id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
+                  ) : localNotifications.length === 0 ? (
+                    <div className="px-6 py-8 text-center text-gray-500">
+                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                      </div>
+                      <h4 className="text-sm font-medium text-gray-900 mb-1">No notifications</h4>
+                      <p className="text-sm text-gray-500">We'll notify you about orders and updates</p>
+                    </div>
+                  ) : (
+                    <div>
+                      {localNotifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                            !notification.read ? 'bg-blue-50' : ''
+                          }`}
+                        >
                         <div className="flex items-start space-x-3">
-                          <div className={`w-2 h-2 rounded-full mt-2 ${notification.is_read ? 'bg-gray-300' : 'bg-blue-500'}`}></div>
+                            {/* Notification Type Indicator */}
+                            <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
+                              notification.type === 'order' ? 'bg-blue-500' :
+                              notification.type === 'payment' ? 'bg-green-500' :
+                              notification.type === 'engagement' ? 'bg-purple-500' :
+                              'bg-gray-500'
+                            }`}></div>
+
+                            {/* Notification Content */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-900 line-clamp-2">{notification.message}</p>
-                            <p className="text-xs text-gray-500 mt-1">{formatNotificationTime(notification.created_at)}</p>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h4 className={`text-sm font-semibold ${getPriorityColor(notification.priority)}`}>
+                                    {notification.title || 'Notification'}
+                                  </h4>
+                                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                                    {notification.message}
+                                  </p>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <p className="text-xs text-gray-400">
+                                      {formatNotificationTime(notification.created_at || notification.timestamp)}
+                                    </p>
+                                    {!notification.read && (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        New
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center space-x-2 mt-2">
+                                {!notification.read && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleMarkAsRead(notification.id, e);
+                                    }}
+                                    className="p-1 text-gray-600 hover:text-gray-800 hover:bg-blue-100 rounded transition-colors"
+                                    title="Mark as read"
+                                    type="button"
+                                  >
+                                    <CheckIcon className="h-4 w-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleDeleteNotification(notification.id, e);
+                                  }}
+                                  className="p-1 text-gray-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                                  title="Delete notification"
+                                  type="button"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center">
-                      <div className="text-sm text-gray-500">No notifications</div>
+                      ))}
                     </div>
                   )}
                 </div>
                 
-                <div className="p-3 border-t border-gray-200">
+                {/* Footer - Fixed at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <div className="flex items-center justify-between">
                   <button
                     onClick={handleViewAllNotifications}
-                    className="w-full text-sm text-blue-600 hover:text-blue-800 font-medium text-center py-2 hover:bg-blue-50 rounded-md transition-colors"
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center space-x-2"
                   >
-                    View All Notifications
+                      <span>View All Notifications</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                   </button>
+                    <div className="text-xs text-gray-500 font-medium">
+                      {localNotifications.length} total
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -251,42 +427,134 @@ export default function AdminNavbar() {
           
             {/* Mobile Notification Dropdown */}
             {showDropdown && (
-              <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                <div className="p-3 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Recent Notifications</h3>
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[400px] overflow-hidden">
+                {/* Header */}
+                <div className="px-4 py-3 border-b border-gray-200 bg-white">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                    </div>
+                    <button
+                      onClick={() => setShowDropdown(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                      title="Close notifications"
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
                 
-                <div className="max-h-64 overflow-y-auto">
+                {/* Notifications List */}
+                <div className="max-h-[400px] overflow-y-auto pb-16">
                   {loadingNotifications ? (
-                    <div className="p-3 text-center">
-                      <div className="text-sm text-gray-500">Loading...</div>
+                    <div className="px-4 py-6 text-center text-gray-500">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
+                      <p className="mt-2 text-xs">Loading...</p>
                     </div>
-                  ) : recentNotifications.length > 0 ? (
-                    recentNotifications.map((notification) => (
-                      <div key={notification.id} className="p-2 border-b border-gray-100 hover:bg-gray-50">
+                  ) : localNotifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-gray-500">
+                      <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                      </div>
+                      <h4 className="text-xs font-medium text-gray-900 mb-1">No notifications</h4>
+                      <p className="text-xs text-gray-500">We'll notify you about orders and updates</p>
+                    </div>
+                  ) : (
+                    <div>
+                      {localNotifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`px-3 py-2 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                            !notification.read ? 'bg-blue-50' : ''
+                          }`}
+                        >
                         <div className="flex items-start space-x-2">
-                          <div className={`w-2 h-2 rounded-full mt-1.5 ${notification.is_read ? 'bg-gray-300' : 'bg-blue-500'}`}></div>
+                            {/* Notification Type Indicator */}
+                            <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-1.5 ${
+                              notification.type === 'order' ? 'bg-blue-500' :
+                              notification.type === 'payment' ? 'bg-green-500' :
+                              notification.type === 'engagement' ? 'bg-purple-500' :
+                              'bg-gray-500'
+                            }`}></div>
+
+                            {/* Notification Content */}
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs text-gray-900 line-clamp-2">{notification.message}</p>
-                            <p className="text-xs text-gray-500 mt-1">{formatNotificationTime(notification.created_at)}</p>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <h4 className={`text-xs font-semibold ${getPriorityColor(notification.priority)}`}>
+                                    {notification.title || 'Notification'}
+                                  </h4>
+                                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                                    {notification.message}
+                                  </p>
+                                  <div className="flex items-center justify-between mt-1">
+                                    <p className="text-xs text-gray-400">
+                                      {formatNotificationTime(notification.created_at || notification.timestamp)}
+                                    </p>
+                                    {!notification.read && (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        New
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center space-x-1 mt-2">
+                                {!notification.read && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleMarkAsRead(notification.id, e);
+                                    }}
+                                    className="p-1 text-gray-600 hover:text-gray-800 hover:bg-blue-100 rounded transition-colors"
+                                    title="Mark as read"
+                                    type="button"
+                                  >
+                                    <CheckIcon className="h-3 w-3" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleDeleteNotification(notification.id, e);
+                                  }}
+                                  className="p-1 text-gray-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                                  title="Delete notification"
+                                  type="button"
+                                >
+                                  <TrashIcon className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-3 text-center">
-                      <div className="text-sm text-gray-500">No notifications</div>
+                      ))}
                     </div>
                   )}
                 </div>
                 
-                <div className="p-2 border-t border-gray-200">
+                {/* Footer - Fixed at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 px-4 py-3 border-t border-gray-200 bg-gray-50">
+                  <div className="flex items-center justify-between">
                   <button
                     onClick={handleViewAllNotifications}
-                    className="w-full text-xs text-blue-600 hover:text-blue-800 font-medium text-center py-2 hover:bg-blue-50 rounded-md transition-colors"
+                      className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center space-x-1"
                   >
-                    View All Notifications
+                      <span>View All Notifications</span>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
                   </button>
+                    <div className="text-xs text-gray-500 font-medium">
+                      {localNotifications.length} total
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

@@ -1053,10 +1053,10 @@ export default function AdminSalesPage() {
                             className="w-10 h-10 rounded object-cover mr-2"
                           />
                           <div>
-                            <h4 className="text-xs font-medium text-gray-900">{product.product_name}</h4>
+                            <h4 className="text-xs font-medium text-gray-900 uppercase">{product.product_name}</h4>
                             <p className="text-xs text-gray-500">#{index + 1} Top Seller</p>
                             {product.category_name && (
-                              <p className="text-xs text-gray-400">{product.category_name}</p>
+                              <p className="text-xs text-gray-400 uppercase">{product.category_name}</p>
                             )}
                           </div>
                         </div>
