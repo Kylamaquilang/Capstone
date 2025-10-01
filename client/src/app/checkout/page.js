@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
 import ThankYouModal from '@/components/common/ThankYouModal';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
 import { BanknotesIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';

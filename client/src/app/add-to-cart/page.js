@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getImageUrl } from '@/utils/imageUtils';
 import { useEffect, useState } from 'react';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 
 export default function ProductPage() {
   const { user, isAuthenticated } = useAuth();
@@ -31,6 +31,25 @@ export default function ProductPage() {
       fetchProduct();
     }
   }, [productName]);
+
+  // Helper function to get the current price (size-specific or base price)
+  const getCurrentPrice = () => {
+    if (!product) return 0;
+    
+    // If no sizes or only NONE size, use base price
+    if (!sizes || sizes.length === 0) {
+      return parseFloat(product.price);
+    }
+    
+    // If no size selected, show base price
+    if (!selectedSize) {
+      return parseFloat(product.price);
+    }
+    
+    // Find the selected size and return its price
+    const selectedSizeData = sizes.find(size => size.id === selectedSize);
+    return selectedSizeData ? parseFloat(selectedSizeData.price) : parseFloat(product.price);
+  };
 
   const fetchProduct = async () => {
     try {
@@ -152,7 +171,7 @@ export default function ProductPage() {
         product_id: product.id,
         product_name: product.name,
         product_image: getImageUrl(product.image),
-        price: parseFloat(product.price),
+        price: getCurrentPrice(),
         quantity: quantity,
         size: selectedSize || null,
         size_id: sizes.length > 0 && selectedSize ? selectedSize : null
@@ -268,7 +287,7 @@ export default function ProductPage() {
                       </div>
                       <h1 className="text-xl font-medium text-gray-900 leading-tight">{product.name}</h1>
                       <div className="text-2xl font-medium text-gray-900">
-                        ₱{product.price?.toFixed(2) || '0.00'}
+                        ₱{getCurrentPrice().toFixed(2)}
                       </div>
                     </div>
 

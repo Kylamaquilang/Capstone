@@ -74,6 +74,41 @@ export const getNotifications = async (req, res) => {
   }
 };
 
+// ✅ Get recent notifications for dropdown
+export const getRecentNotifications = async (req, res) => {
+  try {
+    if (!req.user) {
+      console.error('❌ getRecentNotifications - req.user is undefined');
+      return res.status(401).json({ 
+        success: false,
+        message: 'Unauthorized - user missing' 
+      });
+    }
+
+    const user_id = req.user.id;
+    const { limit = 5 } = req.query;
+    
+    const [notifications] = await pool.query(`
+      SELECT id, title, message, type, is_read, created_at
+      FROM notifications 
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `, [user_id, parseInt(limit)]);
+
+    res.json({
+      success: true,
+      notifications
+    });
+  } catch (err) {
+    console.error('Get recent notifications error:', err);
+    res.status(500).json({
+      error: 'Server error',
+      message: 'Failed to get recent notifications'
+    });
+  }
+};
+
 // ✅ Mark notification as read
 export const markAsRead = async (req, res) => {
   const user_id = req.user.id;

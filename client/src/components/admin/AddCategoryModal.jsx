@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 
 export default function AddCategoryModal({ isOpen, onClose, onSuccess }) {
   const [categoryName, setCategoryName] = useState('');

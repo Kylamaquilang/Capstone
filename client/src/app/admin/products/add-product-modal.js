@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 
 export default function AddProductModal({ onClose, onSuccess }) {
   const [name, setName] = useState('');
@@ -15,7 +15,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
   const [categories, setCategories] = useState([]);
-  const [sizes, setSizes] = useState([{ size: 'NONE' }]);
+  const [sizes, setSizes] = useState([{ size: 'NONE', stock: '', price: '' }]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -63,6 +63,14 @@ export default function AddProductModal({ onClose, onSuccess }) {
         return;
       }
 
+      // Validate that total size stock does not exceed base stock
+      if (!isSizeStockValid()) {
+        const totalSizeStock = getTotalSizeStock();
+        alert(`Total size stock (${totalSizeStock}) cannot exceed base stock (${stock}). Please adjust the size quantities.`);
+        setLoading(false);
+        return;
+      }
+
       let finalImageUrl = null;
       
       // Upload image if provided
@@ -79,7 +87,9 @@ export default function AddProductModal({ onClose, onSuccess }) {
       const sizesData = sizes.filter(sizeItem => 
         sizeItem.size && sizeItem.size.trim() !== ''
       ).map(sizeItem => ({
-        size: sizeItem.size
+        size: sizeItem.size,
+        stock: sizeItem.stock ? Number(sizeItem.stock) : 0,
+        price: sizeItem.price ? Number(sizeItem.price) : Number(price)
       }));
 
       console.log('🔍 Form sizes:', sizes);
@@ -122,7 +132,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
       setCategoryId('');
       setFile(null);
       setPreviewUrl('');
-      setSizes([{ size: 'NONE' }]);
+      setSizes([{ size: 'NONE', stock: '', price: '' }]);
     } catch (err) {
       console.error('Error creating product:', err);
       
@@ -149,7 +159,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
   };
 
   const addSize = () => {
-    setSizes([...sizes, { size: 'NONE' }]);
+    setSizes([...sizes, { size: 'NONE', stock: '', price: '' }]);
   };
 
   const removeSize = (index) => {
@@ -165,11 +175,33 @@ export default function AddProductModal({ onClose, onSuccess }) {
     setSizes(updatedSizes);
   };
 
+  // Calculate total size stock
+  const getTotalSizeStock = () => {
+    return sizes.reduce((total, sizeItem) => {
+      const sizeStock = Number(sizeItem.stock) || 0;
+      return total + sizeStock;
+    }, 0);
+  };
+
+  // Check if total size stock exceeds base stock
+  const isSizeStockValid = () => {
+    const baseStock = Number(stock) || 0;
+    const totalSizeStock = getTotalSizeStock();
+    return totalSizeStock <= baseStock;
+  };
+
+  // Get remaining stock available for sizes
+  const getRemainingStock = () => {
+    const baseStock = Number(stock) || 0;
+    const totalSizeStock = getTotalSizeStock();
+    return Math.max(0, baseStock - totalSizeStock);
+  };
+
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-30 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-xm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto scrollbar-hide">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Add Product</h2>
           <button
             onClick={onClose}
@@ -180,10 +212,12 @@ export default function AddProductModal({ onClose, onSuccess }) {
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column */}
-            <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="p-4">
+          <div className="space-y-4">
+            {/* Top Row - Left: Product Info, Right: Product Sizes */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Left Column - Product Info */}
+              <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
                 <input
@@ -209,7 +243,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
                   <input
-                    type="number"
+                    type=""
                     value={costPrice}
                     onChange={(e) => setCostPrice(e.target.value)}
                     className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -223,7 +257,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price</label>
                   <input
-                    type="number"
+                    type=""
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                     className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -237,14 +271,28 @@ export default function AddProductModal({ onClose, onSuccess }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Base Stock</label>
                   <input
-                    type="number"
+                    type=""
                     value={stock}
                     onChange={(e) => setStock(e.target.value)}
                     className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Base quantity in stock"
+                    placeholder="Base stock"
                     min="0"
                     required
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="" disabled>Select category</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -257,171 +305,202 @@ export default function AddProductModal({ onClose, onSuccess }) {
                       <div className="text-green-600 font-bold">
                         Profit: ₱{(Number(price) - Number(costPrice)).toFixed(2)}
                       </div>
-                      <div className="text-blue-600">
-                        Margin: {(((Number(price) - Number(costPrice)) / Number(price)) * 100).toFixed(1)}%
-                      </div>
                     </div>
                   </div>
                 </div>
               )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select category</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
               </div>
 
-
-              {/* Product Sizes */}
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Product Sizes</label>
-                  <button
-                    type="button"
-                    onClick={addSize}
-                    className="bg-[#000C50] text-white px-3 py-1 rounded-md text-xs hover:bg-green-700 transition-colors"
-                  >
-                    + Add Size
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {sizes.map((sizeItem, index) => (
-                    <div key={index} className="flex space-x-2 items-center">
-                      <select
-                        value={sizeItem.size}
-                        onChange={(e) => updateSize(index, 'size', e.target.value)}
-                        className="border border-gray-300 px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {['NONE','XS','S','M','L','XL','XXL'].map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                      {sizes.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeSize(index)}
-                          className="bg-red-600 text-white px-2 py-1 rounded-md text-xs hover:bg-red-700 transition-colors"
-                        >
-                          ×
-                        </button>
+              {/* Right Column - Product Sizes */}
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-700">Product Sizes</label>
+                    <button
+                      type="button"
+                      onClick={addSize}
+                      className="bg-[#000C50] text-white px-3 py-1 rounded-md text-xs hover:bg-green-700 transition-colors"
+                    >
+                      + Add Size
+                    </button>
+                  </div>
+                  
+                  {/* Stock Summary */}
+                  {stock && (
+                    <div className="mb-3 p-2 bg-gray-50 rounded-md">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-600">Base Stock:</span>
+                        <span className="font-medium">{stock}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-600">Total Size Stock:</span>
+                        <span className={`font-medium ${getTotalSizeStock() > Number(stock) ? 'text-red-600' : 'text-green-600'}`}>
+                          {getTotalSizeStock()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-600">Remaining:</span>
+                        <span className={`font-medium ${getRemainingStock() < 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                          {getRemainingStock()}
+                        </span>
+                      </div>
+                      {!isSizeStockValid() && (
+                        <div className="mt-1 text-xs text-red-600 font-medium">
+                          ⚠️ Total size stock exceeds base stock
+                        </div>
                       )}
                     </div>
-                  ))}
-                </div>
+                  )}
+                  <div className="space-y-2">
+                    {sizes.map((sizeItem, index) => (
+                      <div key={index} className="flex space-x-2 items-end">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Size</label>
+                          <select
+                            value={sizeItem.size}
+                            onChange={(e) => updateSize(index, 'size', e.target.value)}
+                            className="w-full border border-gray-300 px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 h-8"
+                          >
+                            {['NONE','XXS','XS','S','M','L','XL','XXL','XXXL'].map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Stock</label>
+                          <input
+                            type=""
+                            value={sizeItem.stock}
+                            onChange={(e) => updateSize(index, 'stock', e.target.value)}
+                            className={`w-full border px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              getTotalSizeStock() > Number(stock) ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                            }`}
+                            placeholder="0"
+                            min="0"
+                            max={getRemainingStock() + (Number(sizeItem.stock) || 0)}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Price</label>
+                          <input
+                            type=""
+                            value={sizeItem.price}
+                            onChange={(e) => updateSize(index, 'price', e.target.value)}
+                            className="w-full border border-gray-300 px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="0.00"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                        {sizes.length > 1 && (
+                          <button
+                            type=""
+                            onClick={() => removeSize(index)}
+                            className="text-red-600 hover:text-red-800 transition-colors text-sm font-semibold px-1"
+                          >
+                            X
+                          </button>
+                        )}
+                      </div>
+                    ))}
               </div>
             </div>
 
-            {/* Right Column - Image Upload */}
-            <div className="space-y-4">
+                {/* Image Upload Section */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Product Image (Optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Product Image</label>
                 
                 {/* File Input Button */}
                 <div className="mb-4">
-                  <button
-                    type="button"
-                    onClick={() => document.getElementById('product-file-input')?.click()}
-                    className="w-full bg-[#000C50] text-white py-2 px-4 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium flex items-center justify-center space-x-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <span>Browse Files</span>
-                  </button>
                   <input
                     id="product-file-input"
                     type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] || null;
-                      setFile(f);
-                      setPreviewUrl(f ? URL.createObjectURL(f) : '');
-                    }}
-                  />
-                </div>
+                      accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg"
+                      className="hidden"
+                      multiple={false}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] || null;
+                        setFile(f);
+                        setPreviewUrl(f ? URL.createObjectURL(f) : '');
+                      }}
+                    />
+                  </div>
 
-                {/* Drag & Drop Area */}
-                <div
-                  className={`border-2 border-dashed rounded-lg p-4 text-center transition-all cursor-pointer ${
-                    dragActive 
-                      ? 'border-[#000C50] bg-blue-50 border-solid' 
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                  onDragLeave={() => setDragActive(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragActive(false);
-                    const f = e.dataTransfer.files?.[0];
-                    if (f) {
-                      setFile(f);
-                      setPreviewUrl(URL.createObjectURL(f));
-                    }
-                  }}
-                  onClick={() => document.getElementById('product-file-input')?.click()}
-                >
-                  {previewUrl ? (
-                    <div className="space-y-2">
-                      <img src={previewUrl} alt="Preview" className="w-24 h-24 object-cover rounded-lg mx-auto border-2 border-gray-200" />
-                      <div>
-                        <p className="text-xs font-medium text-gray-900">{file?.name}</p>
-                        <p className="text-xs text-gray-500">Click to change image</p>
+                  {/* Drag & Drop Area */}
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-4 text-center transition-all cursor-pointer ${
+                      dragActive 
+                        ? 'border-[#000C50] bg-blue-50 border-solid' 
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                    onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragActive(false);
+                      const f = e.dataTransfer.files?.[0];
+                      if (f) {
+                        setFile(f);
+                        setPreviewUrl(URL.createObjectURL(f));
+                      }
+                    }}
+                    onClick={() => document.getElementById('product-file-input')?.click()}
+                  >
+                    {previewUrl ? (
+                      <div className="space-y-2">
+                        <img src={previewUrl} alt="Preview" className="w-24 h-24 object-cover rounded-lg mx-auto border-2 border-gray-200" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-900">{file?.name}</p>
+                          <p className="text-xs text-gray-500">Click to change image</p>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <svg className="mx-auto h-8 w-8 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <div>
-                        <p className="text-xs text-gray-900">Upload an image</p>
-                        <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                    ) : (
+                      <div className="space-y-2">
+                        <svg className="mx-auto h-8 w-8 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                          <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <div>
+                          <p className="text-xs text-gray-900">Upload an image</p>
+                          <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* File Info */}
+                  {file && (
+                    <div className="mt-3 p-2 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600">File size:</span>
+                        <span className="font-medium">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs mt-1">
+                        <span className="text-gray-600">File type:</span>
+                        <span className="font-medium">{file.type}</span>
                       </div>
                     </div>
                   )}
                 </div>
-
-                {/* File Info */}
-                {file && (
-                  <div className="mt-3 p-2 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">File size:</span>
-                      <span className="font-medium">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs mt-1">
-                      <span className="text-gray-600">File type:</span>
-                      <span className="font-medium">{file.type}</span>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
+
           </div>
 
           {/* Modal Footer */}
-          <div className="mt-6 flex space-x-3 justify-end">
-            <button 
-              type="button" 
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium"
-            >
-              Cancel
-            </button>
+          <div className="mt-4 flex space-x-4">
             <button 
               type="submit" 
               disabled={loading}
               className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 disabled:opacity-50 transition-colors text-sm font-medium"
             >
               {loading ? 'Saving...' : 'Save Product'}
+            </button>
+            <button 
+              type="button" 
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium"
+            >
+              Cancel
             </button>
           </div>
         </form>

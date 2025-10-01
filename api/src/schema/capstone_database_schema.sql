@@ -284,6 +284,7 @@ CREATE TABLE password_reset_codes (
     user_id INT NOT NULL,
     code VARCHAR(10) NOT NULL,
     expires_at DATETIME NOT NULL,
+    verified BOOLEAN DEFAULT FALSE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
 

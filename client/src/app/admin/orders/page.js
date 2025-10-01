@@ -34,6 +34,8 @@ export default function AdminOrdersPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -88,8 +90,18 @@ export default function AdminOrdersPage() {
       filtered = filtered.filter(order => order.degree === departmentFilter);
     }
 
+    // Filter by year level
+    if (yearFilter) {
+      filtered = filtered.filter(order => order.year_level === yearFilter);
+    }
+
+    // Filter by section
+    if (sectionFilter) {
+      filtered = filtered.filter(order => order.section === sectionFilter);
+    }
+
     setFilteredOrders(filtered);
-  }, [orders, searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter, departmentFilter]);
+  }, [orders, searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter, departmentFilter, yearFilter, sectionFilter]);
 
   const handleViewDetails = (orderId) => {
     setSelectedOrderId(orderId);
@@ -283,7 +295,7 @@ export default function AdminOrdersPage() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter, departmentFilter]);
+  }, [searchTerm, statusFilter, paymentStatusFilter, paymentMethodFilter, departmentFilter, yearFilter, sectionFilter]);
 
   return (
     <ErrorBoundary>
@@ -375,6 +387,37 @@ export default function AdminOrdersPage() {
                       <option value="BSHM">BSHM</option>
                     </select>
                   </div>
+                </div>
+                
+                {/* Year and Section Filters */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                  <div className="sm:w-48">
+                    <select
+                      value={yearFilter}
+                      onChange={(e) => setYearFilter(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Year Levels</option>
+                      <option value="1st Year">1st Year</option>
+                      <option value="2nd Year">2nd Year</option>
+                      <option value="3rd Year">3rd Year</option>
+                      <option value="4th Year">4th Year</option>
+                    </select>
+                  </div>
+                  <div className="sm:w-48">
+                    <select
+                      value={sectionFilter}
+                      onChange={(e) => setSectionFilter(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">All Sections</option>
+                      <option value="A">Section A</option>
+                      <option value="B">Section B</option>
+                      <option value="C">Section C</option>
+                      <option value="D">Section D</option>
+                      <option value="E">Section E</option>
+                    </select>
+                  </div>
                   <div className="sm:w-32">
                     <button
                       onClick={() => {
@@ -382,7 +425,9 @@ export default function AdminOrdersPage() {
                         setStatusFilter('');
                         setPaymentStatusFilter('');
                         setPaymentMethodFilter('');
-    setDepartmentFilter('');
+                        setDepartmentFilter('');
+                        setYearFilter('');
+                        setSectionFilter('');
                       }}
                       className="w-full bg-gray-100 text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
                     >
@@ -395,13 +440,17 @@ export default function AdminOrdersPage() {
 
             {/* Orders Table */}
             {loading ? (
-              <div className="p-6 text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#000C50] mx-auto mb-3"></div>
+              <div className="p-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-gray-600 text-sm">Loading orders...</p>
               </div>
             ) : error ? (
-              <div className="p-6 text-center">
-                <div className="text-red-500 text-2xl mb-3">⚠️</div>
+              <div className="p-12 text-center">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
                 <p className="text-red-600 text-sm">{error}</p>
               </div>
             ) : (

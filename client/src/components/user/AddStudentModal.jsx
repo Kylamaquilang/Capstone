@@ -11,7 +11,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
     middle_name: '', 
     suffix: '', 
     email: '', 
-    degree: 'BSIT', 
+    degree: 'BSHM', 
     year_level: '1st Year',
     section: 'A',
     status: 'regular' 
@@ -40,7 +40,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
         middle_name: '', 
         suffix: '', 
         email: '', 
-        degree: 'BSIT', 
+        degree: 'BSHM', 
         year_level: '1st Year',
         section: 'A',
         status: 'regular' 
@@ -67,7 +67,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
         middle_name: '', 
         suffix: '', 
         email: '', 
-        degree: 'BSIT', 
+        degree: 'BSHM', 
         year_level: '1st Year',
         section: 'A',
         status: 'regular' 
@@ -213,11 +213,10 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
                     disabled={submitting}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <option value="BSIT">BSIT - Bachelor of Science in Information Technology</option>
+                    <option value="BSHM">BSHM - Bachelor of Science in Hospitality Management</option>
                     <option value="BSED">BSED - Bachelor of Science in Education</option>
                     <option value="BEED">BEED - Bachelor of Elementary Education</option>
-                    <option value="BSBA">BSBA - Bachelor of Science in Business Administration</option>
-                    <option value="BSCS">BSCS - Bachelor of Science in Computer Science</option>
+                    <option value="BSIT">BSIT - Bachelor of Science in Information Technology</option>
                   </select>
                 </div>
                 

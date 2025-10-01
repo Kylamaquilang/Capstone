@@ -24,11 +24,30 @@ export default function OrderDetailPage() {
     try {
       setLoading(true);
       const { data } = await API.get(`/orders/${orderId}`);
-      setOrder(data);
-      setStatusUpdate({ status: data.status, notes: '' });
+      console.log("Full API response:", data);
+
+      const orderData = data.order || data; // handle both cases
+
+      setOrder({
+        id: orderData.id,
+        status: orderData.status,
+        total_amount: orderData.total_amount,
+        payment_method: orderData.payment_method,
+        created_at: orderData.created_at,
+        updated_at: orderData.updated_at,
+        items: orderData.items || [],
+        status_history: orderData.status_history || [],
+        // Flatten customer fields
+        user_id: orderData.user?.id || orderData.user_id,
+        user_name: orderData.user?.name || orderData.user_name,
+        student_id: orderData.user?.student_id || orderData.student_id,
+        email: orderData.user?.email || orderData.email,
+      });
+
+      setStatusUpdate({ status: orderData.status, notes: "" });
     } catch (err) {
-      setError('Failed to load order details');
-      console.error('Load order error:', err);
+      setError("Failed to load order details");
+      console.error("Load order error:", err);
     } finally {
       setLoading(false);
     }
@@ -134,7 +153,7 @@ export default function OrderDetailPage() {
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h2 className="text-2xl font-bold">Order #{order.id}</h2>
+                <h2 className="text-2xl font-bold">{order.items && order.items.length > 0 ? order.items[0].product_name : 'Order Details'}</h2>
                 <p className="text-gray-600">Order Details</p>
               </div>
               <div className="flex gap-2">
@@ -159,13 +178,13 @@ export default function OrderDetailPage() {
                 <h3 className="text-lg font-semibold mb-3">Customer Information</h3>
                 <div className="space-y-2">
                   <div>
-                    <span className="font-medium">Name:</span> {order.user_name}
+                    <span className="font-medium">Name:</span> {order.user_name || 'N/A'}
                   </div>
                   <div>
                     <span className="font-medium">Student ID:</span> {order.student_id || 'N/A'}
                   </div>
                   <div>
-                    <span className="font-medium">Email:</span> {order.email}
+                    <span className="font-medium">Email:</span> {order.email || 'N/A'}
                   </div>
                   <div>
                     <span className="font-medium">User ID:</span> {order.user_id}
@@ -182,7 +201,7 @@ export default function OrderDetailPage() {
                   </div>
                   <div>
                     <span className="font-medium">Total Amount:</span> 
-                    <span className="font-semibold text-green-600 ml-1">{Number(order.total_amount).toFixed(2)}</span>
+                    <span className="font-semibold text-green-600 ml-1">₱{Number(order.total_amount || 0).toFixed(2)}</span>
                   </div>
                   <div>
                     <span className="font-medium">Payment Method:</span> {order.payment_method}
@@ -227,21 +246,21 @@ export default function OrderDetailPage() {
                             {item.image && (
                               <img 
                                 src={item.image} 
-                                alt={item.name} 
+                                alt={item.product_name || 'Product'} 
                                 className="w-12 h-12 object-cover rounded mr-3"
                               />
                             )}
                             <div>
-                              <div className="font-medium">{item.product_name || item.name || 'Unknown Product'}</div>
+                              <div className="font-medium">{item.product_name || 'Unknown Product'}</div>
                               <div className="text-sm text-gray-500">ID: {item.product_id}</div>
                             </div>
                           </div>
                         </td>
                         <td className="px-4 py-3">{item.size_name || item.size || 'N/A'}</td>
                         <td className="px-4 py-3">{item.quantity}</td>
-                        <td className="px-4 py-3">{Number(item.price).toFixed(2)}</td>
+                        <td className="px-4 py-3">₱{Number(item.unit_price || 0).toFixed(2)}</td>
                         <td className="px-4 py-3 font-medium">
-                          {(Number(item.price) * Number(item.quantity)).toFixed(2)}
+                          ₱{Number(item.total_price || 0).toFixed(2)}
                         </td>
                       </tr>
                     ))}
@@ -296,7 +315,7 @@ export default function OrderDetailPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 max-w-md">
             <h3 className="text-lg font-semibold mb-4">
-              Update Order #{order.id} Status
+              Update {order.items && order.items.length > 0 ? order.items[0].product_name : 'Order'} Status
             </h3>
             
             <div className="mb-4">

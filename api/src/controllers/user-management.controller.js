@@ -310,9 +310,9 @@ export const deleteUser = async (req, res) => {
       return res.status(400).json({ error: 'You cannot delete your own account' });
     }
 
-    // Soft delete by setting is_active to false and deleted_at timestamp
+    // Soft delete by setting is_active to false
     await pool.query(
-      'UPDATE users SET is_active = 0, deleted_at = NOW() WHERE id = ?',
+      'UPDATE users SET is_active = 0 WHERE id = ?',
       [userId]
     );
 

@@ -230,46 +230,101 @@ export const signin = async (req, res) => {
 export const changePassword = async (req, res) => {
   const { email, verificationCode, newPassword } = req.body;
 
+  // Enhanced input validation
   if (!email || !verificationCode || !newPassword) {
     return res.status(400).json({ error: 'Email, verification code, and new password are required' });
   }
 
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+
+  // Validate verification code format (should be 6 digits)
+  const codeRegex = /^\d{6}$/;
+  if (!codeRegex.test(verificationCode)) {
+    return res.status(400).json({ error: 'Verification code must be exactly 6 digits' });
+  }
+
+  // Enhanced password validation
   if (newPassword.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters long' });
   }
 
+  if (newPassword.length > 128) {
+    return res.status(400).json({ error: 'Password must be less than 128 characters' });
+  }
+
   try {
-    // Get user
-    const [users] = await pool.query('SELECT id, name FROM users WHERE email = ?', [email]);
+    // Get user with additional security checks
+    const [users] = await pool.query('SELECT id, name, email, is_active FROM users WHERE email = ?', [email]);
     
     if (users.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: 'User not found with this email address' });
     }
 
     const user = users[0];
 
-    // Verify the code
+    // Check if user account is active
+    if (!user.is_active) {
+      return res.status(403).json({ error: 'Account is deactivated. Please contact support.' });
+    }
+
+    // Check if verification code is valid and verified
     const [codes] = await pool.query(`
       SELECT * FROM password_reset_codes 
-      WHERE user_id = ? AND code = ? AND expires_at > NOW() 
+      WHERE user_id = ? AND code = ? AND expires_at > NOW() AND verified = 1
       ORDER BY created_at DESC LIMIT 1
     `, [user.id, verificationCode]);
 
     if (codes.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired verification code' });
+      // Check if code exists but is not verified
+      const [unverifiedCodes] = await pool.query(`
+        SELECT * FROM password_reset_codes 
+        WHERE user_id = ? AND code = ? AND expires_at > NOW() AND verified = 0
+        ORDER BY created_at DESC LIMIT 1
+      `, [user.id, verificationCode]);
+
+      if (unverifiedCodes.length > 0) {
+        return res.status(400).json({ error: 'Verification code has not been verified. Please verify the code first.' });
+      }
+
+      // Check if code exists but is expired
+      const [expiredCodes] = await pool.query(`
+        SELECT * FROM password_reset_codes 
+        WHERE user_id = ? AND code = ? AND expires_at <= NOW()
+        ORDER BY created_at DESC LIMIT 1
+      `, [user.id, verificationCode]);
+
+      if (expiredCodes.length > 0) {
+        return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+      } else {
+        return res.status(400).json({ error: 'Invalid verification code. Please check and try again.' });
+      }
     }
+
+    const validCode = codes[0];
 
     // Hash the new password
     const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
-    // Update password
-    await pool.query('UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?', [hashedPassword, user.id]);
+    // Start transaction for atomic password update
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
 
-    // Delete the used verification code
-    await pool.query('DELETE FROM password_reset_codes WHERE user_id = ? AND code = ?', [user.id, verificationCode]);
+    try {
+      // Update password
+      await connection.query('UPDATE users SET password = ?, must_change_password = 0, updated_at = NOW() WHERE id = ?', [hashedPassword, user.id]);
 
-    // Send confirmation email
-    const mailOptions = {
+      // Delete the used verification code and any other codes for this user
+      await connection.query('DELETE FROM password_reset_codes WHERE user_id = ?', [user.id]);
+
+      await connection.commit();
+      connection.release();
+
+      // Send confirmation email
+      const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
       subject: 'Password Changed Successfully - ESSEN Store',
@@ -315,12 +370,18 @@ export const changePassword = async (req, res) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+      await transporter.sendMail(mailOptions);
 
-    res.status(200).json({ 
-      message: 'Password changed successfully',
-      user: { id: user.id, name: user.name, email }
-    });
+      res.status(200).json({ 
+        message: 'Password changed successfully',
+        user: { id: user.id, name: user.name, email }
+      });
+
+    } catch (transactionError) {
+      await connection.rollback();
+      connection.release();
+      throw transactionError;
+    }
 
   } catch (error) {
     console.error('Change password error:', error);
@@ -481,16 +542,14 @@ export const verifyPasswordResetCode = async (req, res) => {
       { expiresIn: '15m' }
     );
 
-    // Delete the used verification code
+    // Mark the code as verified
     await pool.query(
-      `DELETE FROM password_reset_codes WHERE id = ?`,
+      `UPDATE password_reset_codes SET verified = 1 WHERE id = ?`,
       [codes[0].id]
     );
 
     res.status(200).json({ 
-      message: 'Verification code verified successfully',
-      resetToken,
-      expiresIn: '15 minutes'
+      message: 'Verification code verified successfully'
     });
   } catch (error) {
     console.error('Verify password reset code error:', error.message);

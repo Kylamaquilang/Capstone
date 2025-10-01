@@ -73,7 +73,7 @@ export const addStudent = async (req, res) => {
     }
 
     // Check if student already exists with this email (excluding soft-deleted users)
-    const [existingEmail] = await pool.query('SELECT * FROM users WHERE email = ? AND (is_active = 1 OR deleted_at IS NULL)', [email.trim()]);
+    const [existingEmail] = await pool.query('SELECT * FROM users WHERE email = ? AND is_active = 1', [email.trim()]);
     if (existingEmail.length > 0) {
       return res.status(409).json({ 
         error: 'Student already exists with this email' 
@@ -81,7 +81,7 @@ export const addStudent = async (req, res) => {
     }
 
     // Check if student already exists with this student_id (excluding soft-deleted users)
-    const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ? AND (is_active = 1 OR deleted_at IS NULL)', [student_id.trim()]);
+    const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ? AND is_active = 1', [student_id.trim()]);
     if (existingStudentId.length > 0) {
       return res.status(409).json({ 
         error: 'Student ID already exists' 

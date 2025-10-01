@@ -35,7 +35,7 @@ export const getAllProductsSimple = async (req, res) => {
         c.name as category
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.is_active = 1 AND p.deleted_at IS NULL
+      WHERE p.is_active = 1
       ORDER BY p.name, p.created_at DESC
     `);
 
@@ -204,29 +204,45 @@ export const createProduct = async (req, res) => {
 
       const productId = productResult.insertId;
 
-      // Store sizes in product_sizes table
-      console.log('🔍 Processing sizes:', sizes);
-      if (sizes && Array.isArray(sizes) && sizes.length > 0) {
-        for (const sizeItem of sizes) {
-          console.log('🔍 Processing size item:', sizeItem);
-          if (sizeItem.size && sizeItem.size.trim() !== '') {
-            await connection.query(
-              `INSERT INTO product_sizes (product_id, size, stock, price, is_active) 
-               VALUES (?, ?, ?, ?, TRUE)`,
-              [
-                productId,
-                sizeItem.size.trim(),
-                parseInt(stock) || 0, // Use product's base stock for each size
-                parseFloat(price) // Use product's base price for each size
-              ]
-            );
-            console.log(`✅ Size ${sizeItem.size} stored for product ${productId}`);
-          }
+    // Store sizes in product_sizes table
+    console.log('🔍 Processing sizes:', sizes);
+    if (sizes && Array.isArray(sizes) && sizes.length > 0) {
+      // Validate that total size stock does not exceed base stock
+      const totalSizeStock = sizes.reduce((total, sizeItem) => {
+        if (sizeItem.size && sizeItem.size.trim() !== '') {
+          return total + (parseInt(sizeItem.stock) || 0);
         }
-        console.log(`Product ${productId} created with ${sizes.length} sizes stored in product_sizes table`);
-      } else {
-        console.log('🔍 No sizes to store for product', productId);
+        return total;
+      }, 0);
+
+      if (totalSizeStock > parseInt(stock)) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({ 
+          error: `Total size stock (${totalSizeStock}) cannot exceed base stock (${stock}). Please adjust the size quantities.` 
+        });
       }
+
+      for (const sizeItem of sizes) {
+        console.log('🔍 Processing size item:', sizeItem);
+        if (sizeItem.size && sizeItem.size.trim() !== '') {
+          await connection.query(
+            `INSERT INTO product_sizes (product_id, size, stock, price, is_active) 
+             VALUES (?, ?, ?, ?, TRUE)`,
+            [
+              productId,
+              sizeItem.size.trim(),
+              parseInt(sizeItem.stock) || 0, // Use size-specific stock
+              parseFloat(sizeItem.price) || parseFloat(price) // Use size-specific price or fallback to base price
+            ]
+          );
+          console.log(`✅ Size ${sizeItem.size} stored for product ${productId}`);
+        }
+      }
+      console.log(`Product ${productId} created with ${sizes.length} sizes stored in product_sizes table`);
+    } else {
+      console.log('🔍 No sizes to store for product', productId);
+    }
 
       await connection.commit();
       connection.release();
@@ -291,7 +307,7 @@ export const getAllProducts = async (req, res) => {
     }
 
     // Always exclude soft-deleted products
-    whereConditions.push('p.is_active = 1 AND p.deleted_at IS NULL');
+    whereConditions.push('p.is_active = 1');
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
@@ -449,10 +465,28 @@ export const getProductByName = async (req, res) => {
     // Try to get product sizes if the table exists, otherwise set empty array
     try {
       const [sizes] = await pool.query(
-        'SELECT * FROM product_sizes WHERE product_id = ?',
+        `SELECT id, size, stock, price, is_active 
+         FROM product_sizes 
+         WHERE product_id = ? AND is_active = 1 
+         ORDER BY 
+           CASE size 
+             WHEN 'NONE' THEN 0
+             WHEN 'XS' THEN 1 
+             WHEN 'S' THEN 2 
+             WHEN 'M' THEN 3 
+             WHEN 'L' THEN 4 
+             WHEN 'XL' THEN 5 
+             WHEN 'XXL' THEN 6 
+             ELSE 7 
+           END`,
         [product.id]
       );
-      product.sizes = sizes;
+      product.sizes = sizes.map(size => ({
+        id: size.id,
+        size: size.size,
+        stock: parseInt(size.stock),
+        price: parseFloat(size.price)
+      }));
     } catch (sizeError) {
       // If product_sizes table doesn't exist, just set empty array
       console.log('Product sizes table not available, setting empty array');
@@ -585,6 +619,22 @@ export const updateProduct = async (req, res) => {
 
       // Update product sizes if provided
       if (sizes && Array.isArray(sizes)) {
+        // Validate that total size stock does not exceed base stock
+        const totalSizeStock = sizes.reduce((total, sizeItem) => {
+          if (sizeItem.size && sizeItem.size.trim() !== '') {
+            return total + (parseInt(sizeItem.stock) || 0);
+          }
+          return total;
+        }, 0);
+
+        if (totalSizeStock > parseInt(stock)) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({ 
+            error: `Total size stock (${totalSizeStock}) cannot exceed base stock (${stock}). Please adjust the size quantities.` 
+          });
+        }
+
         // Delete existing sizes
         await connection.query('DELETE FROM product_sizes WHERE product_id = ?', [id]);
 
@@ -596,7 +646,7 @@ export const updateProduct = async (req, res) => {
 
           await connection.query(
             `INSERT INTO product_sizes (product_id, size, stock, price, is_active) VALUES (?, ?, ?, ?, TRUE)`,
-            [id, sizeData.size.toUpperCase(), parseInt(stock) || 0, parseFloat(price), 1]
+            [id, sizeData.size.toUpperCase(), parseInt(sizeData.stock) || 0, parseFloat(sizeData.price) || parseFloat(price), 1]
           );
         }
       }
@@ -654,9 +704,9 @@ export const deleteProduct = async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      // Soft delete product by setting is_active to false and deleted_at timestamp
+      // Soft delete product by setting is_active to false
       const [result] = await connection.query(
-        'UPDATE products SET is_active = 0, deleted_at = NOW() WHERE id = ?', 
+        'UPDATE products SET is_active = 0 WHERE id = ?', 
         [id]
       );
 

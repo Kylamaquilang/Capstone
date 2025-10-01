@@ -25,6 +25,13 @@ export default function AdminUsersPage() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  
+  // Filter states
+  const [filters, setFilters] = useState({
+    department: '',
+    section: '',
+    yearLevel: ''
+  });
 
   const fetchUsers = async () => {
     try {
@@ -101,11 +108,52 @@ export default function AdminUsersPage() {
     }
   }, [socket, isConnected, joinAdminRoom]);
 
+  // Filter logic
+  const filteredUsers = users.filter(user => {
+    const matchesDepartment = !filters.department || user.degree === filters.department;
+    const matchesSection = !filters.section || user.section === filters.section;
+    const matchesYearLevel = !filters.yearLevel || user.year_level === filters.yearLevel;
+    
+    return matchesDepartment && matchesSection && matchesYearLevel;
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(users.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedUsers = users.slice(startIndex, endIndex);
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+  // Get unique values for filter options
+  const uniqueDepartments = [...new Set(users.map(user => user.degree).filter(Boolean))];
+  const uniqueSections = [...new Set(users.map(user => user.section).filter(Boolean))];
+  const uniqueYearLevels = [...new Set(users.map(user => user.year_level).filter(Boolean))];
+
+  // Define standard filter options to match bulk upload format
+  const standardDepartments = ['BSHM', 'BSED', 'BEED', 'BSIT'];
+  const standardYearLevels = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+  
+  // Combine existing data with standard options
+  const allDepartments = [...new Set([...standardDepartments, ...uniqueDepartments])];
+  const allYearLevels = [...new Set([...standardYearLevels, ...uniqueYearLevels])];
+
+  // Handle filter changes
+  const handleFilterChange = (filterType, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      department: '',
+      section: '',
+      yearLevel: ''
+    });
+    setCurrentPage(1);
+  };
 
   const handleModalSuccess = () => {
     fetchUsers(); // Refresh the users list
@@ -146,18 +194,18 @@ export default function AdminUsersPage() {
   const handleSelectAll = () => {
     console.log('🔄 Select All clicked:', {
       currentSelected: selectedUsers.size,
-      totalUsers: users.length,
-      allSelected: selectedUsers.size === users.length
+      totalUsers: filteredUsers.length,
+      allSelected: selectedUsers.size === filteredUsers.length
     });
     
-    if (selectedUsers.size === users.length) {
+    if (selectedUsers.size === filteredUsers.length) {
       // If all are selected, deselect all
       console.log('📝 Deselecting all users');
       setSelectedUsers(new Set());
     } else {
       // If not all are selected, select all
       console.log('📝 Selecting all users');
-      const allUserIds = users.map(user => user.id);
+      const allUserIds = filteredUsers.map(user => user.id);
       setSelectedUsers(new Set(allUserIds));
     }
   };
@@ -448,15 +496,88 @@ export default function AdminUsersPage() {
               </div>
             </div>
 
+            {/* Filters Section */}
+            <div className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                  {/* Department Filter */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-gray-700">Department</label>
+                    <select
+                      value={filters.department}
+                      onChange={(e) => handleFilterChange('department', e.target.value)}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+                    >
+                      <option value="">All Departments</option>
+                      {allDepartments.sort().map(dept => (
+                        <option key={dept} value={dept}>{dept}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Section Filter */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-gray-700">Section</label>
+                    <select
+                      value={filters.section}
+                      onChange={(e) => handleFilterChange('section', e.target.value)}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+                    >
+                      <option value="">All Sections</option>
+                      {uniqueSections.map(section => (
+                        <option key={section} value={section}>{section}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Year Level Filter */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-gray-700">Year Level</label>
+                    <select
+                      value={filters.yearLevel}
+                      onChange={(e) => handleFilterChange('yearLevel', e.target.value)}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+                    >
+                      <option value="">All Year Levels</option>
+                      {allYearLevels.sort().map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                {(filters.department || filters.section || filters.yearLevel) && (
+                  <button
+                    onClick={clearFilters}
+                    className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Results Summary */}
+              {filteredUsers.length !== users.length && (
+                <div className="mt-3 text-xs text-gray-600">
+                  Showing {filteredUsers.length} of {users.length} users
+                </div>
+              )}
+            </div>
+
             {/* Users Table */}
             {loading ? (
-              <div className="p-6 text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#000C50] mx-auto mb-3"></div>
+              <div className="p-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-gray-600 text-sm">Loading users...</p>
               </div>
             ) : error ? (
-              <div className="p-6 text-center">
-                <div className="text-red-500 text-2xl mb-3">⚠️</div>
+              <div className="p-12 text-center">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
                 <p className="text-red-600 text-sm">{error}</p>
               </div>
             ) : (
@@ -469,15 +590,15 @@ export default function AdminUsersPage() {
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
-                            checked={users.length > 0 && selectedUsers.size === users.length}
+                            checked={filteredUsers.length > 0 && selectedUsers.size === filteredUsers.length}
                             ref={(input) => {
                               if (input) {
-                                input.indeterminate = selectedUsers.size > 0 && selectedUsers.size < users.length;
+                                input.indeterminate = selectedUsers.size > 0 && selectedUsers.size < filteredUsers.length;
                               }
                             }}
                             onChange={handleSelectAll}
                             className="rounded border-gray-300 text-[#000C50] focus:ring-[#000C50] focus:ring-2"
-                            title={selectedUsers.size === users.length ? "Deselect all users" : "Select all users"}
+                            title={selectedUsers.size === filteredUsers.length ? "Deselect all users" : "Select all users"}
                           />
                         </div>
                       </th>
@@ -580,12 +701,15 @@ export default function AdminUsersPage() {
           )}
 
           {/* Pagination */}
-          {users.length > 0 && (
+          {filteredUsers.length > 0 && (
             <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 {/* Records Info */}
                 <div className="text-xs text-gray-600">
-                  Showing {startIndex + 1} to {Math.min(endIndex, users.length)} of {users.length} users
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} users
+                  {filteredUsers.length !== users.length && (
+                    <span className="text-gray-500"> (filtered from {users.length} total)</span>
+                  )}
                 </div>
                 
                 {/* Pagination Controls */}

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
 import API from '@/lib/axios';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 
 export default function PaymentSuccessPage() {
   const router = useRouter();

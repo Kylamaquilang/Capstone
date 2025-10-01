@@ -4,6 +4,7 @@ import { NotificationProvider } from '@/context/NotificationContext';
 import { SocketProvider } from '@/context/SocketContext';
 import { Poppins } from 'next/font/google';
 import './globals.css';
+import '../styles/sweetalert-custom.css';
 
 const poppins = Poppins({
   subsets: ['latin'],

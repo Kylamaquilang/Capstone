@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 
 export default function EditProductModal({ isOpen, onClose, productId, onSuccess }) {
   const [product, setProduct] = useState(null);
@@ -49,10 +49,12 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       // Handle sizes
       if (data.sizes && data.sizes.length > 0) {
         setSizes(data.sizes.map(size => ({
-          size: size.size
+          size: size.size,
+          stock: size.stock || '',
+          price: size.price || ''
         })));
       } else {
-        setSizes([{ size: 'NONE' }]);
+        setSizes([{ size: 'NONE', stock: '', price: '' }]);
       }
     } catch (err) {
       setError('Failed to load product');
@@ -104,6 +106,14 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
         return;
       }
 
+      // Validate that total size stock does not exceed base stock
+      if (!isSizeStockValid()) {
+        const totalSizeStock = getTotalSizeStock();
+        setError(`Total size stock (${totalSizeStock}) cannot exceed base stock (${stock}). Please adjust the size quantities.`);
+        setSaving(false);
+        return;
+      }
+
       let finalImageUrl = product?.image || null;
       
       // Upload image if provided
@@ -120,7 +130,9 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       const sizesData = sizes.filter(sizeItem => 
         sizeItem.size && sizeItem.size.trim() !== ''
       ).map(sizeItem => ({
-        size: sizeItem.size
+        size: sizeItem.size,
+        stock: sizeItem.stock ? Number(sizeItem.stock) : 0,
+        price: sizeItem.price ? Number(sizeItem.price) : Number(price)
       }));
 
       const productData = {
@@ -175,7 +187,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
   };
 
   const addSize = () => {
-    setSizes([...sizes, { size: 'NONE' }]);
+    setSizes([...sizes, { size: 'NONE', stock: '', price: '' }]);
   };
 
   const removeSize = (index) => {
@@ -189,6 +201,28 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       i === index ? { ...size, [field]: value } : size
     );
     setSizes(updatedSizes);
+  };
+
+  // Calculate total size stock
+  const getTotalSizeStock = () => {
+    return sizes.reduce((total, sizeItem) => {
+      const sizeStock = Number(sizeItem.stock) || 0;
+      return total + sizeStock;
+    }, 0);
+  };
+
+  // Check if total size stock exceeds base stock
+  const isSizeStockValid = () => {
+    const baseStock = Number(stock) || 0;
+    const totalSizeStock = getTotalSizeStock();
+    return totalSizeStock <= baseStock;
+  };
+
+  // Get remaining stock available for sizes
+  const getRemainingStock = () => {
+    const baseStock = Number(stock) || 0;
+    const totalSizeStock = getTotalSizeStock();
+    return Math.max(0, baseStock - totalSizeStock);
   };
 
   if (!isOpen) return null;
@@ -378,25 +412,84 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                           + Add Size
                         </button>
                       </div>
+                      
+                      {/* Stock Summary */}
+                      {stock && (
+                        <div className="mb-3 p-2 bg-gray-50 rounded-md border">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-600">Base Stock:</span>
+                            <span className="font-medium">{stock}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-600">Total Size Stock:</span>
+                            <span className={`font-medium ${getTotalSizeStock() > Number(stock) ? 'text-red-600' : 'text-green-600'}`}>
+                              {getTotalSizeStock()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-600">Remaining:</span>
+                            <span className={`font-medium ${getRemainingStock() < 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                              {getRemainingStock()}
+                            </span>
+                          </div>
+                          {!isSizeStockValid() && (
+                            <div className="mt-1 text-xs text-red-600 font-medium">
+                              ⚠️ Total size stock exceeds base stock
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
                       <div className="space-y-2">
                         {sizes.map((sizeItem, index) => (
-                          <div key={index} className="flex space-x-2 items-center">
-                            <select
-                              value={sizeItem.size}
-                              onChange={(e) => updateSize(index, 'size', e.target.value)}
-                              disabled={saving}
-                              className="border border-gray-300 px-2 py-1 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {['NONE','XS','S','M','L','XL','XXL'].map((s) => (
-                                <option key={s} value={s}>{s}</option>
-                              ))}
-                            </select>
+                          <div key={index} className="flex space-x-2 items-end">
+                            <div className="flex-1">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Size</label>
+                              <select
+                                value={sizeItem.size}
+                                onChange={(e) => updateSize(index, 'size', e.target.value)}
+                                disabled={saving}
+                                className="w-full border border-gray-300 px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 h-8 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {['NONE','XS','S','M','L','XL','XXL'].map((s) => (
+                                  <option key={s} value={s}>{s}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex-1">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Stock</label>
+                              <input
+                                type="number"
+                                value={sizeItem.stock}
+                                onChange={(e) => updateSize(index, 'stock', e.target.value)}
+                                className={`w-full border px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 h-8 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                  getTotalSizeStock() > Number(stock) ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                                }`}
+                                placeholder="0"
+                                min="0"
+                                max={getRemainingStock() + (Number(sizeItem.stock) || 0)}
+                                disabled={saving}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Price</label>
+                              <input
+                                type="number"
+                                value={sizeItem.price}
+                                onChange={(e) => updateSize(index, 'price', e.target.value)}
+                                className="w-full border border-gray-300 px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 h-8 disabled:opacity-50 disabled:cursor-not-allowed"
+                                placeholder="0.00"
+                                min="0"
+                                step="0.01"
+                                disabled={saving}
+                              />
+                            </div>
                             {sizes.length > 1 && (
                               <button
                                 type="button"
                                 onClick={() => removeSize(index)}
                                 disabled={saving}
-                                className="bg-red-600 text-white px-2 py-1 rounded text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="bg-red-600 text-white px-2 py-1 rounded-md text-xs hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 ×
                               </button>
@@ -428,8 +521,9 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                         <input
                           id="product-file-input"
                           type="file"
-                          accept="image/*"
+                          accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg"
                           className="hidden"
+                          multiple={false}
                           onChange={(e) => {
                             const f = e.target.files?.[0] || null;
                             setFile(f);

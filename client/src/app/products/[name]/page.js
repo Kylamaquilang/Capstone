@@ -7,7 +7,7 @@ import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
 import API from '@/lib/axios';
 import Image from 'next/image';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 import { getImageUrl } from '@/utils/imageUtils';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 
@@ -58,6 +58,47 @@ export default function ProductDetailPage() {
 
   // Auto-refresh for product details
   useUserAutoRefresh(fetchProduct, 'products');
+
+  // Helper function to get max quantity for selected size
+  const getMaxQuantityForSelectedSize = () => {
+    if (!product || !product.sizes || product.sizes.length === 0) {
+      return product?.stock || 0;
+    }
+    
+    // If only NONE size or no sizes, use product stock
+    if (product.sizes.length === 1 && product.sizes[0].size === 'NONE') {
+      return product.stock || 0;
+    }
+    
+    // If no size selected, return 0
+    if (!selectedSize) {
+      return 0;
+    }
+    
+    // Find the selected size and return its stock
+    const selectedSizeData = product.sizes.find(size => size.size === selectedSize);
+    return selectedSizeData ? selectedSizeData.stock : 0;
+  };
+
+  // Helper function to get the current price (size-specific or base price)
+  const getCurrentPrice = () => {
+    if (!product) return 0;
+    
+    // If no sizes or only NONE size, use base price
+    if (!product.sizes || product.sizes.length === 0 || 
+        (product.sizes.length === 1 && product.sizes[0].size === 'NONE')) {
+      return parseFloat(product.price);
+    }
+    
+    // If no size selected, show base price
+    if (!selectedSize) {
+      return parseFloat(product.price);
+    }
+    
+    // Find the selected size and return its price
+    const selectedSizeData = product.sizes.find(size => size.size === selectedSize);
+    return selectedSizeData ? parseFloat(selectedSizeData.price) : parseFloat(product.price);
+  };
 
   const handleAddToCart = async () => {
     // Only require size selection if the product has sizes available and not just "NONE"
@@ -255,7 +296,7 @@ export default function ProductDetailPage() {
         product_id: sizeInfo ? sizeInfo.product_id : product.id,
         product_name: product.name,
         product_image: getImageUrl(product.image) || '/images/polo.png',
-        price: sizeInfo ? parseFloat(sizeInfo.price) : parseFloat(product.price),
+        price: getCurrentPrice(),
         quantity: quantity,
         size: sizeInfo ? sizeInfo.size : null,
         size_id: sizeInfo ? sizeInfo.id : null
@@ -356,6 +397,7 @@ export default function ProductDetailPage() {
                         height={400}
                         className="object-contain w-full h-full p-4"
                         onError={(e) => {
+                          console.log('Image failed to load, using fallback');
                           e.target.src = '/images/polo.png';
                         }}
                       />
@@ -374,7 +416,7 @@ export default function ProductDetailPage() {
                     </div>
                     <h1 className="text-xl font-medium text-gray-900 leading-tight">{product.name}</h1>
                     <div className="text-2xl font-medium text-gray-900">
-                      ₱{parseFloat(product.price).toFixed(2)}
+                      ₱{getCurrentPrice().toFixed(2)}
                     </div>
                   </div>
 
@@ -423,48 +465,62 @@ export default function ProductDetailPage() {
                       </button>
                       <span className="w-10 text-center text-xs font-medium bg-gray-50 border border-gray-300 rounded-md py-1">{quantity}</span>
                       <button
-                        onClick={() => setQuantity(quantity + 1)}
-                        className="w-6 h-6 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+                        onClick={() => {
+                          const maxQuantity = getMaxQuantityForSelectedSize();
+                          setQuantity(Math.min(maxQuantity, quantity + 1));
+                        }}
+                        disabled={quantity >= getMaxQuantityForSelectedSize()}
+                        className="w-6 h-6 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         +
                       </button>
                     </div>
+                    {selectedSize && (
+                      <p className="text-xs text-gray-500">
+                        Available: {getMaxQuantityForSelectedSize()} units
+                      </p>
+                    )}
                   </div>
 
                   {/* Action Buttons */}
                   <div className="space-y-3 pt-6 border-t border-gray-200">
                     <button
                       onClick={handleAddToCart}
-                      disabled={addingToCart || (product.sizes && product.sizes.length > 0 && 
+                      disabled={addingToCart || getMaxQuantityForSelectedSize() <= 0 || (product.sizes && product.sizes.length > 0 && 
                         !(product.sizes.length === 1 && product.sizes[0].size === 'NONE') && !selectedSize)}
                       className={`w-full py-3 text-sm font-medium rounded-lg transition-colors ${
-                        addingToCart || (product.sizes && product.sizes.length > 0 && 
+                        addingToCart || getMaxQuantityForSelectedSize() <= 0 || (product.sizes && product.sizes.length > 0 && 
                           !(product.sizes.length === 1 && product.sizes[0].size === 'NONE') && !selectedSize)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-[#000C50] text-white hover:bg-gray-800'
                       }`}
                     >
-                      {addingToCart ? 'Adding to Cart...' : 'Add to Cart'}
+                      {addingToCart ? 'Adding to Cart...' : 
+                       getMaxQuantityForSelectedSize() <= 0 ? 'Out of Stock' : 'Add to Cart'}
                     </button>
                     
                     <button
                       onClick={handleBuyNow}
-                      disabled={addingToCart || (product.sizes && product.sizes.length > 0 && 
+                      disabled={addingToCart || getMaxQuantityForSelectedSize() <= 0 || (product.sizes && product.sizes.length > 0 && 
                         !(product.sizes.length === 1 && product.sizes[0].size === 'NONE') && !selectedSize)}
                       className={`w-full py-3 text-sm font-medium rounded-lg transition-colors ${
-                        addingToCart || (product.sizes && product.sizes.length > 0 && 
+                        addingToCart || getMaxQuantityForSelectedSize() <= 0 || (product.sizes && product.sizes.length > 0 && 
                           !(product.sizes.length === 1 && product.sizes[0].size === 'NONE') && !selectedSize)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-white text-gray-900 border border-bg[#000C50] hover:bg-gray-100'
                       }`}
                     >
-                      {addingToCart ? 'Adding to Cart...' : 'Buy Now'}
+                      {addingToCart ? 'Adding to Cart...' : 
+                       getMaxQuantityForSelectedSize() <= 0 ? 'Out of Stock' : 'Buy Now'}
                     </button>
                   </div>
 
                   {/* Stock Info */}
                   <div className="text-xs text-gray-500">
-                    {product.stock} available in stock
+                    {selectedSize ? 
+                      `${getMaxQuantityForSelectedSize()} available in ${selectedSize} size` : 
+                      `${product.stock} available in stock`
+                    }
                   </div>
                 </div>
               </div>

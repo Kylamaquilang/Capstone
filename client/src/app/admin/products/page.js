@@ -146,7 +146,7 @@ export default function AdminProductPage() {
                       setSelectedCategory('');
                       setSelectedSubcategory('');
                     }}
-                    className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${
+                    className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors ${
                       selectedCategory === ''
                         ? 'bg-[#000C50] text-white'
                         : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
@@ -161,7 +161,7 @@ export default function AdminProductPage() {
                         setSelectedCategory(cat.name);
                         setSelectedSubcategory('');
                       }}
-                      className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${
+                      className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors ${
                         selectedCategory === cat.name 
                           ? 'bg-[#000C50] text-white' 
                           : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'

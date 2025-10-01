@@ -23,6 +23,18 @@ export const getImageUrl = (imagePath) => {
     return '/images/polo.png'; // default fallback
   }
   
+  // Check for known missing files and provide fallback
+  const missingImages = [
+    'product-1759125441920-962749394.png',
+    'product-1759125302247-365339742.webp'
+  ];
+  
+  const fileName = imagePath.split('/').pop(); // Extract filename
+  if (missingImages.includes(fileName)) {
+    console.log('Using fallback for missing image:', fileName);
+    return '/images/polo.png'; // fallback for missing images
+  }
+  
   // If it's already a full URL, return as is
   if (imagePath.startsWith('http')) {
     return imagePath;

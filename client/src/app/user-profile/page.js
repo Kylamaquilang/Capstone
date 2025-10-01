@@ -23,7 +23,7 @@ import {
 } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 
 import { getProfileImageUrl } from '@/utils/imageUtils';
 import Navbar from '@/components/common/nav-bar';
@@ -42,11 +42,14 @@ export default function UserProfilePage() {
   const [editing, setEditing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [passwordChangeStep, setPasswordChangeStep] = useState(1); // 1: verification, 2: new password
   const [verificationCode, setVerificationCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [sendingCode, setSendingCode] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [resendingCode, setResendingCode] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -268,6 +271,7 @@ export default function UserProfilePage() {
       });
       
       setShowChangePassword(true);
+      setPasswordChangeStep(1);
     } catch (err) {
       setError(err?.response?.data?.error || 'Failed to send verification code');
     } finally {
@@ -275,9 +279,152 @@ export default function UserProfilePage() {
     }
   };
 
+  const handleResendCode = async () => {
+    try {
+      setResendingCode(true);
+      setError('');
+      
+      await API.post('/auth/send-verification-code', {
+        email: profile.email
+      });
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Code Resent!',
+        text: `A new verification code has been sent to ${profile.email}`,
+        confirmButtonColor: '#000C50',
+      });
+      
+      // Clear the current verification code input
+      setVerificationCode('');
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Failed to resend verification code');
+      Swal.fire({
+        icon: 'error',
+        title: 'Resend Failed',
+        text: err?.response?.data?.error || 'Failed to resend verification code',
+        confirmButtonColor: '#000C50',
+      });
+    } finally {
+      setResendingCode(false);
+    }
+  };
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault();
+    
+    if (!verificationCode) {
+      setError('Verification code is required');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Code Required',
+        text: 'Please enter the verification code sent to your email.',
+        confirmButtonColor: '#000C50',
+      });
+      return;
+    }
+
+    // Validate verification code format (6 digits)
+    const codeRegex = /^\d{6}$/;
+    if (!codeRegex.test(verificationCode)) {
+      setError('Verification code must be exactly 6 digits');
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid Format',
+        text: 'Verification code must be exactly 6 digits.',
+        confirmButtonColor: '#000C50',
+      });
+      return;
+    }
+
+    try {
+      setVerifyingCode(true);
+      setError('');
+      
+      await API.post('/auth/verify-code', {
+        email: profile.email,
+        verificationCode
+      });
+      
+      setCodeVerified(true);
+      setPasswordChangeStep(2);
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Code Verified!',
+        text: 'Now you can set your new password',
+        confirmButtonColor: '#000C50',
+      });
+    } catch (err) {
+      const errorMessage = err?.response?.data?.error || 'Failed to verify code';
+      setError(errorMessage);
+      
+      // Always show SweetAlert for verification errors
+      if (errorMessage.includes('Invalid or expired verification code')) {
+        // Since backend returns same message for both, we'll show a generic message
+        // and provide resend option
+        Swal.fire({
+          icon: 'error',
+          title: 'Invalid Code',
+          text: 'The verification code you entered is incorrect or has expired. Please check the code or request a new one.',
+          confirmButtonColor: '#000C50',
+          showCancelButton: true,
+          cancelButtonText: 'Try Again',
+          confirmButtonText: 'Resend Code',
+          cancelButtonColor: '#6c757d',
+        }).then((result) => {
+          if (result.isConfirmed) {
+            handleResendCode();
+          } else {
+            // Clear the input for user to try again
+            setVerificationCode('');
+          }
+        });
+      } else if (errorMessage.includes('expired')) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Code Expired',
+          text: 'Your verification code has expired. Please request a new one.',
+          confirmButtonColor: '#000C50',
+          showCancelButton: true,
+          cancelButtonText: 'Cancel',
+          confirmButtonText: 'Resend Code',
+          cancelButtonColor: '#6c757d',
+        }).then((result) => {
+          if (result.isConfirmed) {
+            handleResendCode();
+          }
+        });
+      } else if (errorMessage.includes('Invalid') || errorMessage.includes('incorrect')) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Invalid Code',
+          text: 'The verification code you entered is incorrect. Please check and try again.',
+          confirmButtonColor: '#000C50',
+        });
+      } else {
+        // Show SweetAlert for any other verification errors
+        Swal.fire({
+          icon: 'error',
+          title: 'Verification Failed',
+          text: errorMessage,
+          confirmButtonColor: '#000C50',
+        });
+      }
+    } finally {
+      setVerifyingCode(false);
+    }
+  };
+
   const handleChangePassword = async (e) => {
     e.preventDefault();
     
+    // Enhanced frontend validation for password step
+    if (!newPassword) {
+      setError('New password is required');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -285,6 +432,18 @@ export default function UserProfilePage() {
 
     if (newPassword.length < 6) {
       setError('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (newPassword.length > 128) {
+      setError('Password must be less than 128 characters');
+      return;
+    }
+
+    // Check for common weak passwords
+    const weakPasswords = ['password', '123456', 'qwerty', 'abc123', 'password123'];
+    if (weakPasswords.includes(newPassword.toLowerCase())) {
+      setError('Please choose a stronger password');
       return;
     }
 
@@ -308,7 +467,25 @@ export default function UserProfilePage() {
         router.push('/auth/login');
       });
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to change password');
+      const errorMessage = err?.response?.data?.error || 'Failed to change password';
+      setError(errorMessage);
+      
+      // Show specific error messages for better UX
+      if (errorMessage.includes('expired')) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Code Expired',
+          text: 'Your verification code has expired. Please request a new one.',
+          confirmButtonColor: '#000C50',
+        });
+      } else if (errorMessage.includes('Invalid')) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Invalid Code',
+          text: 'The verification code you entered is incorrect. Please check and try again.',
+          confirmButtonColor: '#000C50',
+        });
+      }
     } finally {
       setVerifyingCode(false);
     }
@@ -547,71 +724,133 @@ export default function UserProfilePage() {
                 <h3 className="text-xl font-bold">Change Password</h3>
               </div>
               
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Verification Code
-                  </label>
-                  <input
-                    type="text"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
-                    placeholder="Enter 6-digit code"
-                    required
-                  />
+              {/* Step indicator */}
+              <div className="flex items-center justify-center mb-6">
+                <div className="flex items-center space-x-4">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full ${passwordChangeStep >= 1 ? 'bg-[#000C50] text-white' : 'bg-gray-300 text-gray-600'}`}>
+                    1
+                  </div>
+                  <div className={`w-12 h-1 ${passwordChangeStep >= 2 ? 'bg-[#000C50]' : 'bg-gray-300'}`}></div>
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full ${passwordChangeStep >= 2 ? 'bg-[#000C50] text-white' : 'bg-gray-300 text-gray-600'}`}>
+                    2
+                  </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
-                    placeholder="Enter new password"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Confirm Password
-                  </label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
-                    placeholder="Confirm new password"
-                    required
-                  />
-                </div>
-                
-                <div className="flex gap-4 pt-4">
-                  <button
-                    type="submit"
-                    disabled={verifyingCode}
-                    className="flex-1 bg-[#000C50] text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium disabled:opacity-50"
-                  >
-                    {verifyingCode ? 'Changing Password...' : 'Change Password'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowChangePassword(false);
-                      setVerificationCode('');
-                      setNewPassword('');
-                      setConfirmPassword('');
-                    }}
-                    className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
+              </div>
+              
+              {/* Step 1: Verification Code */}
+              {passwordChangeStep === 1 && (
+                <form onSubmit={handleVerifyCode} className="space-y-4">
+                  <div className="text-center mb-4">
+                    <p className="text-gray-600">Enter the 6-digit verification code sent to your email</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Verification Code
+                    </label>
+                    <input
+                      type="text"
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] text-center text-lg tracking-widest"
+                      placeholder="000000"
+                      maxLength="6"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex gap-4">
+                      <button
+                        type="submit"
+                        disabled={verifyingCode}
+                        className="flex-1 bg-[#000C50] text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium disabled:opacity-50"
+                      >
+                        {verifyingCode ? 'Verifying...' : 'Verify Code'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowChangePassword(false);
+                          setPasswordChangeStep(1);
+                        setVerificationCode('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                        setCodeVerified(false);
+                        }}
+                        className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={handleResendCode}
+                        disabled={resendingCode}
+                        className="text-[#000C50] hover:text-blue-800 text-sm font-medium underline disabled:opacity-50"
+                      >
+                        {resendingCode ? 'Resending...' : "Didn't receive the code? Resend"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
+              
+              {/* Step 2: New Password */}
+              {passwordChangeStep === 2 && (
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div className="text-center mb-4">
+                    <p className="text-gray-600">Code verified! Now set your new password</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                      placeholder="Enter new password"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                      placeholder="Confirm new password"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="flex gap-4 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setPasswordChangeStep(1)}
+                      className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={verifyingCode}
+                      className="flex-1 bg-[#000C50] text-white px-6 py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium disabled:opacity-50"
+                    >
+                      {verifyingCode ? 'Changing Password...' : 'Change Password'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}

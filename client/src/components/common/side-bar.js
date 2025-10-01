@@ -7,7 +7,7 @@ import {
   CubeIcon, ClipboardDocumentListIcon, BanknotesIcon, 
   UserCircleIcon, ArrowLeftOnRectangleIcon, 
   ArchiveBoxIcon, TagIcon, Bars3Icon, XMarkIcon,
-  BellIcon
+  BellIcon, ChartBarIcon
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
@@ -66,10 +66,10 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <div className={`
-         w-64 bg-white border-r border-gray-100 flex flex-col min-h-screen  
+        w-64 bg-white border-r border-gray-100 flex flex-col min-h-screen  
         fixed top-20 left-0 transform transition-transform duration-300 ease-in-out z-30  
         shadow-md
-      ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}  
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}  
       `}>
         {/* Mobile Header */}
         <div className="lg:hidden px-3 py-4 border-b border-gray-200">
@@ -91,8 +91,8 @@ export default function Sidebar() {
             <SidebarItem href="/admin/categories" icon={TagIcon} label="Categories" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/orders" icon={ClipboardDocumentListIcon} label="Orders" onClick={toggleMobileMenu} pathname={pathname} />
-            <SidebarItem href="/admin/notification" icon={BellIcon} label="Notifications" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/sales" icon={BanknotesIcon} label="Sales" onClick={toggleMobileMenu} pathname={pathname} />
+            <SidebarItem href="/admin/reports" icon={ChartBarIcon} label="Reports" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/users" icon={UserCircleIcon} label="Users" onClick={toggleMobileMenu} pathname={pathname} />
           </nav>
         </div>

@@ -32,7 +32,7 @@ export const getCategories = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT * FROM categories
-      WHERE is_active = 1 AND deleted_at IS NULL
+      WHERE is_active = 1
       ORDER BY name ASC
     `)
     res.json(rows)
@@ -79,8 +79,8 @@ export const deleteCategory = async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete category with products. Move or delete products first.' })
     }
 
-    // Soft delete by setting is_active to false and deleted_at timestamp
-    await pool.query(`UPDATE categories SET is_active = 0, deleted_at = NOW() WHERE id = ?`, [id])
+    // Soft delete by setting is_active to false
+    await pool.query(`UPDATE categories SET is_active = 0 WHERE id = ?`, [id])
     
     // Emit refresh signal for deleted category
     const io = req.app.get('io');

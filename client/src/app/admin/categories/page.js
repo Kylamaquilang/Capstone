@@ -7,7 +7,7 @@ import API from '@/lib/axios';
 import ActionMenu from '@/components/common/ActionMenu';
 import { PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import AddCategoryModal from '@/components/admin/AddCategoryModal';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function AdminCategoriesPage() {
@@ -209,12 +209,12 @@ export default function AdminCategoriesPage() {
         <Sidebar />
         <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64">
           {/* Main Container with Buttons and Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-20">
+          <div className="bg-white rounded-lg shadow-xs mt-25">
             {/* Header Section */}
             <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Categories</h1>
+                  <h1 className="text-lg sm:text-1xl font-semibold text-gray-900">Categories</h1>
                 </div>
                 <div className="flex gap-2">
                   {selectedCategories.length > 0 && (
@@ -227,7 +227,7 @@ export default function AdminCategoriesPage() {
                   )}
                   <button
                     onClick={() => setShowAddModal(true)}
-                    className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium"
+                    className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-xs font-light"
                   >
                     Add Category
                   </button>
@@ -238,13 +238,17 @@ export default function AdminCategoriesPage() {
 
             {/* Categories Table */}
             {loading ? (
-              <div className="p-6 text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#000C50] mx-auto mb-3"></div>
+              <div className="p-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-gray-600 text-sm">Loading categories...</p>
               </div>
             ) : error ? (
-              <div className="p-6 text-center">
-                <div className="text-red-500 text-2xl mb-3">⚠️</div>
+              <div className="p-12 text-center">
+                <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
                 <p className="text-red-600 text-sm">{error}</p>
               </div>
             ) : (
@@ -319,7 +323,7 @@ export default function AdminCategoriesPage() {
           {/* Info Box */}
           <div className="bg-blue-50 p-4 rounded-lg mt-6">
             <h3 className="font-medium text-blue-800 mb-2">Category Information</h3>
-            <p className="text-sm text-blue-700">
+            <p className="text-sm text-blue-500">
               • Categories help organize products (e.g., POLO, LANYARD, PE, NSTP)<br/>
               • Categories are used when adding new products<br/>
               • You can edit or delete categories at any time<br/>
@@ -331,16 +335,18 @@ export default function AdminCategoriesPage() {
 
       {/* Add Category Modal */}
       {showAddModal && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-xm flex items-center justify-center z-50 p-4">
         <AddCategoryModal 
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
           onSuccess={handleAddCategorySuccess}
         />
+      </div>
       )}
 
       {/* Edit Category Modal */}
       {showEditModal && editingCategory && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-xm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">

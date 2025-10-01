@@ -188,6 +188,8 @@ export const getAllOrders = async (req, res) => {
         u.student_id,
         u.email,
         u.degree,
+        u.year_level,
+        u.section,
         o.total_amount, 
         o.payment_method, 
         o.pay_at_counter,
@@ -301,9 +303,17 @@ export const getOrderById = async (req, res) => {
 
     // Get order items
     const [items] = await pool.query(`
-      SELECT oi.quantity, oi.unit_price, oi.total_price, p.name as product_name, p.image, p.id as product_id, ps.size as size_name
+      SELECT 
+        oi.quantity, 
+        oi.unit_price, 
+        oi.total_price, 
+        oi.size as size,
+        p.name as product_name, 
+        p.image, 
+        p.id as product_id, 
+        ps.size as size_name
       FROM order_items oi
-      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN products p ON oi.product_id = p.id
       LEFT JOIN product_sizes ps ON oi.size_id = ps.id
       WHERE oi.order_id = ?
     `, [id])

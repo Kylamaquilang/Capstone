@@ -5,16 +5,11 @@ import AddProductForm from './add-product-form';
 
 export default function AdminProductPage() {
   return (
-    <div className="flex flex-col h-screen admin-page">
+    <div className="flex flex-col min-h-screen text-black admin-page">
       <Navbar />
-      <div className="flex flex-1">
-        {/* Sidebar */}
-        <div className="w-64 border-r shadow" style={{ height: 'calc(100vh - 64px)' }}>
-          <Sidebar />
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 bg-gray-100 p-10 overflow-y-auto">
+      <div className="flex flex-1 pt-16 lg:pt-20">
+        <Sidebar />
+        <div className="flex-1 bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-64 ml-0">
           <AddProductForm />
         </div>
       </div>

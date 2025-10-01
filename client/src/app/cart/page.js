@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useNotifications } from '@/context/NotificationContext';
 import API from '@/lib/axios';
-import Swal from 'sweetalert2';
+import Swal from '@/lib/sweetalert-config';
 import { getImageUrl } from '@/utils/imageUtils';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 

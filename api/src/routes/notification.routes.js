@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getUnreadCount,
   getNotifications,
+  getRecentNotifications,
   markAsRead,
   markAllAsRead,
   deleteNotification,
@@ -17,6 +18,9 @@ router.get('/unread-count', verifyToken, getUnreadCount);
 
 // Get all notifications for user
 router.get('/', verifyToken, getNotifications);
+
+// Get recent notifications for dropdown
+router.get('/recent', verifyToken, getRecentNotifications);
 
 // Get admin notifications (admin only)
 router.get('/admin', verifyToken, isAdmin, getAdminNotifications);

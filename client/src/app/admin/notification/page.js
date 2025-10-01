@@ -22,10 +22,10 @@ export default function AdminNotificationPage() {
       // Try admin endpoint first, fallback to regular endpoint
       let response;
       try {
-        response = await API.get('/notifications/admin');
+        response = await API.get('/api/notifications/admin');
       } catch (adminError) {
         console.log('Admin endpoint failed, trying regular endpoint:', adminError.response?.status);
-        response = await API.get('/notifications');
+        response = await API.get('/api/notifications');
       }
       
       const notifications = response.data.notifications || [];
@@ -101,7 +101,7 @@ export default function AdminNotificationPage() {
 
   const handleMarkAsRead = async (notificationId) => {
     try {
-      await API.put(`/notifications/${notificationId}/read`);
+      await API.put(`/api/notifications/${notificationId}/read`);
       
       // Update the notification in the local state
       setNotifications(prev => 
@@ -127,7 +127,7 @@ export default function AdminNotificationPage() {
       // Mark each notification as read individually
       const results = await Promise.allSettled(
         unreadNotifications.map(notification => 
-          API.put(`/notifications/${notification.id}/read`)
+          API.put(`/api/notifications/${notification.id}/read`)
         )
       );
       
