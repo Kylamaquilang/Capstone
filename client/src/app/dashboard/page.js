@@ -142,7 +142,7 @@ export default function UserDashboard() {
   
 
         {/* Banner Section */}
-        <section className="flex w-300 h-[400px] mt-15 mb-10 mt-15 rounded-sm overflow-hidden shadow-md">
+        <section className="flex w-full h-[300px] sm:h-[350px] lg:h-[400px] mt-16 sm:mt-20 mb-6 sm:mb-10 rounded-sm overflow-hidden shadow-md">
           <div className="relative w-3/4">
             <Image
               src="/images/school.png"
@@ -150,21 +150,21 @@ export default function UserDashboard() {
               fill
               className="object-cover"
             />
-            <div className="absolute inset-0 bg-[#000C50]/80 flex flex-col justify-center px-10 text-white">
-              <h2 className="text-8xl font-extrabold ml-30">CPC</h2>
-              <h2 className="text-8xl font-extrabold ml-45">ESSEN</h2>
-              <p className="mt-3 text-sm max-w-md ml-30">
+            <div className="absolute inset-0 bg-[#000C50]/80 flex flex-col justify-center px-4 sm:px-6 lg:px-10 text-white">
+              <h2 className="text-4xl sm:text-6xl lg:text-8xl font-extrabold ml-4 sm:ml-8 lg:ml-30">CPC</h2>
+              <h2 className="text-4xl sm:text-6xl lg:text-8xl font-extrabold ml-6 sm:ml-12 lg:ml-45">ESSEN</h2>
+              <p className="mt-2 sm:mt-3 text-xs sm:text-sm max-w-md ml-4 sm:ml-8 lg:ml-30">
                 Equip yourself for success, find everything you need to thrive in school, from study tools to personal essentials, all in one place.
               </p>
             </div>
           </div>
-          <div className="w-2/5 bg-[#000C50] flex justify-center items-center">
-            <Image src="/images/cpc.png" alt="CPC Logo" width={250} height={250} className="object-contain" />
+          <div className="w-1/4 bg-[#000C50] flex justify-center items-center">
+            <Image src="/images/cpc.png" alt="CPC Logo" width={120} height={120} className="w-20 h-20 sm:w-32 sm:h-32 lg:w-60 lg:h-60 object-contain" />
           </div>
         </section>
 
         {/* Products Section */}
-        <div className="p-6 space-y-10">
+        <div className="px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-10">
           {productsLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#000C50] mx-auto"></div>
@@ -189,16 +189,16 @@ export default function UserDashboard() {
               {Object.entries(products).map(([categoryName, categoryProducts]) => (
                 <div key={categoryName} className="space-y-6">
                   {/* Products Row for this Category */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 mt-15">
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                     {categoryProducts.map((item) => (
                       <Link
                         key={item.id}
                         href={`/products/${encodeURIComponent(item.name)}`}
                         className="block group"
                       >
-                        <div className="bg-white rounded-xl p-4 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                        <div className="bg-white rounded-xl p-3 sm:p-4 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
                           {/* Product Image - Rectangular */}
-                          <div className="relative h-63 mb-8 rounded-lg overflow-hidden">
+                          <div className="relative h-48 sm:h-56 lg:h-64 mb-4 sm:mb-6 rounded-lg overflow-hidden">
                             <Image
                               src={item.src}
                               alt={item.name}
@@ -218,10 +218,10 @@ export default function UserDashboard() {
                           
                           {/* Product Info */}
                           <div className="text-center">
-                            <h3 className="font-semibold text-gray-900 text-lg mb-2 line-clamp-2 uppercase">
+                            <h3 className="font-semibold text-gray-900 text-sm sm:text-base lg:text-lg mb-2 line-clamp-2 uppercase">
                               {item.name}
                             </h3>
-                            <p className="text-lg font-medium text-[#000C50]">
+                            <p className="text-base sm:text-lg font-medium text-[#000C50]">
                               {item.price}
                             </p>
                             {/* Size Indicator */}

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { XMarkIcon, PlusIcon, MinusIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MinusIcon } from '@heroicons/react/24/outline';
 import Swal from '@/lib/sweetalert-config';
 
-const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
+const DeductModal = ({ isOpen, onClose, product, onDeductSuccess }) => {
   const [formData, setFormData] = useState({
     quantity: '',
-    remarks: '',
+    reason: '',
     size: ''
   });
   const [loading, setLoading] = useState(false);
@@ -15,7 +15,7 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
     if (isOpen && product) {
       setFormData({
         quantity: '',
-        remarks: '',
+        reason: '',
         size: ''
       });
       setSelectedSize('');
@@ -37,28 +37,39 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
       Swal.fire({
         icon: 'error',
         title: 'Validation Error',
-        text: 'Please enter a valid quantity to add'
+        text: 'Please enter a valid quantity to deduct'
       });
       return;
     }
 
+    if (!formData.reason) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Validation Error',
+        text: 'Please select a reason for deduction'
+      });
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      setLoading(true);
-      
+      const payload = {
+        product_id: product.id,
+        movement_type: 'stock_out',
+        quantity: parseInt(formData.quantity),
+        reason: formData.reason,
+        notes: null,
+        size: selectedSize || null
+      };
+
       const response = await fetch('http://localhost:5000/api/stock-movements', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          product_id: product.id,
-          movement_type: 'stock_in',
-          quantity: parseInt(formData.quantity),
-          reason: 'restock',
-          notes: formData.remarks.trim() || null,
-          size: selectedSize || null
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -73,20 +84,20 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
         Swal.fire({
           icon: 'success',
           title: 'Success!',
-          text: 'Product restocked successfully'
+          text: 'Stock deducted successfully'
         });
         
-        onRestockSuccess();
+        onDeductSuccess();
         onClose();
       } else {
-        throw new Error(data.error || 'Failed to record stock movement');
+        throw new Error(data.error || 'Failed to record stock deduction');
       }
     } catch (error) {
-      console.error('Restock error:', error);
+      console.error('Deduct error:', error);
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.message || 'Failed to restock product. Please try again.'
+        text: error.message || 'Failed to deduct stock. Please try again.'
       });
     } finally {
       setLoading(false);
@@ -101,7 +112,7 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
-            Restock Product - {product.name}
+            Deduct Stock - {product.name}
           </h2>
           <button
             onClick={onClose}
@@ -145,10 +156,10 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
             </div>
           )}
 
-          {/* Quantity to Add */}
+          {/* Quantity to Deduct */}
           <div>
             <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-2">
-              Quantity to Add
+              Quantity to Deduct
             </label>
             <input
               type="number"
@@ -159,24 +170,32 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
               min="1"
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter quantity to add"
+              placeholder="Enter quantity to deduct"
             />
           </div>
 
-          {/* Remarks */}
+          {/* Reason */}
           <div>
-            <label htmlFor="remarks" className="block text-sm font-medium text-gray-700 mb-2">
-              Remarks (Optional)
+            <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">
+              Reason *
             </label>
-            <textarea
-              id="remarks"
-              name="remarks"
-              value={formData.remarks}
+            <select
+              id="reason"
+              name="reason"
+              value={formData.reason}
               onChange={handleInputChange}
-              rows="3"
+              required
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter additional remarks (optional)..."
-            />
+            >
+              <option value="">Select reason</option>
+              <option value="sale">Sold</option>
+              <option value="issued">Issued</option>
+              <option value="damaged">Damaged</option>
+              <option value="expired">Expired</option>
+              <option value="sample">Sample/Test</option>
+              <option value="waste">Waste</option>
+              <option value="other">Other</option>
+            </select>
           </div>
 
           {/* Actions */}
@@ -191,9 +210,9 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Processing...' : 'Confirm Restock'}
+              {loading ? 'Processing...' : 'Confirm Deduct'}
             </button>
           </div>
         </form>
@@ -202,5 +221,4 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
   );
 };
 
-export default RestockModal;
-
+export default DeductModal;

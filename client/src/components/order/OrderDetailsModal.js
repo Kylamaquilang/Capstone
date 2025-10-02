@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CubeIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 
 export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
@@ -70,7 +70,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
     const icons = {
       pending: '⏳',
       processing: '🔄',
-      ready_for_pickup: '📦',
+      ready_for_pickup: <CubeIcon className="w-4 h-4" />,
       delivered: '✅',
       cancelled: '❌',
       refunded: '💰'

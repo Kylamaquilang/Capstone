@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '@/context/SocketContext';
+import { CubeIcon } from '@heroicons/react/24/outline';
 
 const AdminNotificationPanel = () => {
   const [adminNotifications, setAdminNotifications] = useState([]);
@@ -89,7 +90,7 @@ const AdminNotificationPanel = () => {
   const getTypeIcon = (type) => {
     switch (type) {
       case 'new_order': return '🆕';
-      case 'order_update': return '📦';
+      case 'order_update': return <CubeIcon className="w-4 h-4" />;
       case 'low_stock': return '⚠️';
       case 'admin_order': return '👨‍💼';
       default: return '🔔';

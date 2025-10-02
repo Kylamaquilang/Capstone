@@ -4,8 +4,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
 import API from '@/lib/axios';
-import ActionMenu from '@/components/common/ActionMenu';
-import { PencilSquareIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import AddCategoryModal from '@/components/admin/AddCategoryModal';
 import Swal from '@/lib/sweetalert-config';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
@@ -207,9 +206,9 @@ export default function AdminCategoriesPage() {
       <Navbar />
       <div className="flex">
         <Sidebar />
-        <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 pt-32 overflow-auto lg:ml-64">
+        <div className="flex-1 flex flex-col bg-white p-2 sm:p-3 pt-32 overflow-auto lg:ml-64">
           {/* Main Container with Buttons and Table */}
-          <div className="bg-white rounded-lg shadow-xs mt-25">
+          <div className="bg-white rounded-lg shadow-sm mt-25 shadow-lg">
             {/* Header Section */}
             <div className="p-4 border-b border-gray-200">
               <div className="flex justify-between items-center">
@@ -227,7 +226,7 @@ export default function AdminCategoriesPage() {
                   )}
                   <button
                     onClick={() => setShowAddModal(true)}
-                    className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-xs font-light"
+                    className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium"
                   >
                     Add Category
                   </button>
@@ -257,7 +256,7 @@ export default function AdminCategoriesPage() {
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700">
                         <input
                           type="checkbox"
                           checked={selectAll}
@@ -265,16 +264,14 @@ export default function AdminCategoriesPage() {
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
                       </th>
-                      <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Category Name</th>
+                      <th className="px-4 py-3 text-xs font-medium text-gray-700">Category Name</th>
                       <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {categories.map((category, index) => (
-                      <tr key={category.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                        index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                      }`}>
-                        <td className="px-4 py-3 border-r border-gray-100">
+                      <tr key={category.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
+                        <td className="px-4 py-3">
                           <input
                             type="checkbox"
                             checked={selectedCategories.includes(category.id)}
@@ -282,27 +279,28 @@ export default function AdminCategoriesPage() {
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
                         </td>
-                        <td className="px-4 py-3 border-r border-gray-100">
+                        <td className="px-4 py-3">
                           <span className="text-xs font-medium text-gray-900">
                             {category.name}
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <ActionMenu
-                            actions={[
-                              {
-                                label: 'Edit Category',
-                                icon: PencilSquareIcon,
-                                onClick: () => startEdit(category)
-                              },
-                              {
-                                label: 'Delete Category',
-                                icon: TrashIcon,
-                                onClick: () => handleDeleteCategory(category.id, category.name),
-                                danger: true
-                              }
-                            ]}
-                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => startEdit(category)}
+                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                              title="Edit Category"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategory(category.id, category.name)}
+                              className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                              title="Delete Category"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -318,17 +316,6 @@ export default function AdminCategoriesPage() {
               )}
             </div>
           )}
-          </div>
-
-          {/* Info Box */}
-          <div className="bg-blue-50 p-4 rounded-lg mt-6">
-            <h3 className="font-medium text-blue-800 mb-2">Category Information</h3>
-            <p className="text-sm text-blue-500">
-              • Categories help organize products (e.g., POLO, LANYARD, PE, NSTP)<br/>
-              • Categories are used when adding new products<br/>
-              • You can edit or delete categories at any time<br/>
-              • Deleting a category will not affect existing products
-            </p>
           </div>
         </div>
       </div>

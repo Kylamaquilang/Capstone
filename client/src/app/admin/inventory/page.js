@@ -5,11 +5,25 @@ import Sidebar from '@/components/common/side-bar';
 import API from '@/lib/axios';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 import ActionMenu from '@/components/common/ActionMenu';
-import { CubeIcon, PlusIcon, MinusIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { 
+  CubeIcon, 
+  PlusIcon, 
+  MinusIcon, 
+  ClockIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ArchiveBoxIcon,
+  ChartBarIcon
+} from '@heroicons/react/24/outline';
 import { getImageUrl } from '@/utils/imageUtils';
 import RestockModal from '@/components/admin/RestockModal';
+import DeductModal from '@/components/admin/DeductModal';
+import AdjustModal from '@/components/admin/AdjustModal';
+import { useRouter } from 'next/navigation';
 
 export default function AdminInventoryPage() {
+  const router = useRouter();
   const [inventoryData, setInventoryData] = useState({
     summary: {},
     categoryStats: [],
@@ -19,7 +33,10 @@ export default function AdminInventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showRestockModal, setShowRestockModal] = useState(false);
+  const [showDeductModal, setShowDeductModal] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [currentActionType, setCurrentActionType] = useState('restock');
   const [stockMovements, setStockMovements] = useState([]);
   const [showStockHistory, setShowStockHistory] = useState(false);
 
@@ -33,16 +50,29 @@ export default function AdminInventoryPage() {
     }
   };
 
-  // Handle restock success
-  const handleRestockSuccess = () => {
+  // Handle stock action success
+  const handleStockActionSuccess = () => {
+    setShowRestockModal(false);
+    setShowDeductModal(false);
+    setShowAdjustModal(false);
+    setSelectedProduct(null);
+    setCurrentActionType('restock');
     fetchInventoryData();
     fetchStockMovements();
   };
 
-  // Open restock modal
-  const handleRestock = (product) => {
+  // Open stock action modal
+  const handleStockAction = (product, actionType) => {
     setSelectedProduct(product);
-    setShowRestockModal(true);
+    setCurrentActionType(actionType);
+    
+    if (actionType === 'restock') {
+      setShowRestockModal(true);
+    } else if (actionType === 'deduct') {
+      setShowDeductModal(true);
+    } else if (actionType === 'adjust') {
+      setShowAdjustModal(true);
+    }
   };
 
   const fetchInventoryData = async () => {
@@ -172,7 +202,8 @@ export default function AdminInventoryPage() {
             total_stock: 0,
             total_value: 0,
             price_sum: 0,
-            avg_price: 0
+            avg_price: 0,
+            sizes: new Set()
           });
         }
         
@@ -181,6 +212,15 @@ export default function AdminInventoryPage() {
         categoryData.total_stock += Number(product.stock) || 0;
         categoryData.total_value += (Number(product.stock) || 0) * (Number(product.price) || 0);
         categoryData.price_sum += Number(product.price) || 0;
+        
+        // Add sizes to the category
+        if (product.sizes && Array.isArray(product.sizes)) {
+          product.sizes.forEach(size => {
+            if (size.size_name) {
+              categoryData.sizes.add(size.size_name);
+            }
+          });
+        }
       });
       
       console.log('Category map after processing:', Array.from(categoryMap.entries()));
@@ -190,6 +230,8 @@ export default function AdminInventoryPage() {
         categoryData.avg_price = categoryData.product_count > 0 
           ? categoryData.price_sum / categoryData.product_count 
           : 0;
+        // Convert Set to Array for display
+        categoryData.sizes = Array.from(categoryData.sizes).sort();
       });
       
       categoryStats = Array.from(categoryMap.values());
@@ -424,17 +466,16 @@ export default function AdminInventoryPage() {
       <Navbar />
       <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
-        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
+        <div className="flex-1 bg-white p-2 sm:p-3 overflow-auto lg:ml-64">
            {/* Header */}
            <div className="mb-4 sm:mb-6">
              <div className="flex justify-between items-center">
                <div>
                  <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Inventory</h1>
-                 <p className="text-gray-600 text-sm">Monitor stock levels and manage inventory</p>
                </div>
                <button
                  onClick={refreshInventory}
-                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                 className="px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium mr-5"
                >
                  Refresh Data
                </button>
@@ -452,9 +493,7 @@ export default function AdminInventoryPage() {
             <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
               <div className="flex items-center">
                 <div className="p-2 bg-blue-100 rounded-md mt-2 ml-4">
-                  <svg className="w-8 h-8 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
+                  <CubeIcon className="w-8 h-8 text-blue-700" />
                 </div>
                 <div className="ml-2 sm:ml-3">
                   <p className="text-xs sm:text-sm font-medium text-blue-600">Total Products</p>
@@ -468,9 +507,7 @@ export default function AdminInventoryPage() {
             <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
               <div className="flex items-center">
                 <div className="p-2 bg-green-50 rounded-md mt-2 ml-4">
-                  <svg className="w-8 h-8 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-14 0h14" />
-                  </svg>
+                  <ArchiveBoxIcon className="w-8 h-8 text-green-700" />
                 </div>
                 <div className="ml-2 sm:ml-3">
                   <p className="text-xs sm:text-sm font-medium text-green-600">Total Stock</p>
@@ -484,9 +521,7 @@ export default function AdminInventoryPage() {
             <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
               <div className="flex items-center">
                 <div className="p-2 bg-yellow-50 rounded-md mt-2 ml-4">
-                  <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
+                  <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
                 </div>
                 <div className="ml-2 sm:ml-3">
                   <p className="text-xs sm:text-sm font-medium text-yellow-600">Low Stock</p>
@@ -500,9 +535,7 @@ export default function AdminInventoryPage() {
             <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-100">
               <div className="flex items-center">
                 <div className="p-2 bg-purple-50 rounded-md mt-2 ml-4">
-                  <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
+                  <ChartBarIcon className="w-8 h-8 text-purple-600" />
                 </div>
                 <div className="ml-2 sm:ml-3">
                   <p className="text-xs sm:text-sm font-medium text-purple-600">Inventory Value</p>
@@ -530,6 +563,7 @@ export default function AdminInventoryPage() {
                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Category</th>
                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Products</th>
                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Total Stock</th>
+                         <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Sizes</th>
                          <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Avg Price</th>
                          <th className="px-4 py-3 text-xs font-medium text-gray-700">Total Value</th>
                        </tr>
@@ -539,9 +573,7 @@ export default function AdminInventoryPage() {
                          const categoryName = category.category || category.name || `Category ${index + 1}`;
                          
                          return (
-                           <tr key={`category-${index}`} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                             index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                           }`}>
+                           <tr key={`category-${index}`} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
                              <td className="px-4 py-3 border-r border-gray-100">
                                <span className="text-xs font-medium text-gray-900">
                                  {categoryName}
@@ -595,103 +627,117 @@ export default function AdminInventoryPage() {
                      <table className="w-full text-left border-collapse">
                        <thead className="bg-gray-100">
                          <tr>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Product ID</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Product Name</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Category</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Size/Variant</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Unit</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Qty in Stock</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Reorder Level</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Cost Price</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Selling Price</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Supplier</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Status</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Date Added</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700 border-r border-gray-200">Last Restock</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700">Updated By</th>
-                           <th className="px-3 py-2 text-xs font-medium text-gray-700">Actions</th>
+                           <th className="px-4 py-3 text-xs font-medium text-gray-700">Product Name</th>
+                           <th className="px-4 py-3 text-xs font-medium text-gray-700">Category</th>
+                           <th className="px-4 py-3 text-xs font-medium text-gray-700">Stock (Base + Per Size)</th>
+                           <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
                          </tr>
                        </thead>
                        <tbody>
                          {inventoryData.allProducts.map((product, index) => (
-                           <tr key={product.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                             index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                           }`}>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs font-mono text-gray-900">
-                               {product.product_code || `PRD${String(product.id).padStart(3, '0')}`}
-                             </td>
-                             <td className="px-3 py-2 border-r border-gray-100">
+                           <tr key={product.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
+                             {/* Product Name */}
+                             <td className="px-4 py-3">
                                <div className="flex items-center">
                                  <img 
                                    src={getImageUrl(product.image)} 
                                    alt={product.name}
-                                   className="w-6 h-6 rounded object-cover mr-2"
+                                   className="w-8 h-8 rounded object-cover mr-3"
                                    onError={(e) => {
                                      e.target.src = '/images/polo.png';
                                    }}
                                  />
-                                 <div className="text-xs font-medium text-gray-900 uppercase">{product.name}</div>
+                                 <div>
+                                   <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                                   <div className="text-xs text-gray-500">ID: {product.product_code || `PRD${String(product.id).padStart(3, '0')}`}</div>
+                                 </div>
                                </div>
                              </td>
-                             <td className="px-3 py-2 border-r border-gray-100">
-                               <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-800 rounded-full uppercase">
+                             
+                             {/* Category */}
+                             <td className="px-4 py-3">
+                               <span className="inline-flex px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full uppercase">
                                  {product.category_name || product.category || 'N/A'}
                                </span>
                              </td>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs text-gray-900">
-                               {product.sizes && product.sizes.length > 0 
-                                 ? product.sizes.map(size => size.size).join(', ') 
-                                 : 'N/A'
-                               }
+                             
+                             {/* Stock (Base + Per Size) */}
+                             <td className="px-4 py-3">
+                               <div className="space-y-1">
+                                 {/* Base Stock */}
+                                 <div className="flex items-center justify-between">
+                                   <span className="text-xs text-gray-600">Base:</span>
+                                   <span className={`text-xs font-medium px-2 py-1 rounded ${
+                                     product.stock === 0 
+                                       ? 'bg-red-100 text-red-800' 
+                                       : product.stock <= 5
+                                       ? 'bg-yellow-100 text-yellow-800'
+                                       : 'bg-green-100 text-green-800'
+                                   }`}>
+                                     {product.stock || 0}
+                                   </span>
+                                 </div>
+                                 
+                                 {/* Size Stocks */}
+                                 {product.sizes && product.sizes.length > 0 ? (
+                                   <div className="space-y-1">
+                                     {product.sizes.map((size, sizeIndex) => (
+                                       <div key={sizeIndex} className="flex items-center justify-between">
+                                         <span className="text-xs text-gray-600">{size.size}:</span>
+                                         <span className={`text-xs font-medium px-2 py-1 rounded ${
+                                           size.stock === 0 
+                                             ? 'bg-red-100 text-red-800' 
+                                             : size.stock <= 5
+                                             ? 'bg-yellow-100 text-yellow-800'
+                                             : 'bg-green-100 text-green-800'
+                                         }`}>
+                                           {size.stock || 0}
+                                         </span>
+                                       </div>
+                                     ))}
+                                   </div>
+                                 ) : (
+                                   <div className="text-xs text-gray-500">No sizes</div>
+                                 )}
+                               </div>
                              </td>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs text-gray-900">
-                               {product.unit_of_measure || 'pcs'}
-                             </td>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs text-gray-900 text-center font-medium">
-                               {product.stock || 0}
-                             </td>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs text-gray-900 text-center">
-                               {product.reorder_level || 5}
-                             </td>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs text-gray-900">₱{Number(product.original_price || 0).toFixed(2)}</td>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs font-medium text-gray-900">₱{Number(product.price || 0).toFixed(2)}</td>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs text-gray-900">
-                               {product.supplier || 'N/A'}
-                             </td>
-                             <td className="px-3 py-2 border-r border-gray-100">
-                               <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                                 product.stock === 0 
-                                   ? 'bg-red-100 text-red-800' 
-                                   : product.stock <= (product.reorder_level || 5)
-                                   ? 'bg-yellow-100 text-yellow-800'
-                                   : 'bg-green-100 text-green-800'
-                               }`}>
-                                 {product.stock === 0 
-                                   ? 'Out of Stock' 
-                                   : product.stock <= (product.reorder_level || 5)
-                                   ? 'Low Stock'
-                                   : 'In Stock'
-                                 }
-                               </span>
-                             </td>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs text-gray-900">
-                               {product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}
-                             </td>
-                             <td className="px-3 py-2 border-r border-gray-100 text-xs text-gray-900">
-                               {product.last_restock_date ? new Date(product.last_restock_date).toLocaleDateString() : 'N/A'}
-                             </td>
-                             <td className="px-3 py-2 text-xs text-gray-900">
-                               {product.updated_by || 'N/A'}
-                             </td>
-                             <td className="px-3 py-2">
+                             
+                             {/* Actions */}
+                             <td className="px-4 py-3">
                                <div className="flex space-x-1">
                                  <button
-                                   onClick={() => handleRestock(product)}
-                                   className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center space-x-1"
-                                   title="Manage Stock"
+                                   onClick={() => handleStockAction(product, 'restock')}
+                                   className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center space-x-1"
+                                   title="Restock Product"
                                  >
                                    <PlusIcon className="h-3 w-3" />
-                                   <span>Stock</span>
+                                   <span>Restock</span>
+                                 </button>
+                                 <button
+                                   onClick={() => handleStockAction(product, 'deduct')}
+                                   className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center space-x-1"
+                                   title="Deduct Stock"
+                                 >
+                                   <MinusIcon className="h-3 w-3" />
+                                   <span>Deduct</span>
+                                 </button>
+                                 <button
+                                   onClick={() => handleStockAction(product, 'adjust')}
+                                   className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                                   title="Adjust Stock"
+                                 >
+                                   <ClockIcon className="h-3 w-3" />
+                                   <span>Adjust</span>
+                                 </button>
+                                 <button
+                                   onClick={() => router.push('/admin/inventory/logs')}
+                                   className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors flex items-center space-x-1"
+                                   title="View Logs"
+                                 >
+                                   <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                   </svg>
+                                   <span>View Logs</span>
                                  </button>
                                </div>
                              </td>
@@ -702,7 +748,7 @@ export default function AdminInventoryPage() {
                    </div>
                  ) : (
                    <div className="text-center py-6 text-gray-500">
-                     <div className="text-gray-300 text-2xl mb-2">📦</div>
+                     <CubeIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                      <p className="text-xs">No inventory data available</p>
                      <p className="text-xs text-gray-400 mt-1">Add products to see inventory details</p>
                    </div>
@@ -737,9 +783,7 @@ export default function AdminInventoryPage() {
                      </thead>
                      <tbody>
                        {inventoryData.lowStockProducts.map((product, index) => (
-                         <tr key={product.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                           index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                         }`}>
+                         <tr key={product.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
                            <td className="px-4 py-3 border-r border-gray-100">
                              <div className="flex items-center">
                                <img 
@@ -867,9 +911,7 @@ export default function AdminInventoryPage() {
                          </thead>
                          <tbody>
                            {stockMovements.map((movement, index) => (
-                             <tr key={movement.id} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                               index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                             }`}>
+                             <tr key={movement.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
                                <td className="px-3 py-2 border-r border-gray-100 text-xs text-gray-900">
                                  {new Date(movement.created_at).toLocaleDateString()}
                                </td>
@@ -921,7 +963,23 @@ export default function AdminInventoryPage() {
         isOpen={showRestockModal}
         onClose={() => setShowRestockModal(false)}
         product={selectedProduct}
-        onRestockSuccess={handleRestockSuccess}
+        onRestockSuccess={handleStockActionSuccess}
+      />
+
+      {/* Deduct Modal */}
+      <DeductModal
+        isOpen={showDeductModal}
+        onClose={() => setShowDeductModal(false)}
+        product={selectedProduct}
+        onDeductSuccess={handleStockActionSuccess}
+      />
+
+      {/* Adjust Modal */}
+      <AdjustModal
+        isOpen={showAdjustModal}
+        onClose={() => setShowAdjustModal(false)}
+        product={selectedProduct}
+        onAdjustSuccess={handleStockActionSuccess}
       />
     </div>
   );

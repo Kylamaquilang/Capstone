@@ -26,7 +26,7 @@ export const createStockMovementsTable = async (req, res) => {
       console.log('📋 Existing table structure:', columns);
       
       const existingColumns = columns.map(col => col.Field);
-      const requiredColumns = ['id', 'product_id', 'user_id', 'movement_type', 'quantity', 'reason', 'supplier', 'notes', 'created_at'];
+      const requiredColumns = ['id', 'product_id', 'user_id', 'movement_type', 'quantity', 'reason', 'supplier', 'notes', 'previous_stock', 'new_stock', 'created_at'];
       
       // Add missing columns
       for (const column of requiredColumns) {
@@ -46,7 +46,7 @@ export const createStockMovementsTable = async (req, res) => {
               await pool.query('ALTER TABLE stock_movements ADD COLUMN notes TEXT AFTER supplier');
               break;
             case 'movement_type':
-              await pool.query('ALTER TABLE stock_movements ADD COLUMN movement_type ENUM("stock_in", "stock_out") NOT NULL AFTER user_id');
+              await pool.query('ALTER TABLE stock_movements ADD COLUMN movement_type ENUM("stock_in", "stock_out", "stock_adjustment") NOT NULL AFTER user_id');
               break;
             case 'quantity':
               await pool.query('ALTER TABLE stock_movements ADD COLUMN quantity INT NOT NULL AFTER movement_type');
@@ -56,6 +56,12 @@ export const createStockMovementsTable = async (req, res) => {
               break;
             case 'created_at':
               await pool.query('ALTER TABLE stock_movements ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP AFTER notes');
+              break;
+            case 'previous_stock':
+              await pool.query('ALTER TABLE stock_movements ADD COLUMN previous_stock INT AFTER notes');
+              break;
+            case 'new_stock':
+              await pool.query('ALTER TABLE stock_movements ADD COLUMN new_stock INT AFTER previous_stock');
               break;
           }
           console.log(`✅ Added ${column} column`);
@@ -69,11 +75,13 @@ export const createStockMovementsTable = async (req, res) => {
           id INT PRIMARY KEY AUTO_INCREMENT,
           product_id INT NOT NULL,
           user_id INT NOT NULL,
-          movement_type ENUM('stock_in', 'stock_out') NOT NULL,
+          movement_type ENUM('stock_in', 'stock_out', 'stock_adjustment') NOT NULL,
           quantity INT NOT NULL,
           reason VARCHAR(100) NOT NULL,
           supplier VARCHAR(200),
           notes TEXT,
+          previous_stock INT,
+          new_stock INT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
@@ -112,9 +120,9 @@ export const createStockMovement = async (req, res) => {
       });
     }
 
-    if (!['stock_in', 'stock_out'].includes(movement_type)) {
+    if (!['stock_in', 'stock_out', 'stock_adjustment'].includes(movement_type)) {
       return res.status(400).json({ 
-        error: 'Movement type must be either "stock_in" or "stock_out"' 
+        error: 'Movement type must be "stock_in", "stock_out", or "stock_adjustment"' 
       });
     }
 
@@ -135,11 +143,13 @@ export const createStockMovement = async (req, res) => {
           id INT PRIMARY KEY AUTO_INCREMENT,
           product_id INT NOT NULL,
           user_id INT NOT NULL,
-          movement_type ENUM('stock_in', 'stock_out') NOT NULL,
+          movement_type ENUM('stock_in', 'stock_out', 'stock_adjustment') NOT NULL,
           quantity INT NOT NULL,
           reason VARCHAR(100) NOT NULL,
           supplier VARCHAR(200),
           notes TEXT,
+          previous_stock INT,
+          new_stock INT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
@@ -167,7 +177,7 @@ export const createStockMovement = async (req, res) => {
     const product = products[0];
     const currentStock = parseInt(product.stock) || 0;
 
-    // Check if stock out would result in negative stock
+    // Check if stock out would result in negative stock (not for adjustments)
     if (movement_type === 'stock_out' && currentStock < quantity) {
       return res.status(400).json({ 
         error: `Insufficient stock. Current stock: ${currentStock}, requested: ${quantity}` 
@@ -180,9 +190,15 @@ export const createStockMovement = async (req, res) => {
 
     try {
       // Calculate new stock
-      const newStock = movement_type === 'stock_in' 
-        ? currentStock + quantity 
-        : currentStock - quantity;
+      let newStock;
+      if (movement_type === 'stock_in') {
+        newStock = currentStock + quantity;
+      } else if (movement_type === 'stock_out') {
+        newStock = currentStock - quantity;
+      } else if (movement_type === 'stock_adjustment') {
+        // For adjustments, quantity represents the new stock level
+        newStock = quantity;
+      }
 
       // Update product stock
       await connection.query(
@@ -190,12 +206,12 @@ export const createStockMovement = async (req, res) => {
         [newStock, product_id]
       );
 
-      // Record stock movement
+      // Record stock movement with previous stock for adjustments
       const [result] = await connection.query(
         `INSERT INTO stock_movements 
-         (product_id, user_id, movement_type, quantity, reason, supplier, notes, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [product_id, user_id, movement_type, quantity, reason, supplier, notes]
+         (product_id, user_id, movement_type, quantity, reason, supplier, notes, previous_stock, new_stock, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [product_id, user_id, movement_type, quantity, reason, supplier, notes, currentStock, newStock]
       );
 
       await connection.commit();
@@ -280,6 +296,8 @@ export const getStockMovements = async (req, res) => {
         sm.reason,
         sm.supplier,
         sm.notes,
+        sm.previous_stock,
+        sm.new_stock,
         sm.created_at,
         p.name as product_name,
         u.name as user_name
@@ -327,6 +345,8 @@ export const getStockMovementById = async (req, res) => {
         sm.reason,
         sm.supplier,
         sm.notes,
+        sm.previous_stock,
+        sm.new_stock,
         sm.created_at,
         p.name as product_name,
         u.name as user_name
@@ -398,6 +418,237 @@ export const getStockMovementSummary = async (req, res) => {
 
   } catch (error) {
     console.error('Get Stock Movement Summary Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ Get Current Inventory Report
+export const getCurrentInventoryReport = async (req, res) => {
+  try {
+    const { category, low_stock_threshold = 5 } = req.query;
+
+    let whereConditions = ['p.is_active = 1'];
+    let queryParams = [];
+
+    if (category) {
+      whereConditions.push('c.name = ?');
+      queryParams.push(category);
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    const [inventory] = await pool.query(
+      `SELECT 
+        p.id,
+        p.name as product_name,
+        p.stock as current_stock,
+        p.price as selling_price,
+        p.original_price as cost_price,
+        c.name as category_name,
+        CASE 
+          WHEN p.stock = 0 THEN 'Out of Stock'
+          WHEN p.stock <= ? THEN 'Low Stock'
+          ELSE 'In Stock'
+        END as stock_status,
+        p.created_at,
+        p.updated_at
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       ${whereClause}
+       ORDER BY p.name`,
+      [...queryParams, parseInt(low_stock_threshold)]
+    );
+
+    res.json({
+      report_type: 'current_inventory',
+      generated_at: new Date().toISOString(),
+      total_products: inventory.length,
+      low_stock_threshold: parseInt(low_stock_threshold),
+      inventory
+    });
+
+  } catch (error) {
+    console.error('Get Current Inventory Report Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ Get Restock Report
+export const getRestockReport = async (req, res) => {
+  try {
+    const { days = 30, product_id } = req.query;
+
+    let whereConditions = [
+      'sm.movement_type = "stock_in"',
+      'sm.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)'
+    ];
+    let queryParams = [parseInt(days)];
+
+    if (product_id) {
+      whereConditions.push('sm.product_id = ?');
+      queryParams.push(product_id);
+    }
+
+    const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
+
+    const [restocks] = await pool.query(
+      `SELECT 
+        sm.id,
+        sm.product_id,
+        p.name as product_name,
+        sm.quantity,
+        sm.reason,
+        sm.supplier,
+        sm.previous_stock,
+        sm.new_stock,
+        sm.created_at,
+        u.name as user_name
+       FROM stock_movements sm
+       LEFT JOIN products p ON sm.product_id = p.id
+       LEFT JOIN users u ON sm.user_id = u.id
+       ${whereClause}
+       ORDER BY sm.created_at DESC`,
+      queryParams
+    );
+
+    // Calculate summary
+    const totalRestocked = restocks.reduce((sum, item) => sum + item.quantity, 0);
+    const uniqueProducts = new Set(restocks.map(item => item.product_id)).size;
+
+    res.json({
+      report_type: 'restock',
+      generated_at: new Date().toISOString(),
+      period_days: parseInt(days),
+      total_restocks: restocks.length,
+      total_quantity_restocked: totalRestocked,
+      unique_products_restocked: uniqueProducts,
+      restocks
+    });
+
+  } catch (error) {
+    console.error('Get Restock Report Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ Get Sales/Usage Report
+export const getSalesUsageReport = async (req, res) => {
+  try {
+    const { days = 30, product_id } = req.query;
+
+    let whereConditions = [
+      'sm.movement_type = "stock_out"',
+      'sm.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)'
+    ];
+    let queryParams = [parseInt(days)];
+
+    if (product_id) {
+      whereConditions.push('sm.product_id = ?');
+      queryParams.push(product_id);
+    }
+
+    const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
+
+    const [sales] = await pool.query(
+      `SELECT 
+        sm.id,
+        sm.product_id,
+        p.name as product_name,
+        sm.quantity,
+        sm.reason,
+        sm.previous_stock,
+        sm.new_stock,
+        sm.created_at,
+        u.name as user_name
+       FROM stock_movements sm
+       LEFT JOIN products p ON sm.product_id = p.id
+       LEFT JOIN users u ON sm.user_id = u.id
+       ${whereClause}
+       ORDER BY sm.created_at DESC`,
+      queryParams
+    );
+
+    // Calculate summary
+    const totalSold = sales.reduce((sum, item) => sum + item.quantity, 0);
+    const uniqueProducts = new Set(sales.map(item => item.product_id)).size;
+    
+    // Group by reason
+    const reasonBreakdown = sales.reduce((acc, item) => {
+      acc[item.reason] = (acc[item.reason] || 0) + item.quantity;
+      return acc;
+    }, {});
+
+    res.json({
+      report_type: 'sales_usage',
+      generated_at: new Date().toISOString(),
+      period_days: parseInt(days),
+      total_sales: sales.length,
+      total_quantity_sold: totalSold,
+      unique_products_sold: uniqueProducts,
+      reason_breakdown: reasonBreakdown,
+      sales
+    });
+
+  } catch (error) {
+    console.error('Get Sales/Usage Report Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ Get Low Stock Alert Report
+export const getLowStockAlertReport = async (req, res) => {
+  try {
+    const { threshold = 5, category } = req.query;
+
+    let whereConditions = [
+      'p.is_active = 1',
+      'p.stock <= ?'
+    ];
+    let queryParams = [parseInt(threshold)];
+
+    if (category) {
+      whereConditions.push('c.name = ?');
+      queryParams.push(category);
+    }
+
+    const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
+
+    const [lowStockProducts] = await pool.query(
+      `SELECT 
+        p.id,
+        p.name as product_name,
+        p.stock as current_stock,
+        p.price as selling_price,
+        c.name as category_name,
+        CASE 
+          WHEN p.stock = 0 THEN 'Out of Stock'
+          ELSE 'Low Stock'
+        END as alert_level,
+        p.created_at,
+        p.updated_at
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       ${whereClause}
+       ORDER BY p.stock ASC, p.name`,
+      queryParams
+    );
+
+    // Calculate summary
+    const outOfStock = lowStockProducts.filter(p => p.current_stock === 0).length;
+    const lowStock = lowStockProducts.filter(p => p.current_stock > 0).length;
+
+    res.json({
+      report_type: 'low_stock_alert',
+      generated_at: new Date().toISOString(),
+      threshold: parseInt(threshold),
+      total_alerts: lowStockProducts.length,
+      out_of_stock: outOfStock,
+      low_stock: lowStock,
+      products: lowStockProducts
+    });
+
+  } catch (error) {
+    console.error('Get Low Stock Alert Report Error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };

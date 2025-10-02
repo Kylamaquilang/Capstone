@@ -4,6 +4,7 @@ import Sidebar from '@/components/common/side-bar';
 import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
 import { useSocket } from '@/context/SocketContext';
+import { CubeIcon } from '@heroicons/react/24/outline';
 
 export default function AdminNotificationPage() {
   const { socket, isConnected, joinAdminRoom } = useSocket();
@@ -211,7 +212,7 @@ export default function AdminNotificationPage() {
       <Navbar />
       <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
-        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
+        <div className="flex-1 bg-white p-2 sm:p-3 overflow-auto lg:ml-64">
           <div className="max-w-4xl mx-auto">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               {/* Header */}
@@ -371,7 +372,7 @@ export default function AdminNotificationPage() {
                   })
                 ) : (
                   <div className="text-center py-8">
-                    <div className="text-gray-400 text-2xl mb-3">📦</div>
+                    <CubeIcon className="w-8 h-8 text-gray-400 mx-auto mb-3" />
                     <h3 className="text-sm font-medium text-gray-900 mb-2">No notifications</h3>
                     <p className="text-xs text-gray-500">
                       {statusFilter === 'all' 

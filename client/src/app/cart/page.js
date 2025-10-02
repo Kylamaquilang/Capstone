@@ -1,7 +1,7 @@
 'use client';
 import Footer from '@/components/common/footer';
 import Navbar from '@/components/common/nav-bar';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ShoppingCartIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useNotifications } from '@/context/NotificationContext';
@@ -254,9 +254,9 @@ export default function CartPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
-      <div className="flex-grow flex">
+      <div className="flex-grow flex flex-col lg:flex-row">
         {/* Main Content */}
-      <main className="flex-1 px-4 py-6 max-w-4xl mx-auto">
+      <main className="flex-1 px-4 py-6 max-w-4xl mx-auto lg:mr-0">
         <div className="mb-6">
           <h1 className="text-xl font-semibold text-gray-900 mb-1">Shopping Cart</h1>
           <p className="text-sm text-gray-600">{cartItems.length} item{cartItems.length !== 1 ? 's' : ''}</p>
@@ -265,9 +265,7 @@ export default function CartPage() {
           {cartItems.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6m8 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
-                </svg>
+                <ShoppingCartIcon className="w-12 h-12 text-gray-400" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Your cart is empty</h3>
               <p className="text-gray-600 mb-6">Add some items to get started</p>
@@ -285,7 +283,7 @@ export default function CartPage() {
                   key={item.id}
                   className="bg-white rounded-lg shadow-sm border-gray-200 p-4"
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-3 sm:gap-4">
                     {/* Checkbox */}
                     <input
                       type="checkbox"
@@ -295,7 +293,7 @@ export default function CartPage() {
                     />
 
                     {/* Product Image */}
-                    <div className="w-24 h-24 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
                       <Image
                         src={getImageUrl(item.product_image) || '/images/polo.png'}
                         alt={item.product_name}
@@ -310,10 +308,10 @@ export default function CartPage() {
 
                     {/* Product Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-2">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2">
                         <div className="flex-1 min-w-0">
                           {/* Product Name */}
-                          <h3 className="font-bold text-gray-900 text-lg mb-1 truncate">{item.product_name}</h3>
+                          <h3 className="font-bold text-gray-900 text-base sm:text-lg mb-1 truncate">{item.product_name}</h3>
                           
                           {/* Product Details */}
                           <div className="flex items-center gap-4 text-sm text-gray-500">
@@ -322,8 +320,8 @@ export default function CartPage() {
                         </div>
 
                         {/* Price */}
-                        <div className="text-right ml-4">
-                          <p className="text-lg font-bold text-gray-900">
+                        <div className="text-left sm:text-right mt-2 sm:mt-0 sm:ml-4">
+                          <p className="text-base sm:text-lg font-bold text-gray-900">
                             ₱{(item.price * item.quantity).toFixed(2)}
                           </p>
                         </div>
@@ -361,9 +359,7 @@ export default function CartPage() {
                           onClick={() => handleRemove(item.id)}
                           className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
+                          <TrashIcon className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
@@ -376,7 +372,7 @@ export default function CartPage() {
 
         {/* Right Sidebar - Checkout Panel */}
         {cartItems.length > 0 && (
-          <div className="w-80 bg-white border-gray-200 p-6">
+          <div className="w-full lg:w-80 bg-white border-gray-200 p-4 sm:p-6 lg:sticky lg:top-20 lg:h-fit">
             <div className="sticky top-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Order Summary</h2>
               

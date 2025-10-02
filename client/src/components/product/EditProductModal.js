@@ -21,7 +21,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
-  const [sizes, setSizes] = useState([{ size: 'NONE' }]);
+  const [selectedSizes, setSelectedSizes] = useState([]);
 
   useEffect(() => {
     if (isOpen && productId) {
@@ -48,13 +48,9 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       
       // Handle sizes
       if (data.sizes && data.sizes.length > 0) {
-        setSizes(data.sizes.map(size => ({
-          size: size.size,
-          stock: size.stock || '',
-          price: size.price || ''
-        })));
+        setSelectedSizes(data.sizes.map(size => size.size));
       } else {
-        setSizes([{ size: 'NONE', stock: '', price: '' }]);
+        setSelectedSizes([]);
       }
     } catch (err) {
       setError('Failed to load product');
@@ -71,6 +67,18 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
     } catch (err) {
       console.error('Load categories error:', err);
     }
+  };
+
+  // Available size options
+  const availableSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+  // Handle size selection
+  const handleSizeChange = (size) => {
+    setSelectedSizes(prev => 
+      prev.includes(size) 
+        ? prev.filter(s => s !== size)
+        : [...prev, size]
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -90,29 +98,10 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
         setSaving(false);
         return;
       }
-      if (!costPrice || Number(costPrice) <= 0) {
-        setError('Please enter a valid cost price');
-        setSaving(false);
-        return;
-      }
-      if (Number(price) <= Number(costPrice)) {
-        setError('Selling price must be higher than cost price');
-        setSaving(false);
-        return;
-      }
-      if (!stock || Number(stock) < 0) {
-        setError('Please enter a valid stock quantity');
-        setSaving(false);
-        return;
-      }
+      // Removed cost price validation - only selling price is required
+      // Stock validation removed - stock is auto-managed by inventory
 
-      // Validate that total size stock does not exceed base stock
-      if (!isSizeStockValid()) {
-        const totalSizeStock = getTotalSizeStock();
-        setError(`Total size stock (${totalSizeStock}) cannot exceed base stock (${stock}). Please adjust the size quantities.`);
-        setSaving(false);
-        return;
-      }
+      // Size stock validation removed - stock is auto-managed by inventory
 
       let finalImageUrl = product?.image || null;
       
@@ -127,20 +116,18 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       }
 
       // Prepare sizes data
-      const sizesData = sizes.filter(sizeItem => 
-        sizeItem.size && sizeItem.size.trim() !== ''
-      ).map(sizeItem => ({
-        size: sizeItem.size,
-        stock: sizeItem.stock ? Number(sizeItem.stock) : 0,
-        price: sizeItem.price ? Number(sizeItem.price) : Number(price)
+      const sizesData = selectedSizes.map(size => ({
+        size: size,
+        stock: 0, // Auto-set to 0, managed by inventory
+        price: Number(price) // Use base price
       }));
 
       const productData = {
         name: name.trim(),
         description: description.trim() || null,
         price: Number(price),
-        original_price: Number(costPrice),
-        stock: Number(stock),
+        original_price: Number(price), // Set cost price same as selling price
+        // stock field removed - auto-managed by inventory
         category_id: categoryId ? Number(categoryId) : null,
         image: finalImageUrl,
         sizes: sizesData.length > 0 ? sizesData : undefined
@@ -186,72 +173,27 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
     }
   };
 
-  const addSize = () => {
-    setSizes([...sizes, { size: 'NONE', stock: '', price: '' }]);
-  };
-
-  const removeSize = (index) => {
-    if (sizes.length > 1) {
-      setSizes(sizes.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateSize = (index, field, value) => {
-    const updatedSizes = sizes.map((size, i) => 
-      i === index ? { ...size, [field]: value } : size
-    );
-    setSizes(updatedSizes);
-  };
-
-  // Calculate total size stock
-  const getTotalSizeStock = () => {
-    return sizes.reduce((total, sizeItem) => {
-      const sizeStock = Number(sizeItem.stock) || 0;
-      return total + sizeStock;
-    }, 0);
-  };
-
-  // Check if total size stock exceeds base stock
-  const isSizeStockValid = () => {
-    const baseStock = Number(stock) || 0;
-    const totalSizeStock = getTotalSizeStock();
-    return totalSizeStock <= baseStock;
-  };
-
-  // Get remaining stock available for sizes
-  const getRemainingStock = () => {
-    const baseStock = Number(stock) || 0;
-    const totalSizeStock = getTotalSizeStock();
-    return Math.max(0, baseStock - totalSizeStock);
-  };
+  // Remove unused functions - sizes are now handled with checkboxes
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        {/* Backdrop */}
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-          onClick={handleClose}
-        />
-        
-        {/* Modal */}
-        <div className="relative bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <h2 className="text-xl font-medium text-gray-900">Edit Product</h2>
-            <button
-              onClick={handleClose}
-              disabled={saving}
-              className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
-            >
-              <XMarkIcon className="h-6 w-6" />
-            </button>
-          </div>
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-xm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto scrollbar-hide">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Edit Product</h2>
+          <button
+            onClick={handleClose}
+            disabled={saving}
+            className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
 
-          {/* Content */}
-          <div className="p-6">
+        {/* Modal Body */}
+        <div className="p-4">
             {loading ? (
               <div className="flex justify-center items-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
@@ -267,344 +209,212 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Error Message */}
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-red-600 text-sm">{error}</p>
-                  </div>
-                )}
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-4">
+                  {/* Error Message */}
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <p className="text-red-600 text-sm">{error}</p>
+                    </div>
+                  )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column */}
-                  <div className="space-y-4">
-                    {/* Product Name */}
+                  {/* Top Row - Left: Product Info, Right: Product Sizes */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Left Column - Product Info */}
+                    <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Product Name
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
                       <input
-                        type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        required
-                        disabled={saving}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Enter product name"
-                      />
-                    </div>
-
-                    {/* Cost Price */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Cost Price (₱)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={costPrice}
-                        onChange={(e) => setCostPrice(e.target.value)}
                         required
                         disabled={saving}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        placeholder="0.00"
                       />
                     </div>
 
-                    {/* Selling Price */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Selling Price (₱)
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                      <textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20 resize-none"
+                        placeholder="Enter product description (optional)"
+                        disabled={saving}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
                       <input
                         type="number"
-                        step="0.01"
-                        min="0"
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
-                        required
-                        disabled={saving}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        placeholder="0.00"
-                      />
-                    </div>
-
-                    {/* Profit Analysis Display */}
-                    {costPrice && price && Number(costPrice) > 0 && Number(price) > 0 && (
-                      <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-blue-800 font-medium">Profit Analysis:</span>
-                          <div className="text-right">
-                            <div className="text-green-600 font-bold">
-                              Profit: ₱{(Number(price) - Number(costPrice)).toFixed(2)}
-                            </div>
-                            <div className="text-blue-600">
-                              Margin: {(((Number(price) - Number(costPrice)) / Number(price)) * 100).toFixed(1)}%
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Stock */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Stock Quantity
-                      </label>
-                      <input
-                        type="number"
+                        className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter selling price"
                         min="0"
-                        value={stock}
-                        onChange={(e) => setStock(e.target.value)}
+                        step="0.01"
                         required
                         disabled={saving}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        placeholder="0"
                       />
                     </div>
 
-                    {/* Category */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Category
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                       <select
                         value={categoryId}
                         onChange={(e) => setCategoryId(e.target.value)}
+                        className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         disabled={saving}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <option value="">Select a category</option>
-                        {categories.map((category) => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
-                          </option>
+                        <option value="" disabled>Select category</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>
                         ))}
                       </select>
                     </div>
 
-                    {/* Description */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        disabled={saving}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        placeholder="Enter product description"
-                      />
+                    {/* Stock Display */}
+                    <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+                      <div className="text-sm">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-gray-700 font-medium">Base Stock:</span>
+                          <span className="text-gray-900 font-bold">{stock || 0} (read-only)</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700 font-medium">Size Stocks:</span>
+                          <span className="text-gray-900 font-bold">Auto-managed (read-only)</span>
+                        </div>
+                      </div>
+                    </div>
                     </div>
 
-                    {/* Product Sizes */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-medium text-gray-700">Product Sizes</label>
-                        <button
-                          type="button"
-                          onClick={addSize}
-                          disabled={saving}
-                          className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          + Add Size
-                        </button>
+                    {/* Right Column - Product Sizes */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Sizes</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {availableSizes.map((size) => (
+                            <label key={size} className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedSizes.includes(size)}
+                                onChange={() => handleSizeChange(size)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                disabled={saving}
+                              />
+                              <span className="text-sm text-gray-700">{size}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {selectedSizes.length > 0 && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Selected sizes: {selectedSizes.join(', ')}
+                          </p>
+                        )}
                       </div>
-                      
-                      {/* Stock Summary */}
-                      {stock && (
-                        <div className="mb-3 p-2 bg-gray-50 rounded-md border">
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-600">Base Stock:</span>
-                            <span className="font-medium">{stock}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-600">Total Size Stock:</span>
-                            <span className={`font-medium ${getTotalSizeStock() > Number(stock) ? 'text-red-600' : 'text-green-600'}`}>
-                              {getTotalSizeStock()}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-600">Remaining:</span>
-                            <span className={`font-medium ${getRemainingStock() < 0 ? 'text-red-600' : 'text-blue-600'}`}>
-                              {getRemainingStock()}
-                            </span>
-                          </div>
-                          {!isSizeStockValid() && (
-                            <div className="mt-1 text-xs text-red-600 font-medium">
-                              ⚠️ Total size stock exceeds base stock
+
+                      {/* Image Upload Section */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-3">Product Image</label>
+                        
+                        {/* File Input Button */}
+                        <div className="mb-4">
+                          <input
+                            id="product-file-input"
+                            type="file"
+                            accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg"
+                            className="hidden"
+                            multiple={false}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0] || null;
+                              setFile(f);
+                              setPreviewUrl(f ? URL.createObjectURL(f) : product?.image || '');
+                            }}
+                          />
+                        </div>
+
+                        {/* Drag & Drop Area */}
+                        <div
+                          className={`border-2 border-dashed rounded-lg p-4 text-center transition-all cursor-pointer ${
+                            dragActive 
+                              ? 'border-[#000C50] bg-blue-50 border-solid' 
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                          onDragLeave={() => setDragActive(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setDragActive(false);
+                            const f = e.dataTransfer.files?.[0];
+                            if (f) {
+                              setFile(f);
+                              setPreviewUrl(URL.createObjectURL(f));
+                            }
+                          }}
+                          onClick={() => document.getElementById('product-file-input')?.click()}
+                        >
+                          {previewUrl ? (
+                            <div className="space-y-2">
+                              <img src={previewUrl} alt="Preview" className="w-24 h-24 object-cover rounded-lg mx-auto border-2 border-gray-200" />
+                              <div>
+                                <p className="text-xs font-medium text-gray-900">{file?.name || 'Current image'}</p>
+                                <p className="text-xs text-gray-500">Click to change image</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <svg className="mx-auto h-8 w-8 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              <div>
+                                <p className="text-xs text-gray-900">Upload an image</p>
+                                <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                              </div>
                             </div>
                           )}
                         </div>
-                      )}
-                      
-                      <div className="space-y-2">
-                        {sizes.map((sizeItem, index) => (
-                          <div key={index} className="flex space-x-2 items-end">
-                            <div className="flex-1">
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Size</label>
-                              <select
-                                value={sizeItem.size}
-                                onChange={(e) => updateSize(index, 'size', e.target.value)}
-                                disabled={saving}
-                                className="w-full border border-gray-300 px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 h-8 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {['NONE','XS','S','M','L','XL','XXL'].map((s) => (
-                                  <option key={s} value={s}>{s}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="flex-1">
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Stock</label>
-                              <input
-                                type="number"
-                                value={sizeItem.stock}
-                                onChange={(e) => updateSize(index, 'stock', e.target.value)}
-                                className={`w-full border px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 h-8 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                  getTotalSizeStock() > Number(stock) ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                                }`}
-                                placeholder="0"
-                                min="0"
-                                max={getRemainingStock() + (Number(sizeItem.stock) || 0)}
-                                disabled={saving}
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Price</label>
-                              <input
-                                type="number"
-                                value={sizeItem.price}
-                                onChange={(e) => updateSize(index, 'price', e.target.value)}
-                                className="w-full border border-gray-300 px-2 py-1 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 h-8 disabled:opacity-50 disabled:cursor-not-allowed"
-                                placeholder="0.00"
-                                min="0"
-                                step="0.01"
-                                disabled={saving}
-                              />
-                            </div>
-                            {sizes.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeSize(index)}
-                                disabled={saving}
-                                className="bg-red-600 text-white px-2 py-1 rounded-md text-xs hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                ×
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Right Column - Image Upload */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">Product Image</label>
-                      
-                      {/* File Input Button */}
-                      <div className="mb-4">
-                        <button
-                          type="button"
-                          onClick={() => document.getElementById('product-file-input')?.click()}
-                          disabled={saving}
-                          className="w-full bg-gray-900 text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                          </svg>
-                          <span>Browse Files</span>
-                        </button>
-                        <input
-                          id="product-file-input"
-                          type="file"
-                          accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.svg"
-                          className="hidden"
-                          multiple={false}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0] || null;
-                            setFile(f);
-                            setPreviewUrl(f ? URL.createObjectURL(f) : product?.image || '');
-                          }}
-                        />
-                      </div>
-
-                      {/* Drag & Drop Area */}
-                      <div
-                        className={`border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer ${
-                          dragActive 
-                            ? 'border-gray-900 bg-gray-50 border-solid' 
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                        onDragEnter={(e) => {
-                          e.preventDefault();
-                          setDragActive(true);
-                        }}
-                        onDragLeave={(e) => {
-                          e.preventDefault();
-                          setDragActive(false);
-                        }}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setDragActive(false);
-                          const droppedFile = e.dataTransfer.files[0];
-                          if (droppedFile && droppedFile.type.startsWith('image/')) {
-                            setFile(droppedFile);
-                            setPreviewUrl(URL.createObjectURL(droppedFile));
-                          }
-                        }}
-                        onClick={() => document.getElementById('product-file-input')?.click()}
-                      >
-                        {previewUrl ? (
-                          <div className="space-y-2">
-                            <img 
-                              src={previewUrl} 
-                              alt="Preview" 
-                              className="w-32 h-32 object-cover rounded-lg mx-auto"
-                            />
-                            <p className="text-sm text-gray-600">Click to change image</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <svg className="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                            <div>
-                              <p className="text-sm text-gray-600">Drag and drop an image here</p>
-                              <p className="text-xs text-gray-500">or click to browse</p>
+                        {/* File Info */}
+                        {file && (
+                          <div className="mt-3 p-2 bg-gray-50 rounded-lg">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600">File size:</span>
+                              <span className="font-medium">{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs mt-1">
+                              <span className="text-gray-600">File type:</span>
+                              <span className="font-medium">{file.type}</span>
                             </div>
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
+
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-6 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={handleClose}
+                {/* Modal Footer */}
+                <div className="mt-4 flex space-x-4">
+                  <button 
+                    type="submit" 
                     disabled={saving}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-[#000C50] text-white px-4 py-2 rounded-md hover:bg-blue-800 disabled:opacity-50 transition-colors text-sm font-medium"
+                  >
+                    {saving ? 'Updating...' : 'Update Product'}
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={handleClose}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium"
+                    disabled={saving}
                   >
                     Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {saving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </form>
             )}
-          </div>
         </div>
       </div>
     </div>

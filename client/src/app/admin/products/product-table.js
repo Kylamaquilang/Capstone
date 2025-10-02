@@ -2,15 +2,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Swal from '@/lib/sweetalert-config';
-import { PencilSquareIcon, TrashIcon, MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
-import { EyeIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon, FunnelIcon, CubeIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
-import ActionMenu from '@/components/common/ActionMenu';
 import EditProductModal from '@/components/product/EditProductModal';
 import { useSocket } from '@/context/SocketContext';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 
-export default function ProductTable({ category = '', subcategory = '' }) {
+export default function ProductTable({ category = '', subcategory = '', categoryStyle = { bg: 'bg-gray-50', text: 'text-gray-800' } }) {
   const { socket, isConnected, joinAdminRoom } = useSocket();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -357,7 +355,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+      <div className="bg-white border border-gray-200 p-12 text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
         <p className="text-gray-600 text-sm">Loading products...</p>
       </div>
@@ -366,7 +364,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+      <div className="bg-white border border-gray-200 p-12 text-center">
         <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -380,7 +378,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
   return (
     <>
       {/* Table Header with Search and Filters */}
-      <div className="p-3 border-b border-gray-200">
+      <div className="p-3">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="flex-1 max-w-md">
             <div className="relative">
@@ -390,7 +388,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                 placeholder="Search products..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-80 pl-10 pr-4 py-2 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent rounded-lg"
               />
             </div>
           </div>
@@ -398,7 +396,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
             {selectedRows.length > 0 && (
               <button
                 onClick={handleBulkDelete}
-                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors text-sm font-medium"
+                className="bg-red-500 text-white px-2 py-2 hover:bg-red-700 transition-colors text-sm font-medium rounded-lg"
               >
                 Delete Selected ({getSelectedProductsCount()})
               </button>
@@ -416,7 +414,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-100">
             <tr>
-              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">
+              <th className="px-4 py-3 text-xs font-medium text-gray-700">
                 <input
                   type="checkbox"
                   checked={selectAll}
@@ -425,7 +423,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                 />
               </th>
               <th 
-                className="px-4 py-3 text-xs font-medium text-gray-900 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-xs font-medium text-gray-900 cursor-pointer"
                 onClick={() => handleSort('name')}
               >
                 <div className="flex items-center gap-1">
@@ -436,7 +434,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('category_name')}
               >
                 <div className="flex items-center gap-1">
@@ -447,7 +445,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('original_price')}
               >
                 <div className="flex items-center gap-1">
@@ -458,7 +456,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                 </div>
               </th>
               <th 
-                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
+                className="px-4 py-3 text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
                 onClick={() => handleSort('price')}
               >
                 <div className="flex items-center gap-1">
@@ -468,19 +466,11 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                   )}
                 </div>
               </th>
-              <th 
-                className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('stock')}
-              >
-                <div className="flex items-center gap-1">
-                  Base Stock
-                  {sortField === 'stock' && (
-                    <span className="text-blue-600">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700">
+                Base Stock (Display Only)
               </th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Size</th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Stock</th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700">Size</th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700">Stock (Display Only)</th>
               <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
             </tr>
           </thead>
@@ -488,11 +478,9 @@ export default function ProductTable({ category = '', subcategory = '' }) {
             {paginatedProducts.map((row, rowIndex) => (
                   <tr 
                 key={row.rowKey} 
-                    className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                  rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    }`}
+                    className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white"
                   >
-                    <td className="px-4 py-3 border-r border-gray-100">
+                    <td className="px-4 py-3">
                   <input
                     type="checkbox"
                     checked={selectedRows.includes(row.rowKey)}
@@ -503,22 +491,22 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                 <td className="px-4 py-3 border-r border-gray-100">
                   <div className="text-xs font-medium text-gray-900 uppercase">{row.name}</div>
                     </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
+                    <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 uppercase">
                     {row.category_name || row.category || 'Uncategorized'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
+                    <td className="px-4 py-3">
                       <div className="text-xs font-medium text-gray-900">
                     ₱{Number(row.original_price || 0).toFixed(2)}
                       </div>
                     </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
+                    <td className="px-4 py-3">
                       <div className="text-xs font-medium text-gray-900">
                     ₱{Number(row.price).toFixed(2)}
                       </div>
                     </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
+                    <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                     Number(row.stock) === 0 
                           ? 'bg-red-50 text-red-700' 
@@ -529,7 +517,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                     {row.stock}
                       </span>
                     </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
+                    <td className="px-4 py-3">
                   {row.isSizeRow ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
                       {row.size.size}
@@ -540,7 +528,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                       </span>
                   )}
                     </td>
-                    <td className="px-4 py-3 border-r border-gray-100">
+                    <td className="px-4 py-3">
                   {row.isSizeRow ? (
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                       Number(row.size.stock) === 0 
@@ -564,21 +552,22 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                   )}
                     </td>
                     <td className="px-4 py-3">
-                      <ActionMenu
-                        actions={[
-                          {
-                            label: 'Edit',
-                            icon: PencilSquareIcon,
-                        onClick: () => handleEdit(row.id)
-                          },
-                          {
-                            label: 'Delete',
-                            icon: TrashIcon,
-                        onClick: () => handleDelete(row.id, row.name),
-                            danger: true
-                          }
-                        ]}
-                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEdit(row.id)}
+                          className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit product"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(row.id, row.name)}
+                          className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                          title="Delete product"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
             ))}
@@ -600,12 +589,12 @@ export default function ProductTable({ category = '', subcategory = '' }) {
               <button
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1 || totalPages <= 1}
-                className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                className="px-3 py-1 text-xs border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
               >
                 &lt;
               </button>
               
-              <span className="px-3 py-1 text-xs border border-gray-300 rounded-md bg-[#000C50] text-white">
+              <span className={`px-3 py-1 text-xs border border-gray-300 ${categoryStyle.active}`}>
                 {currentPage}
               </span>
               
@@ -615,7 +604,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
                   setCurrentPage(Math.min(totalPages, currentPage + 1));
                 }}
                 disabled={currentPage === totalPages || totalPages <= 1}
-                className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                className="px-3 py-1 text-xs border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
               >
                 &gt;
               </button>
@@ -627,7 +616,7 @@ export default function ProductTable({ category = '', subcategory = '' }) {
       {/* Empty State */}
       {filteredAndSortedProducts.length === 0 && (
         <div className="p-8 text-center">
-          <div className="text-gray-300 text-3xl mb-4">📦</div>
+          <CubeIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-sm font-medium text-gray-900 mb-2">No products found</h3>
           <p className="text-gray-500 text-xs">
             {searchTerm ? 'Try adjusting your search terms.' : 'Get started by adding your first product.'}

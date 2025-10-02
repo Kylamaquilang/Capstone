@@ -9,24 +9,26 @@ export default function AddProductForm() {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [costPrice, setCostPrice] = useState('');
-  const [stock, setStock] = useState('');
+  const [stock, setStock] = useState('0');
   const [categoryId, setCategoryId] = useState('');
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
   const [categories, setCategories] = useState([]);
-  const [sizes, setSizes] = useState([{ size: 'S', stock: '', price: '' }]);
+  const [selectedSizes, setSelectedSizes] = useState([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Check if sizes should be disabled based on category
-  const isSizeDisabled = () => {
-    if (!categoryId) return false;
-    const selectedCategory = categories.find(c => c.id === Number(categoryId));
-    if (!selectedCategory) return false;
-    
-    const categoryName = selectedCategory.name.toLowerCase();
-    return categoryName === 'lanyard' || categoryName === 'tela';
+  // Available size options
+  const availableSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+  // Handle size selection
+  const handleSizeChange = (size) => {
+    setSelectedSizes(prev => 
+      prev.includes(size) 
+        ? prev.filter(s => s !== size)
+        : [...prev, size]
+    );
   };
 
   useEffect(() => {
@@ -57,22 +59,8 @@ export default function AddProductForm() {
         return;
       }
       
-      if (!costPrice || Number(costPrice) <= 0) {
-        alert('Please enter a valid cost price');
-        setLoading(false);
-        return;
-      }
-      
-      if (Number(price) <= Number(costPrice)) {
-        alert('Selling price must be higher than cost price');
-        setLoading(false);
-        return;
-      }
-      if (!stock || Number(stock) < 0) {
-        alert('Please enter a valid stock quantity');
-        setLoading(false);
-        return;
-      }
+      // Removed cost price validation - only selling price is required
+      // Stock validation removed - stock is auto-managed by inventory
 
       let finalImageUrl = null;
       
@@ -83,15 +71,13 @@ export default function AddProductForm() {
         finalImageUrl = file;
       }
 
-      // Prepare sizes data (only if sizes are not disabled)
+      // Prepare sizes data
       let sizesData = [];
-      if (!isSizeDisabled()) {
-        sizesData = sizes.filter(sizeItem => 
-          sizeItem.size && sizeItem.stock && Number(sizeItem.stock) >= 0
-        ).map(sizeItem => ({
-          size: sizeItem.size,
-          stock: Number(sizeItem.stock),
-          price: sizeItem.price ? Number(sizeItem.price) : Number(price)
+      if (selectedSizes.length > 0) {
+        sizesData = selectedSizes.map(size => ({
+          size: size,
+          stock: 0, // Auto-set to 0
+          price: Number(price) // Use base price
         }));
       }
 
@@ -99,8 +85,8 @@ export default function AddProductForm() {
         name: name.trim(),
         description: description.trim() || null,
         price: Number(price),
-        original_price: Number(costPrice),
-        stock: Number(stock),
+        original_price: Number(price), // Set cost price same as selling price for now
+        stock: 0, // Always start with 0 stock
         category_id: categoryId ? Number(categoryId) : null,
         image: finalImageUrl,
         sizes: sizesData.length > 0 ? sizesData : undefined
@@ -140,22 +126,7 @@ export default function AddProductForm() {
     router.push('/admin/products');
   };
 
-  const addSize = () => {
-    setSizes([...sizes, { size: 'S', stock: '', price: '' }]);
-  };
-
-  const removeSize = (index) => {
-    if (sizes.length > 1) {
-      setSizes(sizes.filter((_, i) => i !== index));
-    }
-  };
-
-  const updateSize = (index, field, value) => {
-    const updatedSizes = sizes.map((size, i) => 
-      i === index ? { ...size, [field]: value } : size
-    );
-    setSizes(updatedSizes);
-  };
+  // Remove unused functions - sizes are now handled with checkboxes
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-8 rounded-sm w-full max-w-2xl mx-auto">
@@ -184,65 +155,32 @@ export default function AddProductForm() {
             />
           </div>
 
-          <div className="flex space-x-4">
-            <div className="flex-1">
-              <label className="block text-sm mb-1">COST PRICE:</label>
-              <input
-                type="number"
-                value={costPrice}
-                onChange={(e) => setCostPrice(e.target.value)}
-                className="w-full border border-gray-400 px-3 py-2 rounded"
-                placeholder="Enter cost price"
-                min="0"
-                step="0.01"
-                required
-              />
-            </div>
-
-            <div className="flex-1">
-              <label className="block text-sm mb-1">SELLING PRICE:</label>
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="w-full border border-gray-400 px-3 py-2 rounded"
-                placeholder="Enter selling price"
-                min="0"
-                step="0.01"
-                required
-              />
-            </div>
-
-            <div className="flex-1">
-              <label className="block text-sm mb-1">BASE STOCK:</label>
-              <input
-                type="number"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                className="w-full border border-gray-400 px-3 py-2 rounded"
-                placeholder="Base quantity in stock"
-                min="0"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-sm mb-1">PRICE:</label>
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="w-full border border-gray-400 px-3 py-2 rounded"
+              placeholder="Enter selling price"
+              min="0"
+              step="0.01"
+              required
+            />
           </div>
 
-          {/* Profit Margin Display */}
-          {costPrice && price && Number(costPrice) > 0 && Number(price) > 0 && (
-            <div className="bg-blue-50 p-3 rounded border border-blue-200">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-blue-800 font-medium">Profit Analysis:</span>
-                <div className="text-right">
-                  <div className="text-green-600 font-bold">
-                    Profit: ₱{(Number(price) - Number(costPrice)).toFixed(2)}
-                  </div>
-                  <div className="text-blue-600">
-                    Margin: {(((Number(price) - Number(costPrice)) / Number(price)) * 100).toFixed(1)}%
-                  </div>
-                </div>
+          {/* Stock Display */}
+          <div className="bg-gray-50 p-3 rounded border border-gray-200">
+            <div className="text-sm">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-gray-700 font-medium">Base Stock:</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-700 font-medium">Size Stocks:</span>
+                
               </div>
             </div>
-          )}
+          </div>
 
           <div>
             <label className="block text-sm mb-1">CATEGORY:</label>
@@ -259,73 +197,24 @@ export default function AddProductForm() {
           </div>
 
           {/* PRODUCT SIZES */}
-          <div className={isSizeDisabled() ? 'opacity-50 pointer-events-none' : ''}>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm">PRODUCT SIZES:</label>
-              {!isSizeDisabled() && (
-                <button
-                  type="button"
-                  onClick={addSize}
-                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                >
-                  + Add Size
-                </button>
-              )}
+          <div>
+            <label className="block text-sm mb-2">SIZES:</label>
+            <div className="grid grid-cols-3 gap-2">
+              {availableSizes.map((size) => (
+                <label key={size} className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedSizes.includes(size)}
+                    onChange={() => handleSizeChange(size)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">{size}</span>
+                </label>
+              ))}
             </div>
-            
-            {isSizeDisabled() ? (
-              <div className="p-3 bg-gray-100 rounded border border-gray-300">
-                <p className="text-sm text-gray-600 text-center">
-                  Sizes are not available for this category
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {sizes.map((sizeItem, index) => (
-                  <div key={index} className="flex space-x-2 items-center">
-                    <select
-                      value={sizeItem.size}
-                      onChange={(e) => updateSize(index, 'size', e.target.value)}
-                      className="border border-gray-400 px-2 py-1 rounded text-sm"
-                    >
-                      {['XS','S','M','L','XL','XXL'].map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="number"
-                      value={sizeItem.stock}
-                      onChange={(e) => updateSize(index, 'stock', e.target.value)}
-                      placeholder="Stock"
-                      min="0"
-                      className="border border-gray-400 px-2 py-1 rounded text-sm w-20"
-                    />
-                    <input
-                      type="number"
-                      value={sizeItem.price}
-                      onChange={(e) => updateSize(index, 'price', e.target.value)}
-                      placeholder="Price (optional)"
-                      min="0"
-                      step="0.01"
-                      className="border border-gray-400 px-2 py-1 rounded text-sm w-24"
-                    />
-                    {sizes.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeSize(index)}
-                        className="bg-red-600 text-white px-2 py-1 rounded text-sm hover:bg-red-700"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {!isSizeDisabled() && (
-              <p className="text-xs text-gray-500 mt-1">
-                Leave price empty to use base price. Stock is required for each size.
+            {selectedSizes.length > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                Selected sizes: {selectedSizes.join(', ')}
               </p>
             )}
           </div>
@@ -421,10 +310,10 @@ export default function AddProductForm() {
 
       <div className="mt-8 flex space-x-4">
         <button type="submit" disabled={loading} className="bg-[#000C50] text-white px-4 py-2 rounded hover:bg-blue-900">
-          {loading ? 'Saving...' : 'SAVE PRODUCT'}
+          {loading ? 'Saving...' : 'Save Product'}
         </button>
-        <button type="button" onClick={handleCancel} className="bg-[#000C50] text-white px-6 py-2 rounded hover:bg-blue-900">
-          CANCEL
+        <button type="button" onClick={handleCancel} className="bg-gray-500 text-white px-6 py-2 rounded hover:bg-gray-600">
+          Cancel
         </button>
       </div>
     </form>

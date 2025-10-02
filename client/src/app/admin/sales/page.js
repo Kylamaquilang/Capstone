@@ -14,8 +14,23 @@ import {
   Title,
   Tooltip,
   Legend,
+  ArcElement,
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Line, Doughnut } from 'react-chartjs-2';
+import { 
+  CurrencyDollarIcon, 
+  ShoppingBagIcon, 
+  UserGroupIcon, 
+  ChartBarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
+  ArrowPathIcon,
+  ClipboardDocumentListIcon,
+  CubeIcon
+} from '@heroicons/react/24/outline';
 
 ChartJS.register(
   CategoryScale,
@@ -24,7 +39,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  ArcElement
 );
 
 export default function AdminSalesPage() {
@@ -455,16 +471,16 @@ export default function AdminSalesPage() {
       {
         label: 'Revenue',
         data: salesData.salesData?.map(item => item.revenue) || [],
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: 'rgb(168, 85, 247)', // Purple
+        backgroundColor: 'rgba(168, 85, 247, 0.1)',
         tension: 0.4,
         fill: true,
       },
       {
         label: 'Orders',
         data: salesData.salesData?.map(item => item.orders) || [],
-        borderColor: 'rgb(34, 197, 94)',
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        borderColor: 'rgb(245, 158, 11)', // Orange
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
         tension: 0.4,
         fill: false,
         yAxisID: 'y1',
@@ -474,6 +490,7 @@ export default function AdminSalesPage() {
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     interaction: {
       mode: 'index',
       intersect: false,
@@ -512,36 +529,83 @@ export default function AdminSalesPage() {
     },
   };
 
+  // Prepare pie chart data for payment methods
+  const pieChartData = {
+    labels: salesData.paymentBreakdown?.map(item => 
+      item.payment_method === 'gcash' ? 'GCash' : 
+      item.payment_method === 'cash' ? 'Cash' : 
+      item.payment_method
+    ) || [],
+    datasets: [
+      {
+        data: salesData.paymentBreakdown?.map(item => item.total_revenue) || [],
+        backgroundColor: [
+          'rgba(147, 197, 253, 0.8)', // Pastel blue for GCash
+          'rgba(254, 240, 138, 0.8)', // Pastel yellow for Cash
+          'rgba(139, 92, 246, 0.8)', // Violet for others
+          'rgba(251, 146, 60, 0.8)', // Orange for others
+        ],
+        borderColor: [
+          'rgba(147, 197, 253, 1)',
+          'rgba(254, 240, 138, 1)',
+          'rgba(139, 92, 246, 1)',
+          'rgba(251, 146, 60, 1)',
+        ],
+        borderWidth: 2,
+      },
+    ],
+  };
+
+  const pieChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+      },
+      title: {
+        display: true,
+        text: 'Payment Method Breakdown',
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            const label = context.label || '';
+            const value = context.parsed;
+            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            const percentage = ((value / total) * 100).toFixed(1);
+            return `${label}: ₱${value.toLocaleString()} (${percentage}%)`;
+          }
+        }
+      }
+    },
+  };
+
   return (
     <div className="min-h-screen text-black admin-page">
       <Navbar />
       <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
-        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
+        <div className="flex-1 bg-white p-2 sm:p-3 overflow-auto lg:ml-64">
           {/* Header */}
           <div className="mb-2">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Sales Analytics</h1>
-                <p className="text-gray-600 text-sm">Comprehensive sales performance and reporting from orders data</p>
+                <h1 className="text-lg sm:text-2xl font-semibold text-gray-900 mb-5">Sales Analytics</h1>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={fetchSalesData}
-                  className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center gap-2"
+                  className="px-3 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center gap-2 mb-5"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  <ArrowPathIcon className="w-4 h-4" />
                   Refresh Data
                 </button>
                 <a
                   href="/admin/orders"
-                  className="px-3 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm font-medium flex items-center gap-2"
+                  className="px-3 py-2 bg-white-600 text-[#000C50] rounded-md text-sm font-medium flex items-center gap-2 mb-5 border"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
+                  <ClipboardDocumentListIcon className="w-4 h-4" />
                   View Orders
                 </a>
               </div>
@@ -555,7 +619,7 @@ export default function AdminSalesPage() {
           )}
 
           {/* Filters */}
-          <div className="bg-white p-2 sm:p-3 rounded-lg shadow-sm border border-gray-200 mb-2">
+          <div className="bg-white p-2 sm:p-3 rounded-lg shadow-sm border border-gray-200 mb-5">
             <div className="flex flex-wrap items-center gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
@@ -607,13 +671,11 @@ export default function AdminSalesPage() {
           ) : (
             <>
               {/* Sales Summary */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-6">
                 <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                   <div className="flex items-center">
                     <div className="p-2 bg-blue-50 rounded-md mt-2 ml-4">
-                      <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                      </svg>
+                      <ShoppingBagIcon className="w-8 h-8 text-blue-600" />
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-blue-600">Total Orders</p>
@@ -627,9 +689,7 @@ export default function AdminSalesPage() {
                 <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                   <div className="flex items-center">
                     <div className="p-2 bg-green-50 rounded-md mt-2 ml-4">
-                      <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
+                      <CurrencyDollarIcon className="w-8 h-8 text-green-600" />
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-green-600">Total Revenue</p>
@@ -643,9 +703,7 @@ export default function AdminSalesPage() {
                 <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                   <div className="flex items-center">
                     <div className="p-2 bg-purple-50 rounded-md mt-2 ml-4">
-                      <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
+                      <ChartBarIcon className="w-8 h-8 text-purple-600" />
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-purple-600">Avg Order Value</p>
@@ -659,9 +717,7 @@ export default function AdminSalesPage() {
                 <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                   <div className="flex items-center">
                     <div className="p-2 bg-yellow-50 rounded-md mt-2 ml-4">
-                      <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                      </svg>
+                      <ChartBarIcon className="w-8 h-8 text-yellow-600" />
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-yellow-600">Growth</p>
@@ -678,15 +734,13 @@ export default function AdminSalesPage() {
 
               {/* Profit Analytics Section */}
               {salesData.profitAnalytics && (
-                <div className="mb-2">
+                <div className="mb-5">
                   <h2 className="text-sm font-semibold text-gray-900 mb-2">Profit Analytics</h2>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                       <div className="flex items-center">
                         <div className="p-2 bg-blue-50 rounded-md mt-2 ml-4">
-                          <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                          </svg>
+                          <CurrencyDollarIcon className="w-8 h-8 text-blue-600" />
                         </div>
                         <div className="ml-3">
                           <p className="text-sm font-medium text-blue-600">Total Cost</p>
@@ -700,9 +754,7 @@ export default function AdminSalesPage() {
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                       <div className="flex items-center">
                         <div className="p-2 bg-green-50 rounded-md mt-2 ml-4">
-                          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                          </svg>
+                          <ChartBarIcon className="w-8 h-8 text-green-600" />
                         </div>
                         <div className="ml-3">
                           <p className="text-sm font-medium text-green-600">Total Profit</p>
@@ -716,9 +768,7 @@ export default function AdminSalesPage() {
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                       <div className="flex items-center">
                         <div className="p-2 bg-purple-50 rounded-md mt-2 ml-4">
-                          <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
+                          <ChartBarIcon className="w-8 h-8 text-purple-600" />
                         </div>
                         <div className="ml-3">
                           <p className="text-sm font-medium text-purple-600">Profit Margin</p>
@@ -732,9 +782,7 @@ export default function AdminSalesPage() {
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                       <div className="flex items-center">
                         <div className="p-2 bg-orange-50 rounded-md mt-2 ml-4">
-                          <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
+                          <ChartBarIcon className="w-8 h-8 text-orange-600" />
                         </div>
                         <div className="ml-3">
                           <p className="text-sm font-medium text-orange-600">Avg Profit/Order</p>
@@ -751,105 +799,58 @@ export default function AdminSalesPage() {
                 </div>
               )}
 
-              {/* Sales Tracking Section */}
-              <div className="mb-2">
-                <h2 className="text-sm font-semibold text-gray-900 mb-2">Sales Tracking</h2>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-xs font-medium text-gray-600">Completed Sales</p>
-                        <p className="text-lg font-bold text-green-600">
-                          {salesData.salesLogsSummary?.completed_sales || 0}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-xs font-medium text-gray-600">Sales Revenue</p>
-                        <p className="text-lg font-bold text-blue-600">
-                          {formatCurrency(salesData.salesLogsSummary?.completed_revenue || 0)}
-                        </p>
-                      </div>
-                    </div>
+              {/* Charts Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2">
+                {/* Sales Trend Line Chart */}
+                <div className="bg-white border border-gray-200 rounded-lg shadow-md">
+                  <div className="p-4">
+                    <h3 className="text-sm font-semibold text-gray-900">Sales Trend</h3>
                   </div>
-
-                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                  <div className="p-4">
+                    {salesData.salesData && salesData.salesData.length > 0 ? (
+                      <div className="h-80">
+                        <Line data={chartData} options={chartOptions} />
                       </div>
-                      <div className="ml-3">
-                        <p className="text-xs font-medium text-gray-600">Reversed Sales</p>
-                        <p className="text-lg font-bold text-red-600">
-                          {salesData.salesLogsSummary?.reversed_sales || 0}
-                        </p>
+                    ) : (
+                      <div className="text-center py-6 text-gray-500">
+                        <ChartBarIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-xs">No sales data available for the selected period</p>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-xs font-medium text-gray-600">Total Sales Logs</p>
-                        <p className="text-lg font-bold text-purple-600">
-                          {salesData.salesLogsSummary?.total_sales_logs || 0}
-                        </p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
-              </div>
 
-              {/* Sales Chart */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-md mb-2 flex align-center">
-                <div className="p-2">
-                  <h3 className="text-sm font-semibold text-gray-900">Sales Trend</h3>
-                </div>
-                <div className="p-2">
-                {salesData.salesData && salesData.salesData.length > 0 ? (
-                  <div className="h-80">
-                    <Line data={chartData} options={chartOptions} />
+                {/* Payment Method Pie Chart */}
+                <div className="bg-white border border-gray-200 rounded-lg shadow-md">
+                  <div className="p-4">
+                    <h3 className="text-sm font-semibold text-gray-900">Payment Methods</h3>
                   </div>
-                ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    <div className="text-gray-300 text-2xl mb-2">📈</div>
-                    <p className="text-xs">No sales data available for the selected period</p>
+                  <div className="p-4">
+                    {salesData.paymentBreakdown && salesData.paymentBreakdown.length > 0 ? (
+                      <div className="h-80">
+                        <Doughnut data={pieChartData} options={pieChartOptions} />
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-gray-500">
+                        <ChartBarIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-xs">No payment data available</p>
+                      </div>
+                    )}
                   </div>
-                )}
                 </div>
               </div>
 
               {/* Sales Data Table */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-2">
+              <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-2 mt-5">
                 <div className="p-2">
-                  <h3 className="text-sm font-semibold text-gray-900">Detailed Sales Data</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 ml-3 mt-1">Detailed Sales Data</h3>
                 </div>
                 <div className="p-2">
                   {salesData.salesData && salesData.salesData.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
-                      <thead className="bg-blue-100">
+                      <thead className="bg-gray-100">
                         <tr>
                           <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Period</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Orders</th>
@@ -859,9 +860,7 @@ export default function AdminSalesPage() {
                       </thead>
                       <tbody>
                         {salesData.salesData.map((item, index) => (
-                          <tr key={index} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                          }`}>
+                          <tr key={index} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
                             <td className="px-4 py-3 border-r border-gray-100">
                               <span className="text-xs font-medium text-gray-900">{formatDate(item.period)}</span>
                             </td>
@@ -883,7 +882,7 @@ export default function AdminSalesPage() {
                     </div>
                   ) : (
                     <div className="text-center py-6 text-gray-500">
-                      <div className="text-gray-300 text-2xl mb-2">📊</div>
+                      <div className="text-gray-300 text-2xl mb-2"></div>
                       <p className="text-xs">No sales data available for the selected period</p>
                     </div>
                   )}
@@ -891,9 +890,9 @@ export default function AdminSalesPage() {
               </div>
 
               {/* Payment Method Breakdown */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-md mb-2">
+              <div className="bg-white border border-gray-200 rounded-lg shadow-md mb-2 mt-5">
                 <div className="p-2">
-                  <h3 className="text-sm font-semibold text-gray-900">Payment Method Breakdown</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 ml-3 mt-1">Payment Method Breakdown</h3>
                 </div>
                 <div className="p-2">
                 {salesData.paymentBreakdown && salesData.paymentBreakdown.length > 0 ? (
@@ -943,15 +942,15 @@ export default function AdminSalesPage() {
               </div>
 
               {/* Inventory Movement Summary */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-md mb-2">
+              <div className="bg-white border border-gray-200 rounded-lg shadow-md mb-2 mt-5">
                 <div className="p-2">
-                  <h3 className="text-sm font-semibold text-gray-900">Inventory Movement Summary</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 ml-3 mt-1">Inventory Movement Summary</h3>
                 </div>
                 <div className="p-2">
                   {salesData.inventorySummary && salesData.inventorySummary.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse">
-                      <thead className="bg-blue-100">
+                      <thead className="bg-gray-100">
                         <tr>
                           <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Movement Type</th>
                           <th className="px-4 py-3 text-xs font-medium text-gray-700 border-r border-gray-200">Count</th>
@@ -961,9 +960,7 @@ export default function AdminSalesPage() {
                       </thead>
                       <tbody>
                         {salesData.inventorySummary.map((movement, index) => (
-                          <tr key={index} className={`hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                            index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                          }`}>
+                          <tr key={index} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
                             <td className="px-4 py-3 border-r border-gray-100">
                               <span className="text-xs font-medium text-gray-900 capitalize">{movement.movement_type}</span>
                             </td>
@@ -983,7 +980,7 @@ export default function AdminSalesPage() {
                     </div>
                   ) : (
                     <div className="text-center py-6 text-gray-500">
-                      <div className="text-gray-300 text-2xl mb-2">📦</div>
+                      <CubeIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                       <p className="text-xs">No inventory movement data available</p>
                     </div>
                   )}
@@ -991,10 +988,10 @@ export default function AdminSalesPage() {
               </div>
 
               {/* Recent Orders Summary */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-2">
+              <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-2 mt-5">
                 <div className="p-2">
-                  <h3 className="text-sm font-semibold text-gray-900">Recent Orders Summary</h3>
-                  <div className="text-xs text-gray-600 mt-1">
+                  <h3 className="text-sm font-semibold text-gray-900 ml-3 mt-1">Recent Orders Summary</h3>
+                  <div className="text-xs text-gray-600 mt-1 ml-3 mt-1">
                     Showing orders from {formatDate(dateRange.start_date)} to {formatDate(dateRange.end_date)}
                   </div>
                 </div>
@@ -1037,9 +1034,9 @@ export default function AdminSalesPage() {
               </div>
 
               {/* Top Products */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                <div className="p-2 border-b border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-900">Top Performing Products</h3>
+              <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-5">
+                <div className="p-2">
+                  <h3 className="text-sm font-semibold text-gray-900 ml-3 mt-1">Top Selling Products</h3>
                 </div>
                 <div className="p-2">
                 {salesData.topProducts && salesData.topProducts.length > 0 ? (

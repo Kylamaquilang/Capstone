@@ -4,6 +4,10 @@ import {
   getStockMovements, 
   getStockMovementById, 
   getStockMovementSummary,
+  getCurrentInventoryReport,
+  getRestockReport,
+  getSalesUsageReport,
+  getLowStockAlertReport,
   testStockMovements,
   createStockMovementsTable
 } from '../controllers/stock-movement.controller.js';
@@ -32,5 +36,11 @@ router.get('/:id', isAdmin, getStockMovementById);
 
 // Get stock movement summary (admin only)
 router.get('/summary/overview', isAdmin, getStockMovementSummary);
+
+// Inventory Reports (admin only)
+router.get('/reports/current-inventory', isAdmin, getCurrentInventoryReport);
+router.get('/reports/restock', isAdmin, getRestockReport);
+router.get('/reports/sales-usage', isAdmin, getSalesUsageReport);
+router.get('/reports/low-stock-alert', isAdmin, getLowStockAlertReport);
 
 export default router;

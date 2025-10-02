@@ -594,17 +594,16 @@ export default function UserProfilePage() {
 
       <main className="flex-grow">
         {/* User Info Card */}
-        <div className="bg-[#000C50] to-blue-800 m-6 p-8 rounded-lg flex justify-between items-center relative mx-25 text-white shadow-xl">
-          <div className="flex gap-6 items-center">
-            <div className="relative">
+        <div className="bg-[#000C50] to-blue-800 mx-4 sm:mx-6 lg:mx-8 xl:mx-24 my-4 sm:my-6 p-4 sm:p-6 lg:p-8 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center relative text-white shadow-xl">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center w-full sm:w-auto">
+            <div className="relative flex-shrink-0">
               {profile.profile_image ? (
                 <Image
                   src={getProfileImageUrl(profile.profile_image)}
                   alt="Profile"
-                  width={100}
-                  height={100}
-                  className="rounded-full object-cover border-4 border-white shadow-lg"
-                  style={{ width: 'auto', height: 'auto' }}
+                  width={80}
+                  height={80}
+                  className="w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-full object-cover border-4 border-white shadow-lg"
                   onError={(e) => {
                     e.target.style.display = 'none';
                     e.target.nextSibling.style.display = 'flex';
@@ -612,7 +611,7 @@ export default function UserProfilePage() {
                 />
               ) : null}
               <div 
-                className={`bg-white text-[#000C50] w-25 h-25 rounded-full flex items-center justify-center text-2xl font-bold border-4 border-white shadow-lg ${
+                className={`bg-white text-[#000C50] w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 rounded-full flex items-center justify-center text-lg sm:text-xl lg:text-2xl font-bold border-4 border-white shadow-lg ${
                   profile.profile_image ? 'hidden' : ''
                 }`}
               >
@@ -620,29 +619,29 @@ export default function UserProfilePage() {
               </div>
               {uploadingImage && (
                 <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                  <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-white"></div>
                 </div>
               )}
             </div>
-            <div>
-              <h1 className="text-3xl font-bold mb-2">{profile.name}</h1>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 truncate">{profile.name}</h1>
               <div className="flex items-center gap-2 mb-1">
-                <AcademicCapIcon className="h-5 w-5" />
-                <p className="text-lg opacity-90">{profile.student_id}</p>
+                <AcademicCapIcon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                <p className="text-sm sm:text-base lg:text-lg opacity-90 truncate">{profile.student_id}</p>
               </div>
               <div className="flex items-center gap-2 mb-1">
-                <EnvelopeIcon className="h-5 w-5" />
-                <p className="text-sm opacity-80">{profile.email}</p>
+                <EnvelopeIcon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                <p className="text-xs sm:text-sm opacity-80 truncate">{profile.email}</p>
               </div>
               {profile.contact_number && (
                 <div className="flex items-center gap-2 mb-2">
-                  <PhoneIcon className="h-5 w-5" />
-                  <p className="text-sm opacity-80">{profile.contact_number}</p>
+                  <PhoneIcon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                  <p className="text-xs sm:text-sm opacity-80 truncate">{profile.contact_number}</p>
                 </div>
               )}
               <div className="flex items-center gap-2 mt-2">
-                <ShieldCheckIcon className="h-4 w-4" />
-                <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                <ShieldCheckIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className={`px-2 sm:px-3 py-1 text-xs font-medium rounded-full ${
                   profile.is_active 
                     ? 'bg-green-100 text-green-800' 
                     : 'bg-red-100 text-red-800'
@@ -654,15 +653,15 @@ export default function UserProfilePage() {
           </div>
 
           {/* Hamburger Button */}
-          <div className="relative">
+          <div className="relative mt-4 sm:mt-0 flex-shrink-0">
             <button 
               onClick={() => setMenuOpen(!menuOpen)}
-              className="bg-white bg-opacity-20 hover:bg-opacity-30 p-3 rounded-full transition-all"
+              className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 sm:p-3 rounded-full transition-all"
             >
-              <Bars3Icon className="h-6 w-6 text-[#000C50]" />
+              <Bars3Icon className="h-5 w-5 sm:h-6 sm:w-6 text-[#000C50]" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg z-10 border">
+              <div className="absolute right-0 mt-2 w-48 sm:w-56 bg-white rounded-lg shadow-lg z-10 border">
                 <div className="p-2">
                   <button
                     onClick={() => setEditing(!editing)}
@@ -705,23 +704,23 @@ export default function UserProfilePage() {
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="mx-24 mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+          <div className="mx-4 sm:mx-6 lg:mx-8 xl:mx-24 mb-4 sm:mb-6 p-3 sm:p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
             {error}
           </div>
         )}
         {success && (
-          <div className="mx-24 mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+          <div className="mx-4 sm:mx-6 lg:mx-8 xl:mx-24 mb-4 sm:mb-6 p-3 sm:p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
             {success}
           </div>
         )}
 
         {/* Change Password Modal */}
         {showChangePassword && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-              <div className="flex items-center gap-3 mb-6">
-                <KeyIcon className="h-6 w-6 text-[#000C50]" />
-                <h3 className="text-xl font-bold">Change Password</h3>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-4 sm:p-6 lg:p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center gap-3 mb-4 sm:mb-6">
+                <KeyIcon className="h-5 w-5 sm:h-6 sm:w-6 text-[#000C50] flex-shrink-0" />
+                <h3 className="text-lg sm:text-xl font-bold truncate">Change Password</h3>
               </div>
               
               {/* Step indicator */}
@@ -857,13 +856,13 @@ export default function UserProfilePage() {
 
         {/* Profile Edit Form */}
         {editing && (
-          <div className="mx-24 mb-8 bg-white border rounded-lg p-8 shadow-md">
+          <div className="mx-4 sm:mx-6 lg:mx-8 xl:mx-24 mb-6 sm:mb-8 bg-white border rounded-lg p-4 sm:p-6 lg:p-8 shadow-md">
             <div className="flex items-center gap-3 mb-6">
-              <UserIcon className="h-6 w-6 text-[#000C50]" />
-              <h3 className="text-xl font-bold">Edit Profile Information</h3>
+              <UserIcon className="h-5 w-5 sm:h-6 sm:w-6 text-[#000C50] flex-shrink-0" />
+              <h3 className="text-lg sm:text-xl font-bold truncate">Edit Profile Information</h3>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Full Name
@@ -907,10 +906,10 @@ export default function UserProfilePage() {
                 </div>
               </div>
               
-              <div className="flex gap-4 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
                 <button
                   type="submit"
-                  className="bg-[#000C50] text-white px-8 py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium"
+                  className="bg-[#000C50] text-white px-6 sm:px-8 py-2 sm:py-3 rounded-lg hover:bg-blue-900 transition-colors font-medium"
                 >
                   Save Changes
                 </button>
@@ -924,7 +923,7 @@ export default function UserProfilePage() {
                       contact_number: profile.contact_number || ''
                     });
                   }}
-                  className="bg-gray-300 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+                  className="bg-gray-300 text-gray-700 px-6 sm:px-8 py-2 sm:py-3 rounded-lg hover:bg-gray-400 transition-colors font-medium"
                 >
                   Cancel
                 </button>
@@ -934,12 +933,12 @@ export default function UserProfilePage() {
         )}
 
         {/* Order History */}
-        <div className="mx-4 sm:mx-6 lg:mx-24 bg-white rounded-lg shadow-sm border border-gray-200 mb-6 mt-5">
+        <div className="mx-4 sm:mx-6 lg:mx-8 xl:mx-24 bg-white rounded-lg shadow-sm border border-gray-200 mb-6 mt-5">
           <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <ShoppingBagIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600" />
-                <h2 className="text-base sm:text-lg font-semibold text-gray-900">Order History</h2>
-                <span className="text-xs sm:text-sm text-gray-500 ml-auto">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>
+                <ShoppingBagIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 flex-shrink-0" />
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Order History</h2>
+                <span className="text-xs sm:text-sm text-gray-500 ml-auto flex-shrink-0">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
           
@@ -1041,10 +1040,10 @@ export default function UserProfilePage() {
         {/* Order Details Modal */}
         {showOrderModal && selectedOrder && (
           <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full max-h-[70vh] overflow-y-auto shadow-2xl border border-gray-200">
+            <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl border border-gray-200">
               <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                <ShoppingBagIcon className="h-5 w-5 sm:h-6 sm:w-6 text-[#000C50]" />
-                <h3 className="text-lg sm:text-xl font-bold">
+                <ShoppingBagIcon className="h-5 w-5 sm:h-6 sm:w-6 text-[#000C50] flex-shrink-0" />
+                <h3 className="text-lg sm:text-xl font-bold truncate">
                   {selectedOrder.items && selectedOrder.items.length > 0 
                     ? selectedOrder.items[0].product_name
                     : 'Order Details'
@@ -1121,7 +1120,7 @@ export default function UserProfilePage() {
               <div className="flex justify-end pt-3 sm:pt-4">
                 <button
                   onClick={handleCloseModal}
-                  className="bg-[#000C50] text-white px-4 py-2 rounded-lg hover:bg-blue-900 transition-colors font-medium text-sm"
+                  className="bg-[#000C50] text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-900 transition-colors font-medium text-xs sm:text-sm"
                 >
                   Close
                 </button>

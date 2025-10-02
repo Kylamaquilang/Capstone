@@ -33,3 +33,4 @@ CREATE INDEX IF NOT EXISTS idx_products_reorder_level ON products(reorder_level)
 
 -- Show the updated table structure
 DESCRIBE products;
+

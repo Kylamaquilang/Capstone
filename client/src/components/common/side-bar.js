@@ -66,7 +66,7 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <div className={`
-        w-64 bg-white border-r border-gray-100 flex flex-col min-h-screen  
+        w-60 bg-white flex flex-col min-h-screen  
         fixed top-20 left-0 transform transition-transform duration-300 ease-in-out z-30  
         shadow-md
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}  

@@ -10,11 +10,21 @@ import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 
 export default function AdminProductPage() {
   const { socket, isConnected, joinAdminRoom } = useSocket();
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const [activeTab, setActiveTab] = useState('ALL');
   const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+
+  // Define the tabs
+  const tabs = [
+    { id: 'ALL', label: 'ALL' },
+    { id: 'LANYARD', label: 'LANYARD' },
+    { id: 'NSTP', label: 'NSTP' },
+    { id: 'P.E', label: 'P.E' },
+    { id: 'POLO', label: 'POLO' },
+    { id: 'TELA', label: 'TELA' }
+  ];
 
   const refreshCategories = useCallback(async () => {
     try {
@@ -60,10 +70,10 @@ export default function AdminProductPage() {
 
     // Load subcategories when main category is selected
     const loadSubcategories = async () => {
-      if (selectedCategory) {
+      if (activeTab && activeTab !== 'ALL') {
         try {
           const { data } = await API.get('/categories');
-          const categorySubcategories = data.filter(cat => cat.parent_id === Number(selectedCategory));
+          const categorySubcategories = data.filter(cat => cat.parent_id === Number(activeTab));
           if (isMounted) {
             setSubcategories(categorySubcategories);
           }
@@ -89,14 +99,14 @@ export default function AdminProductPage() {
 
       // Listen for product updates
       const handleProductUpdate = (productData) => {
-        console.log('📦 Real-time product update received:', productData);
+        console.log('Real-time product update received:', productData);
         // Refresh categories when products are updated (might affect categories)
         fetchCategories();
       };
 
       // Listen for new products
       const handleNewProduct = (productData) => {
-        console.log('📦 Real-time new product received:', productData);
+        console.log('Real-time new product received:', productData);
         // Refresh categories when new products are added
         fetchCategories();
       };
@@ -122,87 +132,77 @@ export default function AdminProductPage() {
     return () => {
       isMounted = false;
     };
-  }, [socket, isConnected, joinAdminRoom, selectedCategory]);
+  }, [socket, isConnected, joinAdminRoom, activeTab]);
 
   return (
     <div className="min-h-screen text-black admin-page">
       <Navbar />
       <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
         <Sidebar />
-        <div className="flex-1 bg-gray-50 p-2 sm:p-3 overflow-auto lg:ml-64">
+        <div className="flex-1 bg-white-50 p-2 sm:p-3 overflow-auto lg:ml-64">
           {/* Header Section */}
           <div className="mb-2 ml-1 sm:ml-2">
             <h1 className="text-lg sm:text-2xl font-semibold text-gray-900 mb-1">Products</h1>
           </div>
 
-          {/* Main Container with Buttons and Table */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            {/* Category Filter and Add Product Button */}
-            <div className="p-2 sm:p-3 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => {
-                      setSelectedCategory('');
-                      setSelectedSubcategory('');
-                    }}
-                    className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors ${
-                      selectedCategory === ''
-                        ? 'bg-[#000C50] text-white'
-                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                    }`}
-                  >
-                    ALL
-                  </button>
-                  {categories.map((cat) => (
+          {/* Main Container with Search, Tabs and Table */}
+          <div className="bg-white rounded-xl shadow-lg">
+            {/* Modern Tab Navigation */}
+            <div className="border-b border-gray-100">
+              <div className="flex items-center justify-between px-4 py-3">
+                {/* Tab Navigation */}
+                <div className="flex space-x-1 bg-white-100 p-1 rounded-lg">
+                  {tabs.map((tab) => (
                     <button
-                      key={cat.id}
+                      key={tab.id}
                       onClick={() => {
-                        setSelectedCategory(cat.name);
+                        setActiveTab(tab.id);
                         setSelectedSubcategory('');
                       }}
-                      className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-semibold transition-colors ${
-                        selectedCategory === cat.name 
-                          ? 'bg-[#000C50] text-white' 
-                          : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                      className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+                        activeTab === tab.id
+                          ? 'bg-[#000C50] text-white shadow-sm font-semibold'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white'
                       }`}
                     >
-                      {String(cat.name).toUpperCase()}
+                      {tab.label}
                     </button>
                   ))}
                 </div>
-                
-                {/* Subcategory Filter */}
-                {subcategories.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2 sm:mt-0">
+
+                {/* Add Product Button */}
+                <button 
+                  onClick={() => setShowAddProductModal(true)}
+                  className="bg-[#000C50] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium shadow-sm"
+                >
+                  Add Product
+                </button>
+              </div>
+              
+              {/* Subcategory Filter */}
+              {subcategories.length > 0 && (
+                <div className="px-4 pb-3">
+                  <div className="flex flex-wrap gap-2">
                     {subcategories.map((sub) => (
                       <button
                         key={sub.id}
                         onClick={() => setSelectedSubcategory(sub.name)}
-                        className={`px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-colors ${
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
                           selectedSubcategory === sub.name 
-                            ? 'bg-blue-600 text-white' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                         }`}
                       >
                         {String(sub.name).toUpperCase()}
                       </button>
                     ))}
                   </div>
-                )}
-
-                {/* Add Product Button */}
-                <button 
-                  onClick={() => setShowAddProductModal(true)}
-                  className="bg-[#000C50] text-white px-3 sm:px-4 py-2 rounded-md hover:bg-blue-800 transition-colors text-sm font-medium self-start sm:self-auto mt-3 sm:mt-0"
-                >
-                  Add Product
-                </button>
-              </div>
+                </div>
+              )}
             </div>
 
-            {/* Product Table */}
-            <ProductTable category={selectedCategory} subcategory={selectedSubcategory} />
+            {/* Product Table with Search Bar */}
+            <ProductTable category={activeTab === 'ALL' ? '' : activeTab} subcategory={selectedSubcategory} />
           </div>
         </div>
       </div>

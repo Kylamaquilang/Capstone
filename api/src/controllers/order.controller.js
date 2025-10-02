@@ -386,7 +386,11 @@ export const updateOrderStatus = async (req, res) => {
     `, [id, oldStatus, status, notes || null])
 
     // Handle inventory and sales tracking based on status changes
-    if (status === 'cancelled' || status === 'refunded') {
+    if (status === 'processing' && oldStatus !== 'processing') {
+      // Automatically record stock out when order moves to processing
+      await recordOrderStockOut(id, req.user.id)
+      
+    } else if (status === 'cancelled' || status === 'refunded') {
       // Restore stock for cancelled/refunded orders
       await restoreOrderStock(id)
       
@@ -548,6 +552,72 @@ export const updateOrderStatus = async (req, res) => {
   } catch (err) {
     console.error('Update status error:', err)
     res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// Helper function to record stock out when order moves to processing
+const recordOrderStockOut = async (orderId, userId) => {
+  try {
+    // Get order items
+    const [orderItems] = await pool.query(`
+      SELECT oi.product_id, oi.quantity, p.name as product_name
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id = ?
+    `, [orderId])
+
+    for (const item of orderItems) {
+      // Check if stock_movements table exists
+      try {
+        await pool.query('SELECT 1 FROM stock_movements LIMIT 1')
+      } catch (tableError) {
+        console.log('Stock movements table does not exist, creating it...')
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS stock_movements (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            product_id INT NOT NULL,
+            user_id INT NOT NULL,
+            movement_type ENUM('stock_in', 'stock_out') NOT NULL,
+            quantity INT NOT NULL,
+            reason VARCHAR(100) NOT NULL,
+            supplier VARCHAR(200),
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            
+            CONSTRAINT chk_movement_quantity CHECK (quantity > 0),
+            INDEX idx_stock_movements_product (product_id),
+            INDEX idx_stock_movements_user (user_id),
+            INDEX idx_stock_movements_type (movement_type),
+            INDEX idx_stock_movements_date (created_at)
+          )
+        `)
+      }
+
+      // Record stock out movement
+      await pool.query(`
+        INSERT INTO stock_movements 
+        (product_id, user_id, movement_type, quantity, reason, notes, created_at) 
+        VALUES (?, ?, 'stock_out', ?, 'sale', ?, NOW())
+      `, [
+        item.product_id, 
+        userId, 
+        item.quantity, 
+        `Order #${orderId} - ${item.product_name}`
+      ])
+
+      // Update product stock
+      await pool.query(
+        'UPDATE products SET stock = stock - ? WHERE id = ?',
+        [item.quantity, item.product_id]
+      )
+    }
+
+    console.log(`✅ Stock out recorded for order ${orderId}`)
+  } catch (error) {
+    console.error('Error recording stock out:', error)
   }
 }
 

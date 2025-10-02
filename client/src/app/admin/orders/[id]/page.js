@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
 import API from '@/lib/axios';
+import { CubeIcon } from '@heroicons/react/24/outline';
 
 export default function OrderDetailPage() {
   const [order, setOrder] = useState(null);
@@ -87,7 +88,7 @@ export default function OrderDetailPage() {
     const icons = {
       pending: '⏳',
       processing: '⚙️',
-      ready_for_pickup: '📦',
+      ready_for_pickup: <CubeIcon className="w-4 h-4" />,
       delivered: '✅',
       cancelled: '❌',
       refunded: '↩️'

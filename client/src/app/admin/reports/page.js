@@ -674,43 +674,25 @@ export default function AdminReportsPage() {
       <table>
         <thead>
           <tr>
-            <th>Product ID</th>
             <th>Product Name</th>
             <th>Category</th>
             <th>Size/Variant</th>
-            <th>Unit</th>
             <th>Qty in Stock</th>
-            <th>Reorder Level</th>
-            <th>Cost Price</th>
-            <th>Selling Price</th>
-            <th>Supplier</th>
             <th>Status</th>
-            <th>Date Added</th>
-            <th>Last Restock</th>
-            <th>Updated By</th>
           </tr>
         </thead>
         <tbody>
           ${data.map(product => `
             <tr>
-              <td style="font-family: monospace;">${product.product_code || `PRD${String(product.id).padStart(3, '0')}`}</td>
               <td style="font-weight: 500;">${product.name}</td>
               <td>${product.category_name || product.category || 'N/A'}</td>
               <td>${product.sizes && product.sizes.length > 0 ? product.sizes.map(size => size.size).join(', ') : 'N/A'}</td>
-              <td>${product.unit_of_measure || 'pcs'}</td>
               <td style="text-align: center; font-weight: 500;">${product.stock || 0}</td>
-              <td style="text-align: center;">${product.reorder_level || 5}</td>
-              <td style="text-align: right;">${formatCurrency(product.original_price || 0)}</td>
-              <td style="text-align: right;">${formatCurrency(product.price || 0)}</td>
-              <td>${product.supplier || 'N/A'}</td>
               <td>
                 <span class="status-badge ${product.stock === 0 ? 'status-out-of-stock' : product.stock <= (product.reorder_level || 5) ? 'status-low-stock' : 'status-good'}">
                   ${product.stock === 0 ? 'Out of Stock' : product.stock <= (product.reorder_level || 5) ? 'Low Stock' : 'In Stock'}
                 </span>
               </td>
-              <td>${product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}</td>
-              <td>${product.last_restock_date ? new Date(product.last_restock_date).toLocaleDateString() : 'N/A'}</td>
-              <td>${product.updated_by || 'N/A'}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -963,19 +945,10 @@ export default function AdminReportsPage() {
     
     data.forEach((product, index) => {
       content += `${index + 1}. ${product.name}\n`;
-      content += `   Product ID: ${product.product_code || `PRD${String(product.id).padStart(3, '0')}`}\n`;
       content += `   Category: ${product.category_name || product.category || 'N/A'}\n`;
       content += `   Size/Variant: ${product.sizes && product.sizes.length > 0 ? product.sizes.map(size => size.size).join(', ') : 'N/A'}\n`;
-      content += `   Unit: ${product.unit_of_measure || 'pcs'}\n`;
       content += `   Qty in Stock: ${product.stock || 0}\n`;
-      content += `   Reorder Level: ${product.reorder_level || 5}\n`;
-      content += `   Cost Price: ${formatCurrency(product.original_price || 0)}\n`;
-      content += `   Selling Price: ${formatCurrency(product.price || 0)}\n`;
-      content += `   Supplier: ${product.supplier || 'N/A'}\n`;
-      content += `   Status: ${product.stock === 0 ? 'Out of Stock' : product.stock <= (product.reorder_level || 5) ? 'Low Stock' : 'In Stock'}\n`;
-      content += `   Date Added: ${product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}\n`;
-      content += `   Last Restock: ${product.last_restock_date ? new Date(product.last_restock_date).toLocaleDateString() : 'N/A'}\n`;
-      content += `   Updated By: ${product.updated_by || 'N/A'}\n\n`;
+      content += `   Status: ${product.stock === 0 ? 'Out of Stock' : product.stock <= (product.reorder_level || 5) ? 'Low Stock' : 'In Stock'}\n\n`;
     });
     
     return content;
@@ -1177,13 +1150,10 @@ export default function AdminReportsPage() {
                 {activeTab === 'inventory' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     {/* Header Section */}
-                    <div className="px-6 py-5 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
+                    <div className="px-6 py-5 bg-white border-b border-gray-100">
                       <div className="flex justify-between items-center">
                         <div>
                           <h3 className="text-xl font-semibold text-gray-900">Inventory Report</h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            Current stock levels of all products
-                          </p>
                         </div>
                         <div className="flex items-center gap-3">
                           {/* Search Input */}
@@ -1191,7 +1161,7 @@ export default function AdminReportsPage() {
                             <input
                               type="text"
                               placeholder="Search products..."
-                              className="pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+                              className="pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
                             />
                             <svg className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1200,10 +1170,9 @@ export default function AdminReportsPage() {
                           {/* Download Button */}
                           <button
                             onClick={handleDownload}
-                            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                            className="px-4 py-2 text-sm bg-[#000C50] text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                           >
                             <ArrowDownTrayIcon className="h-4 w-4" />
-                            Download
                           </button>
                         </div>
                       </div>
@@ -1217,20 +1186,11 @@ export default function AdminReportsPage() {
                             <th className="px-6 py-4 text-left">
                               <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product ID</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size/Variant</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty in Stock</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Reorder Level</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cost Price</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Selling Price</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date Added</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Restock</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Updated By</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -1239,9 +1199,6 @@ export default function AdminReportsPage() {
                               <tr key={product.id} className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                                 <td className="px-6 py-4">
                                   <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                                </td>
-                                <td className="px-6 py-4 text-sm font-mono text-gray-900">
-                                  {product.product_code || `PRD${String(product.id).padStart(3, '0')}`}
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="text-sm font-medium text-gray-900 uppercase">{product.name}</div>
@@ -1257,19 +1214,8 @@ export default function AdminReportsPage() {
                                     : 'N/A'
                                   }
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {product.unit_of_measure || 'pcs'}
-                                </td>
                                 <td className="px-6 py-4 text-sm text-gray-900 text-center font-medium">
                                   {product.stock || 0}
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900 text-center">
-                                  {product.reorder_level || 5}
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">₱{Number(product.original_price || 0).toFixed(2)}</td>
-                                <td className="px-6 py-4 text-sm font-medium text-gray-900">₱{Number(product.price || 0).toFixed(2)}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {product.supplier || 'N/A'}
                                 </td>
                                 <td className="px-6 py-4">
                                   <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${
@@ -1287,20 +1233,11 @@ export default function AdminReportsPage() {
                                     }
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {product.created_at ? new Date(product.created_at).toLocaleDateString() : 'N/A'}
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {product.last_restock_date ? new Date(product.last_restock_date).toLocaleDateString() : 'N/A'}
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {product.updated_by || 'N/A'}
-                                </td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan="15" className="px-6 py-12 text-center">
+                              <td colSpan="6" className="px-6 py-12 text-center">
                                 <div className="flex flex-col items-center gap-3">
                                   <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

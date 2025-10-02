@@ -67,7 +67,6 @@ export default function Navbar() {
         <Image src="/images/logo1.png" alt="Logo" width={120} height={120} priority />
       </div>
       <div className="flex gap-4 items-center">
-        
         <NotificationBell userType="user" userId={user?.id?.toString()} />
         
         <Link href="/cart">
@@ -76,7 +75,9 @@ export default function Navbar() {
           </Badge>
         </Link>
         
-        <Link href="/user-profile"><UserCircleIcon className="h-6 w-6 text-white" /></Link>
+        <Link href="/user-profile">
+          <UserCircleIcon className="h-6 w-6 text-white" />
+        </Link>
       </div>
     </nav>
   );

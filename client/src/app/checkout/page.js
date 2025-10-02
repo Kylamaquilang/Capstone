@@ -238,23 +238,23 @@ const CheckoutPage = () => {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Checkout</h1>
-          <p className="text-gray-600">{cartItems.length} item{cartItems.length !== 1 ? 's' : ''} in your order</p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">Checkout</h1>
+          <p className="text-sm sm:text-base text-gray-600">{cartItems.length} item{cartItems.length !== 1 ? 's' : ''} in your order</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Left Panel - Order Summary */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Order Summary</h2>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+              <h2 className="text-sm font-semibold text-gray-900 mb-4 sm:mb-6">Order Summary</h2>
               
               <div className="space-y-4">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="flex items-center gap-4 py-4 border-b border-gray-100 last:border-b-0">
+                  <div key={item.id} className="flex items-center gap-3 sm:gap-4 py-3 sm:py-4 border-b border-gray-100 last:border-b-0">
                     {/* Product Image */}
-                    <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
                       <Image
                         src={getImageUrl(item.product_image) || '/images/polo.png'}
                         alt={item.product_name}
@@ -273,12 +273,12 @@ const CheckoutPage = () => {
 
                     {/* Product Details */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 text-base mb-1 truncate">{item.product_name}</h3>
-                      <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
+                      <h3 className="font-medium text-gray-900 text-sm sm:text-base mb-1 truncate">{item.product_name}</h3>
+                      <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-1 sm:mb-2">
                         <span>{item.size || 'One Size'}</span>
                         <span>Qty: {item.quantity}</span>
                       </div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm sm:text-base font-medium text-gray-900">
                         ₱{(item.price * item.quantity).toFixed(2)}
                       </p>
                     </div>
@@ -289,8 +289,8 @@ const CheckoutPage = () => {
               {/* Order Total */}
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="flex justify-between items-center">
-                  <span className="text-1xl font-medium text-gray-900">Total:</span>
-                  <span className="text-2xl font-bold text-gray-900">₱{totalAmount.toFixed(2)}</span>
+                  <span className="text-sm font-medium text-gray-900">Total:</span>
+                  <span className="text-1xl font-bold text-gray-900">₱{totalAmount.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -298,13 +298,13 @@ const CheckoutPage = () => {
 
           {/* Right Panel - Payment Method & Checkout */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Payment Method</h2>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 lg:sticky lg:top-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Payment Method</h2>
               
-              <div className="space-y-4 mb-8">
+              <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
                 {/* Pay at Counter */}
                 <div 
-                  className={`p-4 rounded-lg cursor-pointer transition-all ${
+                  className={`p-3 sm:p-4 rounded-lg cursor-pointer transition-all ${
                     selectedMethod === 'pickup' 
                       ? 'border-[#000C50] bg-blue-50' 
                       : 'border-gray-200 hover:border-gray-300'
@@ -314,8 +314,8 @@ const CheckoutPage = () => {
                   <div className="flex items-center gap-3">
                     <BanknotesIcon className="h-5 w-5 text-[#000C50]" />
                     <div className="flex-1">
-                      <div className="font-medium text-gray-900">Pay at Counter</div>
-                      <div className="text-sm text-gray-600">Cash payment upon pickup</div>
+                      <div className="text-sm font-medium text-gray-900">Pay at Counter</div>
+                      <div className="text-xs text-gray-600">Cash payment upon pickup</div>
                     </div>
                     <input
                       type="radio"
@@ -330,7 +330,7 @@ const CheckoutPage = () => {
 
                 {/* GCash Online Payment */}
                 <div 
-                  className={`p-4 rounded-lg cursor-pointer transition-all ${
+                  className={`p-3 sm:p-4 rounded-lg cursor-pointer transition-all ${
                     selectedMethod === 'gcash' 
                       ? 'border-[#000C50] bg-blue-50' 
                       : 'border-gray-200 hover:border-gray-300'
@@ -340,8 +340,8 @@ const CheckoutPage = () => {
                   <div className="flex items-center gap-3">
                     <DevicePhoneMobileIcon className="h-5 w-5 text-[#000C50]" />
                     <div className="flex-1">
-                      <div className="font-medium text-gray-900">GCash Online</div>
-                      <div className="text-sm text-gray-600">Secure online payment</div>
+                      <div className="text-sm font-medium text-gray-900">GCash Online</div>
+                      <div className="text-xs text-gray-600">Secure online payment</div>
                     </div>
                     <input
                       type="radio"
@@ -359,7 +359,7 @@ const CheckoutPage = () => {
               <button 
                 onClick={handleCheckout}
                 disabled={!selectedMethod || processingPayment}
-                className={`w-full h-12 py-2 rounded-lg font-medium text-base transition-all duration-200 ${
+                className={`w-full h-12 sm:h-10 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
                   !selectedMethod || processingPayment
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-[#000C50] text-white hover:bg-gray-800 shadow-sm hover:shadow-md'
