@@ -6,6 +6,7 @@ import {
   getOrderItems,
   getOrderById,
   updateOrderStatus,
+  updateOrderPaymentMethod,
   getOrderStats,
   getSalesPerformance,
   confirmOrderReceipt,
@@ -25,6 +26,7 @@ router.get('/:id', verifyToken, isAdmin, getOrderById)
 
 router.get('/:id/items', verifyToken, getOrderItems)
 router.patch('/:id/status', verifyToken, isAdmin, updateOrderStatus)
+router.patch('/:id/payment-method', verifyToken, isAdmin, updateOrderPaymentMethod)
 router.post('/:id/confirm-receipt', verifyToken, isAdmin, confirmOrderReceipt)
 router.post('/:id/user-confirm', verifyToken, userConfirmOrderReceipt)
 router.post('/:orderId/confirm-notification', verifyToken, confirmOrderReceiptNotification)

@@ -20,7 +20,8 @@ import {
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  CreditCardIcon
 } from '@heroicons/react/24/outline';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -36,6 +37,9 @@ export default function AdminOrdersPage() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusUpdate, setStatusUpdate] = useState({ status: '', notes: '' });
   const [updating, setUpdating] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentUpdate, setPaymentUpdate] = useState({ payment_method: '', payment_status: '', notes: '' });
+  const [updatingPayment, setUpdatingPayment] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
@@ -148,6 +152,16 @@ export default function AdminOrdersPage() {
     setShowDetailsModal(true);
   };
 
+  const handleUpdatePayment = (order) => {
+    setSelectedOrder(order);
+    setPaymentUpdate({ 
+      payment_method: order.payment_method || '', 
+      payment_status: order.payment_status || '', 
+      notes: '' 
+    });
+    setShowPaymentModal(true);
+  };
+
   const updateOrderStatus = async () => {
     if (!selectedOrder || !statusUpdate.status) return;
     
@@ -190,6 +204,44 @@ export default function AdminOrdersPage() {
       alert('Failed to update order status');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const updateOrderPaymentMethod = async () => {
+    if (!selectedOrder || !paymentUpdate.payment_method) return;
+    
+    try {
+      setUpdatingPayment(true);
+      const response = await API.patch(`/orders/${selectedOrder.id}/payment-method`, paymentUpdate);
+      
+      // Update local state
+      setOrders(orders.map(order => 
+        order.id === selectedOrder.id 
+          ? { 
+              ...order, 
+              payment_method: paymentUpdate.payment_method,
+              payment_status: paymentUpdate.payment_status || order.payment_status
+            }
+          : order
+      ));
+      
+      // Show success message
+      let successMessage = `Order #${selectedOrder.id} payment method updated to ${paymentUpdate.payment_method.toUpperCase()}`;
+      
+      if (paymentUpdate.payment_status) {
+        successMessage += ` with status: ${paymentUpdate.payment_status.toUpperCase()}`;
+      }
+      
+      alert(successMessage);
+      
+      setShowPaymentModal(false);
+      setSelectedOrder(null);
+      setPaymentUpdate({ payment_method: '', payment_status: '', notes: '' });
+    } catch (err) {
+      console.error('Payment update error:', err);
+      alert('Failed to update payment method');
+    } finally {
+      setUpdatingPayment(false);
     }
   };
 
@@ -923,6 +975,13 @@ export default function AdminOrdersPage() {
                               <PencilIcon className="h-4 w-4" />
                             </button>
                             <button
+                              onClick={() => handleUpdatePayment(order)}
+                              className="p-1 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded transition-colors"
+                              title="Update Payment Method"
+                            >
+                              <CreditCardIcon className="h-4 w-4" />
+                            </button>
+                            <button
                               onClick={() => handleViewDetails(order.id)}
                               className="p-1 text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
                               title="View Details"
@@ -1056,6 +1115,82 @@ export default function AdminOrdersPage() {
                 className="flex-1 px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
                 {updating ? 'Updating...' : 'Update Status'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Method Update Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Update Payment Method - Order #{selectedOrder?.id}
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Payment Method
+                </label>
+                <select
+                  value={paymentUpdate.payment_method}
+                  onChange={(e) => setPaymentUpdate({ ...paymentUpdate, payment_method: e.target.value })}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Payment Method</option>
+                  <option value="cash">Cash</option>
+                  <option value="gcash">GCash</option>
+                  <option value="card">Card</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Payment Status (Optional)
+                </label>
+                <select
+                  value={paymentUpdate.payment_status}
+                  onChange={(e) => setPaymentUpdate({ ...paymentUpdate, payment_status: e.target.value })}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Keep Current Status</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={paymentUpdate.notes}
+                  onChange={(e) => setPaymentUpdate({ ...paymentUpdate, notes: e.target.value })}
+                  placeholder="Add notes about the payment method change..."
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows="3"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={updateOrderPaymentMethod}
+                disabled={updatingPayment}
+                className="flex-1 px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {updatingPayment ? 'Updating...' : 'Update Payment Method'}
               </button>
             </div>
           </div>

@@ -1442,6 +1442,189 @@ export const getSalesAnalytics = async (req, res) => {
   }
 }
 
+// ✅ Admin updates order payment method
+export const updateOrderPaymentMethod = async (req, res) => {
+  const { id } = req.params;
+  const { payment_method, payment_status, notes } = req.body;
+
+  // Validate payment method
+  const validPaymentMethods = ['cash', 'gcash', 'card'];
+  if (!validPaymentMethods.includes(payment_method)) {
+    return res.status(400).json({ 
+      error: 'Invalid payment method',
+      validPaymentMethods: validPaymentMethods
+    });
+  }
+
+  // Validate payment status if provided
+  const validPaymentStatuses = ['unpaid', 'pending', 'paid', 'cancelled', 'refunded'];
+  if (payment_status && !validPaymentStatuses.includes(payment_status)) {
+    return res.status(400).json({ 
+      error: 'Invalid payment status',
+      validPaymentStatuses: validPaymentStatuses
+    });
+  }
+
+  try {
+    // Get current order details
+    const [currentOrder] = await pool.query(
+      'SELECT payment_method, payment_status, user_id, total_amount FROM orders WHERE id = ?',
+      [id]
+    );
+
+    if (currentOrder.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const oldPaymentMethod = currentOrder[0].payment_method;
+    const oldPaymentStatus = currentOrder[0].payment_status;
+    const userId = currentOrder[0].user_id;
+    const totalAmount = currentOrder[0].total_amount;
+
+    // Start transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    try {
+      // Update payment method and status
+      const updateFields = ['payment_method = ?'];
+      const updateValues = [payment_method];
+
+      if (payment_status) {
+        updateFields.push('payment_status = ?');
+        updateValues.push(payment_status);
+      }
+
+      updateFields.push('updated_at = NOW()');
+      updateValues.push(id);
+
+      await connection.query(
+        `UPDATE orders SET ${updateFields.join(', ')} WHERE id = ?`,
+        updateValues
+      );
+
+      // Log payment method change
+      await connection.query(`
+        INSERT INTO order_status_logs (order_id, old_status, new_status, notes, admin_id, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
+      `, [
+        id, 
+        `payment_method:${oldPaymentMethod}`, 
+        `payment_method:${payment_method}`, 
+        notes || `Payment method changed from ${oldPaymentMethod} to ${payment_method}`,
+        req.user.id
+      ]);
+
+      // If payment status was updated, log that too
+      if (payment_status && payment_status !== oldPaymentStatus) {
+        await connection.query(`
+          INSERT INTO order_status_logs (order_id, old_status, new_status, notes, admin_id, created_at)
+          VALUES (?, ?, ?, ?, ?, NOW())
+        `, [
+          id, 
+          `payment_status:${oldPaymentStatus}`, 
+          `payment_status:${payment_status}`, 
+          notes || `Payment status changed from ${oldPaymentStatus} to ${payment_status}`,
+          req.user.id
+        ]);
+      }
+
+      // Create payment transaction record if payment method changed
+      if (payment_method !== oldPaymentMethod) {
+        await connection.query(`
+          INSERT INTO payment_transactions (
+            order_id, 
+            transaction_id, 
+            amount, 
+            payment_method, 
+            status, 
+            gateway_response,
+            created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, NOW())
+        `, [
+          id,
+          `admin_update_${id}_${Date.now()}`,
+          totalAmount,
+          payment_method,
+          payment_status || oldPaymentStatus,
+          JSON.stringify({ 
+            admin_updated: true, 
+            previous_method: oldPaymentMethod,
+            reason: 'Admin updated payment method',
+            updated_at: new Date().toISOString()
+          })
+        ]);
+      }
+
+      await connection.commit();
+      connection.release();
+
+      // Create notification for user about payment method change
+      try {
+        await pool.query(`
+          INSERT INTO notifications (user_id, title, message, type, related_id, created_at)
+          VALUES (?, ?, ?, ?, ?, NOW())
+        `, [
+          userId,
+          '💳 Payment Method Updated',
+          `Your order #${id} payment method has been updated to ${payment_method.toUpperCase()}${payment_status ? ` with status: ${payment_status.toUpperCase()}` : ''}.`,
+          'system',
+          id
+        ]);
+
+        // Emit real-time notification to user
+        const io = req.app.get('io');
+        if (io) {
+          emitUserNotification(io, userId, {
+            title: '💳 Payment Method Updated',
+            message: `Your order #${id} payment method has been updated to ${payment_method.toUpperCase()}${payment_status ? ` with status: ${payment_status.toUpperCase()}` : ''}.`,
+            type: 'system',
+            orderId: id,
+            read: false,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (notificationError) {
+        console.error('Error creating payment method change notification:', notificationError);
+        // Don't fail the operation if notification fails
+      }
+
+      // Emit real-time updates
+      const io = req.app.get('io');
+      if (io) {
+        emitAdminDataRefresh(io, 'orders', { 
+          action: 'payment_updated', 
+          orderId: id, 
+          paymentMethod: payment_method,
+          paymentStatus: payment_status || oldPaymentStatus
+        });
+        emitUserDataRefresh(io, userId, 'orders', { 
+          action: 'payment_updated', 
+          orderId: id 
+        });
+      }
+
+      res.json({ 
+        message: `Order payment method updated successfully`,
+        previousPaymentMethod: oldPaymentMethod,
+        newPaymentMethod: payment_method,
+        previousPaymentStatus: oldPaymentStatus,
+        newPaymentStatus: payment_status || oldPaymentStatus,
+        orderId: id
+      });
+
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
+
+  } catch (err) {
+    console.error('Update payment method error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // ✅ Confirm Order Receipt (Public endpoint for email button)
 export const confirmOrderReceiptPublic = async (req, res) => {
   try {

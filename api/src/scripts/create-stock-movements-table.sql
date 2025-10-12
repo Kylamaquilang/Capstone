@@ -31,3 +31,6 @@ DESCRIBE stock_movements;
 -- Show any existing data
 SELECT COUNT(*) as total_movements FROM stock_movements;
 
+
+
+
