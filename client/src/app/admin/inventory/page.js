@@ -7,7 +7,6 @@ import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 import { 
   CubeIcon, 
   PlusIcon, 
-  MinusIcon, 
   ClockIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
@@ -28,7 +27,6 @@ export default function AdminInventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showStockInModal, setShowStockInModal] = useState(false);
-  const [showStockOutModal, setShowStockOutModal] = useState(false);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [currentActionType, setCurrentActionType] = useState('stockIn');
@@ -41,12 +39,6 @@ export default function AdminInventoryPage() {
     batchNo: '',
     expiryDate: '',
     source: 'supplier',
-    note: ''
-  });
-  const [stockOutForm, setStockOutForm] = useState({
-    quantity: '',
-    referenceNo: '',
-    source: 'sale',
     note: ''
   });
   const [adjustForm, setAdjustForm] = useState({
@@ -89,7 +81,6 @@ export default function AdminInventoryPage() {
   // Handle stock action success
   const handleStockActionSuccess = () => {
     setShowStockInModal(false);
-    setShowStockOutModal(false);
     setShowAdjustModal(false);
     setSelectedProduct(null);
     setCurrentActionType('stockIn');
@@ -103,8 +94,6 @@ export default function AdminInventoryPage() {
     
     if (actionType === 'stockIn') {
       setShowStockInModal(true);
-    } else if (actionType === 'stockOut') {
-      setShowStockOutModal(true);
     } else if (actionType === 'adjust') {
       setShowAdjustModal(true);
     }
@@ -132,25 +121,6 @@ export default function AdminInventoryPage() {
     }
   };
 
-  // Handle stock out form submission
-  const handleStockOut = async (e) => {
-    e.preventDefault();
-    try {
-      await API.post('/stock/out', {
-        productId: selectedProduct?.id,
-        quantity: parseInt(stockOutForm.quantity),
-        referenceNo: stockOutForm.referenceNo,
-        source: stockOutForm.source,
-        note: stockOutForm.note
-      });
-
-      handleStockActionSuccess();
-      alert('Stock deducted successfully!');
-    } catch (error) {
-      console.error('Error deducting stock:', error);
-      alert('Error deducting stock. Please try again.');
-    }
-  };
 
   // Handle stock adjustment form submission
   const handleAdjustStock = async (e) => {
@@ -268,21 +238,21 @@ export default function AdminInventoryPage() {
       <div className="flex pt-16 lg:pt-20">
         <Sidebar />
         <div className="flex-1 bg-white p-2 sm:p-3 overflow-auto lg:ml-64">
-          {/* Header */}
-          <div className="mb-4 sm:mb-6">
-            <div className="flex justify-between items-center">
-              <div>
+           {/* Header */}
+           <div className="mb-4 sm:mb-6">
+             <div className="flex justify-between items-center">
+               <div>
                 <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Inventory Management</h1>
                 <p className="text-sm text-gray-600 mt-1">Transaction-based stock tracking system</p>
-              </div>
-              <button
+               </div>
+               <button
                 onClick={fetchAllData}
-                className="px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium mr-5"
-              >
-                Refresh Data
-              </button>
-            </div>
-          </div>
+                 className="px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium mr-5"
+               >
+                 Refresh Data
+               </button>
+             </div>
+           </div>
 
           {error && (
             <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-md text-sm">
@@ -322,71 +292,71 @@ export default function AdminInventoryPage() {
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              {/* Inventory Overview Cards */}
+          {/* Inventory Overview Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-blue-100 rounded-md mt-2 ml-4">
-                      <CubeIcon className="w-8 h-8 text-blue-700" />
-                    </div>
-                    <div className="ml-2 sm:ml-3">
-                      <p className="text-xs sm:text-sm font-medium text-blue-600">Total Products</p>
-                      <p className="text-base sm:text-lg font-bold text-blue-700">
+            <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
+              <div className="flex items-center">
+                <div className="p-2 bg-blue-100 rounded-md mt-2 ml-4">
+                  <CubeIcon className="w-8 h-8 text-blue-700" />
+                </div>
+                <div className="ml-2 sm:ml-3">
+                  <p className="text-xs sm:text-sm font-medium text-blue-600">Total Products</p>
+                  <p className="text-base sm:text-lg font-bold text-blue-700">
                         {getSummaryStats().total_products}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-green-50 rounded-md mt-2 ml-4">
-                      <ArchiveBoxIcon className="w-8 h-8 text-green-700" />
-                    </div>
-                    <div className="ml-2 sm:ml-3">
-                      <p className="text-xs sm:text-sm font-medium text-green-600">Total Stock</p>
-                      <p className="text-base sm:text-lg font-bold text-green-700">
-                        {getSummaryStats().total_stock}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-yellow-50 rounded-md mt-2 ml-4">
-                      <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
-                    </div>
-                    <div className="ml-2 sm:ml-3">
-                      <p className="text-xs sm:text-sm font-medium text-yellow-600">Low Stock</p>
-                      <p className="text-base sm:text-lg font-bold text-yellow-700">
-                        {getSummaryStats().low_stock_count}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-purple-50 rounded-md mt-2 ml-4">
-                      <ChartBarIcon className="w-8 h-8 text-purple-600" />
-                    </div>
-                    <div className="ml-2 sm:ml-3">
-                      <p className="text-xs sm:text-sm font-medium text-purple-600">Inventory Value</p>
-                      <p className="text-base sm:text-lg font-bold text-purple-700">
-                        {formatCurrency(getSummaryStats().total_inventory_value)}
-                      </p>
-                    </div>
-                  </div>
+                  </p>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
+              <div className="flex items-center">
+                <div className="p-2 bg-green-50 rounded-md mt-2 ml-4">
+                  <ArchiveBoxIcon className="w-8 h-8 text-green-700" />
+                </div>
+                <div className="ml-2 sm:ml-3">
+                  <p className="text-xs sm:text-sm font-medium text-green-600">Total Stock</p>
+                  <p className="text-base sm:text-lg font-bold text-green-700">
+                        {getSummaryStats().total_stock}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
+              <div className="flex items-center">
+                <div className="p-2 bg-yellow-50 rounded-md mt-2 ml-4">
+                  <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
+                </div>
+                <div className="ml-2 sm:ml-3">
+                  <p className="text-xs sm:text-sm font-medium text-yellow-600">Low Stock</p>
+                  <p className="text-base sm:text-lg font-bold text-yellow-700">
+                        {getSummaryStats().low_stock_count}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+                <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
+              <div className="flex items-center">
+                <div className="p-2 bg-purple-50 rounded-md mt-2 ml-4">
+                  <ChartBarIcon className="w-8 h-8 text-purple-600" />
+                </div>
+                <div className="ml-2 sm:ml-3">
+                  <p className="text-xs sm:text-sm font-medium text-purple-600">Inventory Value</p>
+                  <p className="text-base sm:text-lg font-bold text-purple-700">
+                        {formatCurrency(getSummaryStats().total_inventory_value)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
 
               {/* Quick Actions */}
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                <div className="p-4 border-b border-gray-200">
+             <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+               <div className="p-4 border-b border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900">Quick Actions</h3>
-                </div>
-                <div className="p-4">
+               </div>
+               <div className="p-4">
                   <div className="flex flex-wrap gap-3">
                     <button
                       onClick={() => {
@@ -397,16 +367,6 @@ export default function AdminInventoryPage() {
                     >
                       <PlusIcon className="h-4 w-4" />
                       <span>Add Stock</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedProduct(null);
-                        setShowStockOutModal(true);
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium flex items-center space-x-2"
-                    >
-                      <MinusIcon className="h-4 w-4" />
-                      <span>Deduct Stock</span>
                     </button>
                     <button
                       onClick={() => {
@@ -425,10 +385,10 @@ export default function AdminInventoryPage() {
                       <DocumentTextIcon className="h-4 w-4" />
                       <span>Advanced Stock Management</span>
                     </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+                   </div>
+                   </div>
+               </div>
+             </div>
           )}
 
           {/* Current Stock Tab */}
@@ -447,10 +407,10 @@ export default function AdminInventoryPage() {
                     >
                       Add Stock
                     </button>
-                  </div>
-                </div>
+                 </div>
+               </div>
                 
-                <div className="overflow-x-auto">
+                   <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
@@ -472,17 +432,17 @@ export default function AdminInventoryPage() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
                         </th>
-                      </tr>
-                    </thead>
+                         </tr>
+                       </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {currentStock.map((product) => (
                         <tr key={product.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {product.name}
-                          </td>
+                             </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {product.sku}
-                          </td>
+                             </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {product.current_stock}
                           </td>
@@ -492,11 +452,11 @@ export default function AdminInventoryPage() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockStatusColor(product.stock_status)}`}>
                               {product.stock_status}
-                            </span>
-                          </td>
+                                   </span>
+                             </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">
-                              <button
+                                 <button
                                 onClick={() => {
                                   setSelectedProduct(product);
                                   setShowStockInModal(true);
@@ -504,8 +464,8 @@ export default function AdminInventoryPage() {
                                 className="text-[#000C50] hover:text-blue-700"
                               >
                                 Add Stock
-                              </button>
-                              <button
+                                 </button>
+                                 <button
                                 onClick={() => {
                                   setSelectedProduct(product);
                                   setShowAdjustModal(true);
@@ -513,16 +473,16 @@ export default function AdminInventoryPage() {
                                 className="text-orange-600 hover:text-orange-700"
                               >
                                 Adjust
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+                                 </button>
+                               </div>
+                             </td>
+                           </tr>
+                         ))}
+                       </tbody>
+                     </table>
+                   </div>
+                   </div>
+               </div>
           )}
 
           {/* Stock History Tab */}
@@ -531,7 +491,7 @@ export default function AdminInventoryPage() {
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Transaction History</h3>
                 
-                <div className="overflow-x-auto">
+                   <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
@@ -556,25 +516,25 @@ export default function AdminInventoryPage() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           User
                         </th>
-                      </tr>
-                    </thead>
+                       </tr>
+                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {stockHistory.map((transaction) => (
                         <tr key={transaction.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {new Date(transaction.created_at).toLocaleDateString()}
-                          </td>
+                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {transaction.product_name}
-                          </td>
+                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTransactionTypeColor(transaction.transaction_type)}`}>
                               {transaction.transaction_type}
-                            </span>
-                          </td>
+                                       </span>
+                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {transaction.quantity}
-                          </td>
+                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {transaction.reference_no}
                           </td>
@@ -583,14 +543,14 @@ export default function AdminInventoryPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {transaction.created_by_name}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+                           </td>
+                         </tr>
+                       ))}
+                     </tbody>
+                     </table>
+                   </div>
+                   </div>
+               </div>
           )}
 
           {/* Low Stock Alerts Tab */}
@@ -603,9 +563,9 @@ export default function AdminInventoryPage() {
                   <div className="text-center py-8">
                     <div className="text-green-600 text-lg font-medium">All products are well stocked!</div>
                     <p className="text-gray-500 mt-2">No low stock alerts at this time.</p>
-                  </div>
+                 </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                     <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
@@ -624,25 +584,25 @@ export default function AdminInventoryPage() {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Actions
                           </th>
-                        </tr>
-                      </thead>
+                           </tr>
+                         </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {lowStockAlerts.map((product) => (
                           <tr key={product.id}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {product.name}
-                            </td>
+                               </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                               {product.current_stock}
-                            </td>
+                               </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {product.reorder_level}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getAlertLevelColor(product.alert_level)}`}>
                                 {product.alert_level}
-                              </span>
-                            </td>
+                                 </span>
+                               </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <button
                                 onClick={() => {
@@ -653,18 +613,18 @@ export default function AdminInventoryPage() {
                               >
                                 Add Stock
                               </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                               </td>
+                             </tr>
+                           ))}
+                         </tbody>
+                       </table>
+                     </div>
                 )}
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+                 </div>
+               )}
+             </div>
+           </div>
 
       {/* Stock In Modal */}
       {showStockInModal && (
@@ -685,7 +645,7 @@ export default function AdminInventoryPage() {
                       onChange={(e) => setStockInForm({ ...stockInForm, quantity: e.target.value })}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                     />
-                  </div>
+        </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Reference No</label>
                     <input
@@ -694,7 +654,7 @@ export default function AdminInventoryPage() {
                       onChange={(e) => setStockInForm({ ...stockInForm, referenceNo: e.target.value })}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                     />
-                  </div>
+      </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Batch No (Optional)</label>
                     <input
@@ -757,78 +717,6 @@ export default function AdminInventoryPage() {
         </div>
       )}
 
-      {/* Stock Out Modal */}
-      {showStockOutModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Deduct Stock {selectedProduct && `- ${selectedProduct.name}`}
-              </h3>
-              <form onSubmit={handleStockOut}>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Quantity</label>
-                    <input
-                      type="number"
-                      required
-                      value={stockOutForm.quantity}
-                      onChange={(e) => setStockOutForm({ ...stockOutForm, quantity: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Reference No</label>
-                    <input
-                      type="text"
-                      value={stockOutForm.referenceNo}
-                      onChange={(e) => setStockOutForm({ ...stockOutForm, referenceNo: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Source</label>
-                    <select
-                      value={stockOutForm.source}
-                      onChange={(e) => setStockOutForm({ ...stockOutForm, source: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    >
-                      <option value="sale">Sale</option>
-                      <option value="damage">Damage</option>
-                      <option value="theft">Theft</option>
-                      <option value="adjustment">Adjustment</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Note</label>
-                    <textarea
-                      value={stockOutForm.note}
-                      onChange={(e) => setStockOutForm({ ...stockOutForm, note: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                      rows="3"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end space-x-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowStockOutModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                  >
-                    Deduct Stock
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Adjust Stock Modal */}
       {showAdjustModal && (

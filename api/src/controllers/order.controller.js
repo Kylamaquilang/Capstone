@@ -560,11 +560,8 @@ const recordOrderStockOut = async (orderId, userId) => {
         `Order #${orderId} - ${item.product_name}`
       ])
 
-      // Update product stock
-      await pool.query(
-        'UPDATE products SET stock = stock - ? WHERE id = ?',
-        [item.quantity, item.product_id]
-      )
+      // Note: Stock is already deducted during checkout process
+      // No need to deduct again here as it would cause double deduction
     }
 
     console.log(`✅ Stock out recorded for order ${orderId}`)
@@ -1030,15 +1027,8 @@ export const userConfirmOrderReceipt = async (req, res) => {
       WHERE oi.order_id = ?
     `, [id]);
 
-    // Update inventory for each item
-    for (const item of orderItems) {
-      // Update products table stock
-      await pool.query(`
-        UPDATE products 
-        SET stock = stock - ?
-        WHERE id = ?
-      `, [item.quantity, item.product_id]);
-    }
+    // Note: Stock is already deducted during checkout process
+    // No need to deduct again here as it would cause double deduction
 
     // Create product summary for notifications
     let productSummary = '';

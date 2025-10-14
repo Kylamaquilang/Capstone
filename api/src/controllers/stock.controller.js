@@ -10,6 +10,7 @@ const getCurrentStock = async (req, res) => {
         p.category_id,
         c.name as category_name,
         COALESCE(sb.qty, p.stock, 0) as current_stock,
+        p.stock as base_stock,
         p.reorder_point,
         p.max_stock,
         CASE 

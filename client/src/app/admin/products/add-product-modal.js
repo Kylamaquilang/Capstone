@@ -118,7 +118,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
         description: description.trim() || null,
         price: Number(price),
         original_price: Number(costPrice),
-        stock: Number(stock),
+        stock: Number(stock) || 0, // Allow setting initial stock
         category_id: categoryId ? Number(categoryId) : null,
         image: finalImageUrl,
         sizes: sizesData.length > 0 ? sizesData : undefined

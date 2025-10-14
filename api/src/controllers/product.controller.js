@@ -226,6 +226,28 @@ export const createProduct = async (req, res) => {
 
       const productId = productResult.insertId;
 
+      // If initial stock is provided, create initial stock transaction
+      if (parseInt(stock) > 0) {
+        console.log(`📦 Creating initial stock transaction for Product ID ${productId} with ${stock} units`);
+        
+        // Insert initial stock transaction
+        await connection.query(
+          `INSERT INTO stock_transactions (product_id, transaction_type, quantity, reference_no, source, note, created_by, created_at)
+           VALUES (?, 'IN', ?, ?, 'initial_stock', 'Initial stock for new product', 1, NOW())`,
+          [productId, parseInt(stock), `INIT-${productId}`]
+        );
+
+        // Initialize stock balance
+        await connection.query(
+          `INSERT INTO stock_balance (product_id, qty, updated_at)
+           VALUES (?, ?, NOW())
+           ON DUPLICATE KEY UPDATE qty = qty + VALUES(qty), updated_at = NOW()`,
+          [productId, parseInt(stock)]
+        );
+
+        console.log(`✅ Initial stock transaction created for Product ID ${productId}`);
+      }
+
     // Store sizes in product_sizes table
     console.log('🔍 Processing sizes:', sizes);
     if (sizes && Array.isArray(sizes) && sizes.length > 0) {
