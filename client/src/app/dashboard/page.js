@@ -136,10 +136,10 @@ export default function UserDashboard() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-white flex flex-col">
         <Navbar />
 
-  
+        <main className="flex-grow">
 
         {/* Banner Section */}
         <section className="flex w-full h-[300px] sm:h-[350px] lg:h-[400px] mt-16 sm:mt-20 mb-6 sm:mb-10 rounded-sm overflow-hidden shadow-md">
@@ -280,6 +280,8 @@ export default function UserDashboard() {
             </div>
           </div>
         )}
+
+        </main>
 
         <Footer />
       </div>

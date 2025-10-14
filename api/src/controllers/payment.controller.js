@@ -114,6 +114,83 @@ export const getPaymentStatus = async (req, res) => {
   }
 };
 
+// Cancel payment/order during payment process
+export const cancelPayment = async (req, res) => {
+  const { orderId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    // Get order details and verify ownership
+    const [orders] = await pool.query(
+      'SELECT user_id, status, payment_status, total_amount, payment_method FROM orders WHERE id = ?',
+      [orderId]
+    );
+
+    if (orders.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (orders[0].user_id !== userId) {
+      return res.status(403).json({ error: 'You can only cancel your own orders' });
+    }
+
+    const order = orders[0];
+
+    // Check if order can be cancelled (only if not processing or beyond)
+    const cancellableStatuses = ['pending'];
+    if (!cancellableStatuses.includes(order.status)) {
+      return res.status(400).json({ 
+        error: 'Order cannot be cancelled',
+        message: `Orders with status '${order.status}' cannot be cancelled. Only pending orders can be cancelled.`,
+        currentStatus: order.status,
+        cancellableStatuses
+      });
+    }
+
+    // Update order status to cancelled
+    await pool.query(
+      'UPDATE orders SET status = ?, payment_status = ?, updated_at = NOW() WHERE id = ?',
+      ['cancelled', 'cancelled', orderId]
+    );
+
+    // Log status change
+    await pool.query(`
+      INSERT INTO order_status_logs (order_id, old_status, new_status, notes, created_at)
+      VALUES (?, ?, ?, ?, NOW())
+    `, [orderId, order.status, 'cancelled', 'Cancelled during payment process']);
+
+    // Restore stock for cancelled order
+    const { restoreOrderStock } = await import('./order.controller.js');
+    await restoreOrderStock(orderId);
+    
+    // Log sales reversal
+    const { logSalesMovement } = await import('./order.controller.js');
+    await logSalesMovement(orderId, 'reversal', order.total_amount, order.payment_method, 'Order cancelled during payment');
+
+    // Create notification for user
+    const { createOrderStatusNotification, createCancelledOrderNotification } = await import('./order.controller.js');
+    await createOrderStatusNotification(userId, orderId, 'cancelled');
+    await createCancelledOrderNotification(orderId, userId);
+
+    console.log(`✅ Payment cancelled for order ${orderId} by user ${userId}`);
+
+    res.json({
+      success: true,
+      message: 'Order cancelled successfully',
+      orderId: orderId,
+      previousStatus: order.status,
+      newStatus: 'cancelled'
+    });
+
+  } catch (error) {
+    console.error('Cancel payment error:', error);
+    res.status(500).json({ 
+      error: 'Failed to cancel payment',
+      details: error.message
+    });
+  }
+};
+
 // Get GCash payment statistics (for admin tracking)
 export const getGCashStats = async (req, res) => {
   try {

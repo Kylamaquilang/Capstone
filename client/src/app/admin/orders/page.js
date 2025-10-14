@@ -69,8 +69,11 @@ export default function AdminOrdersPage() {
   };
 
   const getUniqueOrderStatuses = () => {
-    const statuses = [...new Set(orders.map(order => order.status).filter(Boolean))];
-    return statuses.sort();
+    // Return all possible order statuses, not just ones that exist in current data
+    const allStatuses = ['pending', 'processing', 'ready_for_pickup', 'claimed', 'cancelled', 'refunded', 'completed'];
+    console.log('📋 Admin orders - Available statuses:', allStatuses);
+    console.log('📋 Admin orders - Current orders statuses:', orders.map(order => order.status));
+    return allStatuses;
   };
 
   const getUniquePaymentStatuses = () => {
@@ -116,7 +119,10 @@ export default function AdminOrdersPage() {
 
     // Filter by status
     if (statusFilter) {
+      console.log('📋 Admin orders - Filtering by status:', statusFilter);
+      console.log('📋 Admin orders - Orders before status filter:', filtered.length);
       filtered = filtered.filter(order => order.status === statusFilter);
+      console.log('📋 Admin orders - Orders after status filter:', filtered.length);
     }
 
     // Filter by payment status
@@ -162,8 +168,39 @@ export default function AdminOrdersPage() {
     setShowPaymentModal(true);
   };
 
+  const handleStatusChange = (e) => {
+    const newStatus = e.target.value;
+    
+    // Prevent selecting disabled options for ready_for_pickup
+    if (selectedOrder?.status === 'ready_for_pickup' && 
+        (newStatus === 'pending' || newStatus === 'processing' || newStatus === 'cancelled')) {
+      return; // Don't update the status
+    }
+    
+    // Prevent selecting disabled options for claimed
+    if (selectedOrder?.status === 'claimed' && 
+        (newStatus === 'pending' || newStatus === 'processing' || newStatus === 'ready_for_pickup' || newStatus === 'cancelled')) {
+      return; // Don't update the status
+    }
+    
+    setStatusUpdate({ ...statusUpdate, status: newStatus });
+  };
+
   const updateOrderStatus = async () => {
     if (!selectedOrder || !statusUpdate.status) return;
+    
+    // Validate status change restrictions
+    if (selectedOrder.status === 'ready_for_pickup' && 
+        (statusUpdate.status === 'pending' || statusUpdate.status === 'processing' || statusUpdate.status === 'cancelled')) {
+      alert('Error: Orders ready for pickup cannot be moved back to pending, processing, or cancelled status.');
+      return;
+    }
+    
+    if (selectedOrder.status === 'claimed' && 
+        (statusUpdate.status === 'pending' || statusUpdate.status === 'processing' || statusUpdate.status === 'ready_for_pickup' || statusUpdate.status === 'cancelled')) {
+      alert('Error: Claimed orders cannot be moved back to pending, processing, ready for pickup, or cancelled status.');
+      return;
+    }
     
     try {
       setUpdating(true);
@@ -201,7 +238,9 @@ export default function AdminOrdersPage() {
       setSelectedOrder(null);
       setStatusUpdate({ status: '', notes: '' });
     } catch (err) {
-      alert('Failed to update order status');
+      console.error('Update order status error:', err);
+      const errorMessage = err?.response?.data?.error || err?.response?.data?.message || 'Failed to update order status';
+      alert(`Error: ${errorMessage}`);
     } finally {
       setUpdating(false);
     }
@@ -250,9 +289,10 @@ export default function AdminOrdersPage() {
       pending: 'bg-yellow-100 text-yellow-800',
       processing: 'bg-blue-100 text-blue-800',
       ready_for_pickup: 'bg-purple-100 text-purple-800',
-      delivered: 'bg-green-100 text-green-800',
+      claimed: 'bg-green-100 text-green-800',
       cancelled: 'bg-red-100 text-red-800',
-      refunded: 'bg-gray-100 text-gray-800'
+      refunded: 'bg-gray-100 text-gray-800',
+      completed: 'bg-emerald-100 text-emerald-800'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -263,9 +303,10 @@ export default function AdminOrdersPage() {
       pending: <ClockIcon {...iconProps} className="h-5 w-5 text-yellow-500" />,
       processing: <CogIcon {...iconProps} className="h-5 w-5 text-blue-500" />,
       ready_for_pickup: <CubeIcon {...iconProps} className="h-5 w-5 text-purple-500" />,
-      delivered: <CheckCircleIcon {...iconProps} className="h-5 w-5 text-green-500" />,
+      claimed: <CheckCircleIcon {...iconProps} className="h-5 w-5 text-green-500" />,
       cancelled: <XCircleIcon {...iconProps} className="h-5 w-5 text-red-500" />,
-      refunded: <ArrowPathIcon {...iconProps} className="h-5 w-5 text-gray-500" />
+      refunded: <ArrowPathIcon {...iconProps} className="h-5 w-5 text-gray-500" />,
+      completed: <CheckCircleIcon {...iconProps} className="h-5 w-5 text-emerald-500" />
     };
     return icons[status] || <ClockIcon {...iconProps} className="h-5 w-5 text-gray-500" />;
   };
@@ -288,6 +329,7 @@ export default function AdminOrdersPage() {
       console.log('📋 Admin orders - Loading orders with token');
       const { data } = await API.get('/orders/admin');
       console.log('📋 Admin orders - API response:', data);
+      console.log('📋 Admin orders - Orders with claimed status:', data?.filter(order => order.status === 'claimed'));
       setOrders(data || []);
       setFilteredOrders(data || []);
     } catch (err) {
@@ -483,7 +525,9 @@ export default function AdminOrdersPage() {
           formatCurrency(order.total_amount),
           order.payment_method === 'gcash' ? 'GCash' : 'Cash',
           order.payment_status?.charAt(0).toUpperCase() + order.payment_status?.slice(1) || 'N/A',
-          order.status === 'ready_for_pickup' ? 'For Pickup' : order.status?.replace('_', ' ').charAt(0).toUpperCase() + order.status?.replace('_', ' ').slice(1) || 'N/A',
+          order.status === 'ready_for_pickup' ? 'For Pickup' : 
+          order.status === 'claimed' ? 'Claimed' :
+          order.status?.replace('_', ' ').charAt(0).toUpperCase() + order.status?.replace('_', ' ').slice(1) || 'N/A',
           order.created_at ? formatDate(order.created_at) : 'N/A'
         ];
       });
@@ -661,7 +705,9 @@ export default function AdminOrdersPage() {
                 <td style="text-align: right; font-weight: 500;">${formatCurrency(order.total_amount)}</td>
                 <td>${order.payment_method === 'gcash' ? 'GCash' : 'Cash'}</td>
                 <td>${order.payment_status?.charAt(0).toUpperCase() + order.payment_status?.slice(1) || 'N/A'}</td>
-                <td>${order.status === 'ready_for_pickup' ? 'For Pickup' : order.status?.replace('_', ' ').charAt(0).toUpperCase() + order.status?.replace('_', ' ').slice(1) || 'N/A'}</td>
+                <td>${order.status === 'ready_for_pickup' ? 'For Pickup' : 
+                    order.status === 'claimed' ? 'Claimed' :
+                    order.status?.replace('_', ' ').charAt(0).toUpperCase() + order.status?.replace('_', ' ').slice(1) || 'N/A'}</td>
                 <td>${order.created_at ? formatDate(order.created_at) : 'N/A'}</td>
               </tr>
             `;
@@ -956,7 +1002,7 @@ export default function AdminOrdersPage() {
                           <div className="flex items-center space-x-2">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)} uppercase`}>
                               {order.status === 'ready_for_pickup' ? 'For Pickup' : 
-                               order.status === 'delivered' ? 'Claimed' : 
+                               order.status === 'claimed' ? 'Claimed' : 
                                order.status.replace('_', ' ')}
                             </span>
                           </div>
@@ -1060,19 +1106,63 @@ export default function AdminOrdersPage() {
               </label>
               <select
                 value={statusUpdate.status}
-                onChange={(e) => setStatusUpdate({ ...statusUpdate, status: e.target.value })}
+                onChange={handleStatusChange}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="pending">Pending</option>
-                <option value="processing">Processing</option>
-                <option value="ready_for_pickup">For Pickup</option>
-                <option value="delivered">Claimed</option>
-                <option value="cancelled">Cancelled</option>
+                <option 
+                  value="pending" 
+                  disabled={selectedOrder?.status === 'ready_for_pickup' || selectedOrder?.status === 'claimed'}
+                >
+                  Pending
+                </option>
+                <option 
+                  value="processing" 
+                  disabled={selectedOrder?.status === 'ready_for_pickup' || selectedOrder?.status === 'claimed'}
+                >
+                  Processing
+                </option>
+                <option 
+                  value="ready_for_pickup" 
+                  disabled={selectedOrder?.status === 'claimed'}
+                >
+                  For Pickup
+                </option>
+                <option value="claimed">Claimed</option>
+                <option 
+                  value="cancelled" 
+                  disabled={selectedOrder?.status === 'ready_for_pickup' || selectedOrder?.status === 'claimed'}
+                >
+                  Cancelled
+                </option>
                 <option value="refunded">Refunded</option>
               </select>
               
+              {/* Show restriction message for ready_for_pickup status */}
+              {selectedOrder?.status === 'ready_for_pickup' && (
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <div className="flex items-center">
+                    <span className="text-yellow-600 mr-2">⚠️</span>
+                    <div className="text-sm text-yellow-800">
+                      <strong>Status Restriction:</strong> Orders ready for pickup cannot be moved back to pending, processing, or cancelled status.
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Show restriction message for claimed status */}
+              {selectedOrder?.status === 'claimed' && (
+                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                  <div className="flex items-center">
+                    <span className="text-red-600 mr-2">🚫</span>
+                    <div className="text-sm text-red-800">
+                      <strong>Status Restriction:</strong> Claimed orders cannot be moved back to pending, processing, ready for pickup, or cancelled status.
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Show automatic actions for claimed status */}
-              {statusUpdate.status === 'delivered' && selectedOrder?.payment_status !== 'paid' && (
+              {statusUpdate.status === 'claimed' && selectedOrder?.payment_status !== 'paid' && (
                 <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
                   <div className="flex items-center">
                     <span className="text-green-600 mr-2"></span>

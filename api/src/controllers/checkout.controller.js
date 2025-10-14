@@ -1,6 +1,7 @@
 import { pool } from '../database/db.js'
 import { createOrderStatusNotification, createAdminOrderNotification } from '../utils/notification-helper.js'
 import { emitUserNotification, emitAdminNotification, emitInventoryUpdate, emitNewOrder, emitDataRefresh, emitAdminDataRefresh, emitUserDataRefresh } from '../utils/socket-helper.js'
+import { processOrderStockOut } from './stock.controller.js'
 
 
 export const checkout = async (req, res) => {
@@ -206,60 +207,20 @@ export const checkout = async (req, res) => {
           [orderId, item.product_id, item.size_id || null, productName, item.quantity, item.size_price || item.price, costPrice, (item.size_price || item.price) * item.quantity]
         )
 
-        // Log inventory movement - the database trigger will handle stock deduction
-        if (item.size_id) {
-          console.log(`📦 Processing size-specific item: Product ID ${item.product_id}, Size ID ${item.size_id}, Quantity ${item.quantity}`);
-          
-          // Check stock before processing
-          const [currentStock] = await connection.query(
-            `SELECT stock FROM product_sizes WHERE id = ?`,
-            [item.size_id]
-          );
-          
-          if (currentStock.length === 0) {
-            throw new Error(`Size ID ${item.size_id} not found`);
-          }
-          
-          const availableStock = currentStock[0].stock;
-          console.log(`📦 Size ID ${item.size_id} current stock: ${availableStock}, requested: ${item.quantity}`);
-          
-          if (availableStock < item.quantity) {
-            throw new Error(`Insufficient stock for size ID ${item.size_id}. Available: ${availableStock}, Requested: ${item.quantity}`);
-          }
-          
-          // Log inventory movement - trigger will deduct stock automatically
-          await connection.query(`
-            INSERT INTO inventory_movements (product_id, size_id, movement_type, quantity_change, reason, order_id, created_at)
-            VALUES (?, ?, 'sale', ?, 'Order placed', ?, NOW())
-          `, [item.product_id, item.size_id, -item.quantity, orderId])
-          
-          console.log(`✅ Size-specific stock deduction logged for Size ID ${item.size_id} (trigger will handle deduction)`);
-        } else {
-          // Check stock before processing
-          const [currentStock] = await connection.query(
-            `SELECT stock FROM products WHERE id = ?`,
-            [item.product_id]
-          );
-          
-          if (currentStock.length === 0) {
-            throw new Error(`Product ID ${item.product_id} not found`);
-          }
-          
-          const availableStock = currentStock[0].stock;
-          console.log(`📦 Product ID ${item.product_id} current stock: ${availableStock}, requested: ${item.quantity}`);
-          
-          if (availableStock < item.quantity) {
-            throw new Error(`Insufficient stock for product ID ${item.product_id}. Available: ${availableStock}, Requested: ${item.quantity}`);
-          }
-          
-          // Log inventory movement - trigger will deduct stock automatically
-          await connection.query(`
-            INSERT INTO inventory_movements (product_id, movement_type, quantity_change, reason, order_id, created_at)
-            VALUES (?, 'sale', ?, 'Order placed', ?, NOW())
-          `, [item.product_id, -item.quantity, orderId])
-          
-          console.log(`✅ General product stock deduction logged for Product ID ${item.product_id} (trigger will handle deduction)`);
-        }
+        // Process stock out using new stock management system
+        console.log(`📦 Processing stock out for Product ID ${item.product_id}, Quantity ${item.quantity}`);
+        
+        // Prepare order items for stock processing
+        const orderItems = [{
+          product_id: item.product_id,
+          quantity: item.quantity,
+          product_name: productName
+        }];
+        
+        // Process stock out using the new system
+        await processOrderStockOut(orderId, orderItems);
+        
+        console.log(`✅ Stock out processed for Product ID ${item.product_id}`);
       }
 
       // Only delete cart items if we processed cart items (not direct products)

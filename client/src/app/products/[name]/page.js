@@ -332,17 +332,20 @@ export default function ProductDetailPage() {
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 flex flex-col">
           <Navbar />
-          <div className="container mx-auto px-4 py-12">
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12">
-                <div className="flex justify-center items-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
+          <main className="flex-grow">
+            <div className="container mx-auto px-4 py-12">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12">
+                  <div className="flex justify-center items-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </main>
+          <Footer />
         </div>
       </ProtectedRoute>
     );
@@ -351,23 +354,26 @@ export default function ProductDetailPage() {
   if (error) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 flex flex-col">
           <Navbar />
-          <div className="container mx-auto px-4 py-12">
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12">
-                <div className="text-center">
-                  <p className="text-red-600 text-sm mb-6">{error}</p>
-                  <button 
-                    onClick={() => router.push('/dashboard')}
-                    className="inline-block px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-                  >
-                    Back to Dashboard
-                  </button>
+          <main className="flex-grow">
+            <div className="container mx-auto px-4 py-12">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12">
+                  <div className="text-center">
+                    <p className="text-red-600 text-sm mb-6">{error}</p>
+                    <button 
+                      onClick={() => router.push('/dashboard')}
+                      className="inline-block px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+                    >
+                      Back to Dashboard
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </main>
+          <Footer />
         </div>
       </ProtectedRoute>
     );
@@ -379,10 +385,11 @@ export default function ProductDetailPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <Navbar />
 
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <main className="flex-grow">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div className="max-w-6xl mx-auto">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
@@ -537,6 +544,7 @@ export default function ProductDetailPage() {
             </button>
           </div>
         </div>
+        </main>
 
         <Footer />
       </div>

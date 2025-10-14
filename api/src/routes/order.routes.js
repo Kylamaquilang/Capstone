@@ -14,7 +14,8 @@ import {
   confirmOrderReceiptNotification,
   testNotification,
   getSalesAnalytics,
-  confirmOrderReceiptPublic
+  confirmOrderReceiptPublic,
+  userCancelOrder
 } from '../controllers/order.controller.js'
 import { verifyToken, isAdmin } from '../middleware/verifyToken.js'
 
@@ -29,6 +30,7 @@ router.patch('/:id/status', verifyToken, isAdmin, updateOrderStatus)
 router.patch('/:id/payment-method', verifyToken, isAdmin, updateOrderPaymentMethod)
 router.post('/:id/confirm-receipt', verifyToken, isAdmin, confirmOrderReceipt)
 router.post('/:id/user-confirm', verifyToken, userConfirmOrderReceipt)
+router.post('/:id/cancel', verifyToken, userCancelOrder)
 router.post('/:orderId/confirm-notification', verifyToken, confirmOrderReceiptNotification)
 
 // Analytics and reporting routes

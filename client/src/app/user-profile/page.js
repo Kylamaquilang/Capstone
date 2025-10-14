@@ -8,7 +8,6 @@ import {
   Bars3Icon, 
   UserIcon, 
   ShoppingBagIcon, 
-  ClockIcon, 
   CheckCircleIcon,
   PencilIcon,
   CameraIcon,
@@ -19,7 +18,8 @@ import {
   EnvelopeIcon,
   PhoneIcon,
   AcademicCapIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
@@ -52,8 +52,6 @@ export default function UserProfilePage() {
   const [resendingCode, setResendingCode] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [ordersPerPage] = useState(5);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -554,14 +552,21 @@ export default function UserProfilePage() {
     document.body.style.overflow = 'unset';
   };
 
-  // Pagination logic
-  const indexOfLastOrder = currentPage * ordersPerPage;
-  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
-  const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
-  const totalPages = Math.ceil(orders.length / ordersPerPage);
+  // Filter completed orders only
+  const completedOrders = orders.filter(order => 
+    ['completed', 'claimed', 'cancelled', 'refunded'].includes(order.status)
+  );
 
-  const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
+  // Pagination logic for completed orders
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyPerPage = 5;
+  const indexOfLastHistoryOrder = historyPage * historyPerPage;
+  const indexOfFirstHistoryOrder = indexOfLastHistoryOrder - historyPerPage;
+  const currentCompletedOrders = completedOrders.slice(indexOfFirstHistoryOrder, indexOfLastHistoryOrder);
+  const totalHistoryPages = Math.ceil(completedOrders.length / historyPerPage);
+
+  const handleHistoryPageChange = (pageNumber) => {
+    setHistoryPage(pageNumber);
   };
 
   if (loading) {
@@ -936,9 +941,9 @@ export default function UserProfilePage() {
         <div className="mx-4 sm:mx-6 lg:mx-8 xl:mx-24 bg-white rounded-lg shadow-sm border border-gray-200 mb-6 mt-5">
           <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <ShoppingBagIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 flex-shrink-0" />
+                <CheckCircleIcon className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
                 <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Order History</h2>
-                <span className="text-xs sm:text-sm text-gray-500 ml-auto flex-shrink-0">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>
+                <span className="text-xs sm:text-sm text-gray-500 ml-auto flex-shrink-0">{completedOrders.length} order{completedOrders.length !== 1 ? 's' : ''}</span>
             </div>
           </div>
           
@@ -947,35 +952,28 @@ export default function UserProfilePage() {
               <div className="flex justify-center py-8 sm:py-12">
                 <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-[#000C50]"></div>
               </div>
-            ) : orders.length === 0 ? (
+            ) : completedOrders.length === 0 ? (
               <div className="text-center py-8 sm:py-12">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                  <ShoppingBagIcon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
+                  <CheckCircleIcon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
                 </div>
                 <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-1">
-                  No orders yet
+                  No completed orders yet
                 </h3>
                 <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
-                  You haven't placed any orders yet.
+                  Your completed orders will appear here.
                 </p>
-                  <button
-                    onClick={() => router.push('/dashboard')}
-                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-[#000C50] bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    Start Shopping
-                  </button>
               </div>
             ) : (
               <>
               <div className="space-y-2 sm:space-y-3 pr-1 sm:pr-2">
-                  {currentOrders.map((order) => (
+                  {currentCompletedOrders.map((order) => (
                   <div 
                     key={order.id} 
-                    className="bg-gray-50 rounded-lg border border-gray-200 p-3 sm:p-4 hover:shadow-sm transition-shadow cursor-pointer"
-                    onClick={() => handleOrderClick(order)}
+                    className="bg-gray-50 rounded-lg border border-gray-200 p-3 sm:p-4 hover:shadow-sm transition-shadow"
                   >
                     <div className="flex items-start justify-between mb-2 sm:mb-3">
-                      <div className="flex-1">
+                      <div className="flex-1 cursor-pointer" onClick={() => handleOrderClick(order)}>
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-xs sm:text-sm font-medium text-gray-900">
                             {order.items && order.items.length > 0 
@@ -999,32 +997,42 @@ export default function UserProfilePage() {
                         <p className="text-xs text-gray-500">{order.payment_method}</p>
                       </div>
                     </div>
+                    
+                    {/* View Details Button */}
+                    <div className="flex items-center justify-start pt-2 border-t border-gray-200">
+                      <button
+                        onClick={() => handleOrderClick(order)}
+                        className="text-xs text-[#000C50] hover:text-blue-700 font-medium"
+                      >
+                        View Details
+                      </button>
+                    </div>
                   </div>
                   ))}
                 </div>
 
-                {/* Pagination */}
-                {totalPages > 1 && (
+                {/* Pagination for Order History */}
+                {totalHistoryPages > 1 && (
                   <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
                     <div className="text-sm text-gray-500">
-                      Showing {indexOfFirstOrder + 1} to {Math.min(indexOfLastOrder, orders.length)} of {orders.length} orders
+                      Showing {indexOfFirstHistoryOrder + 1} to {Math.min(indexOfLastHistoryOrder, completedOrders.length)} of {completedOrders.length} orders
                     </div>
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1}
+                        onClick={() => handleHistoryPageChange(historyPage - 1)}
+                        disabled={historyPage === 1}
                         className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         &lt;
                       </button>
                       
                       <span className="px-3 py-1 text-sm border border-gray-300 rounded-md bg-[#000C50] text-white">
-                        {currentPage}
+                        {historyPage}
                       </span>
                       
                       <button
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage === totalPages}
+                        onClick={() => handleHistoryPageChange(historyPage + 1)}
+                        disabled={historyPage === totalHistoryPages}
                         className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         &gt;
@@ -1065,12 +1073,12 @@ export default function UserProfilePage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Payment Method</p>
-                    <p className="text-sm text-gray-900">{selectedOrder.payment_method}</p>
+                    <p className="text-sm font-medium text-gray-700">Status</p>
+                    <p className="text-sm text-gray-900 capitalize">{selectedOrder.status}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Product Price</p>
-                    <p className="text-sm font-semibold text-gray-900">₱{selectedOrder.items && selectedOrder.items.length > 0 ? selectedOrder.items[0].unit_price : '0'}</p>
+                    <p className="text-sm font-medium text-gray-700">Payment Method</p>
+                    <p className="text-sm text-gray-900">{selectedOrder.payment_method}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-700">Total Amount</p>
@@ -1118,6 +1126,7 @@ export default function UserProfilePage() {
               </div>
               
               <div className="flex justify-end pt-3 sm:pt-4">
+                {/* Close Button */}
                 <button
                   onClick={handleCloseModal}
                   className="bg-[#000C50] text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-900 transition-colors font-medium text-xs sm:text-sm"

@@ -3,6 +3,7 @@ import {
     MagnifyingGlassIcon,
     ShoppingCartIcon,
     UserCircleIcon,
+    ShoppingBagIcon,
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -68,6 +69,10 @@ export default function Navbar() {
       </div>
       <div className="flex gap-4 items-center">
         <NotificationBell userType="user" userId={user?.id?.toString()} />
+        
+        <Link href="/active-orders" title="My Orders">
+          <ShoppingBagIcon className="h-6 w-6 text-white hover:text-gray-300 transition-colors" />
+        </Link>
         
         <Link href="/cart">
           <Badge count={cartCount}>

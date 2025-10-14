@@ -24,6 +24,7 @@ import userManagementRoutes from './src/routes/user-management.routes.js';
 import paymentRoutes from './src/routes/payment.routes.js';
 import notificationRoutes from './src/routes/notification.routes.js';
 import stockMovementRoutes from './src/routes/stock-movement.routes.js';
+import stockRoutes from './src/routes/stock.routes.js';
 
 // Import error handling middleware
 import { errorHandler, notFound } from './src/middleware/error.middleware.js';
@@ -131,6 +132,7 @@ app.use('/api/users', userManagementRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/stock-movements', stockMovementRoutes);
+app.use('/api/stock', stockRoutes);
 
 // Error handling middleware
 app.use(notFound);

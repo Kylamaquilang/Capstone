@@ -59,12 +59,12 @@ export const sendPasswordResetEmail = async (email, verificationCode, userName) 
       subject: 'CPC Essen - Password Reset Verification',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
-          <div style="background-color: #000C50; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+          <div style="background-color: #000C50; color: white; padding: 25px; text-align: center; border-radius: 15px 15px 0 0;">
             <h1 style="margin: 0; font-size: 24px;">CPC Essen</h1>
             <p style="margin: 5px 0 0 0; font-size: 16px;">Password Reset Verification</p>
           </div>
           
-          <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="background-color: white; padding: 35px; border-radius: 0 0 15px 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
             <h2 style="color: #333; margin-bottom: 20px;">Hello ${userName},</h2>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -133,12 +133,12 @@ export const sendWelcomeEmail = async (email, userName, studentId, defaultPasswo
       subject: 'Welcome to CPC Essen - Your Account Details',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
-          <div style="background-color: #000C50; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+          <div style="background-color: #000C50; color: white; padding: 25px; text-align: center; border-radius: 15px 15px 0 0;">
             <h1 style="margin: 0; font-size: 24px;">CPC Essen</h1>
             <p style="margin: 5px 0 0 0; font-size: 16px;">Welcome to Our Platform</p>
           </div>
           
-          <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="background-color: white; padding: 35px; border-radius: 0 0 15px 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
             <h2 style="color: #333; margin-bottom: 20px;">Welcome ${userName}!</h2>
             
             <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
@@ -201,51 +201,48 @@ export const sendOrderReceiptEmail = async (email, userName, orderData) => {
     
     const { orderId, items, totalAmount, paymentMethod, createdAt, status } = orderData;
     
+    // Generate order name from items (first product name + count if multiple products)
+    const uniqueProducts = [...new Set(items.map(item => item.product_name))];
+    const orderName = uniqueProducts.length > 1 
+      ? `${uniqueProducts[0]} +${uniqueProducts.length - 1}`
+      : uniqueProducts[0] || `Order #${orderId}`;
+    
     // Format items for display
     const itemsHtml = items.map(item => `
-      <tr style="border-bottom: 1px solid #eee;">
-        <td style="padding: 15px 0; color: #333;">${item.quantity}x ${item.product_name}</td>
-        <td style="padding: 15px 0; text-align: right; color: #333;">₱${Number(item.price).toFixed(2)}</td>
-        <td style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">₱${Number(item.price * item.quantity).toFixed(2)}</td>
+      <tr style="border-bottom: 1px solid #eee; background-color: white;">
+        <td style="padding: 18px 15px; color: #333; font-size: 15px;">${item.quantity}x ${item.product_name}</td>
+        <td style="padding: 18px 15px; text-align: right; color: #333; font-size: 15px;">₱${Number(item.unit_price).toFixed(2)}</td>
+        <td style="padding: 18px 15px; text-align: right; color: #333; font-weight: bold; font-size: 15px;">₱${Number(item.total_price).toFixed(2)}</td>
       </tr>
     `).join('');
     
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `CPC Essen - Order Receipt #${orderId}`,
+      subject: `CPC Essen - Order Receipt: ${orderName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
-          <div style="background-color: #000C50; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+          <div style="background-color: #000C50; color: white; padding: 25px; text-align: center; border-radius: 15px 15px 0 0;">
             <h1 style="margin: 0; font-size: 24px;">CPC Essen</h1>
             <p style="margin: 5px 0 0 0; font-size: 16px;">Order Receipt</p>
           </div>
           
-          <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h2 style="color: #333; margin-bottom: 20px;">Thank you for your order, ${userName}!</h2>
-            
-            <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
-              <p style="margin: 0; color: #155724; font-weight: bold; font-size: 18px;">🎉 Thank You!</p>
-              <p style="margin: 10px 0 0 0; color: #155724; line-height: 1.6;">
-                Thank you for confirming receipt of your order. We appreciate your business and hope you enjoy your purchase!
-              </p>
+          <div style="background-color: white; padding: 35px; border-radius: 0 0 15px 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <div style="background-color: #f8f9fa; padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 5px solid #000C50; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Order Name:</strong> ${orderName}</p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Order Date:</strong> ${new Date(createdAt).toLocaleDateString()}</p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Confirmed Date:</strong> ${orderData.confirmedAt ? new Date(orderData.confirmedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Status:</strong> <span style="color: #28a745; font-weight: bold;">Completed</span></p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Payment Method:</strong> ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
             </div>
             
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #000C50;">
-              <p style="margin: 5px 0;"><strong>Order Number:</strong> #${orderId}</p>
-              <p style="margin: 5px 0;"><strong>Order Date:</strong> ${new Date(createdAt).toLocaleDateString()}</p>
-              <p style="margin: 5px 0;"><strong>Confirmed Date:</strong> ${orderData.confirmedAt ? new Date(orderData.confirmedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
-              <p style="margin: 5px 0;"><strong>Status:</strong> Completed</p>
-              <p style="margin: 5px 0;"><strong>Payment Method:</strong> ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
-            </div>
-            
-            <h3 style="color: #333; margin-bottom: 15px;">Order Details</h3>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <h3 style="color: #333; margin-bottom: 20px; font-size: 20px; font-weight: 600; border-bottom: 2px solid #000C50; padding-bottom: 10px;">Order Details</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
               <thead>
-                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #000C50;">
-                  <th style="padding: 15px 0; text-align: left; color: #333; font-weight: bold;">Item</th>
-                  <th style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">Unit Price</th>
-                  <th style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">Total</th>
+                <tr style="background-color: #000C50; color: white;">
+                  <th style="padding: 18px 15px; text-align: left; font-weight: bold; font-size: 16px;">Item</th>
+                  <th style="padding: 18px 15px; text-align: right; font-weight: bold; font-size: 16px;">Unit Price</th>
+                  <th style="padding: 18px 15px; text-align: right; font-weight: bold; font-size: 16px;">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -253,16 +250,12 @@ export const sendOrderReceiptEmail = async (email, userName, orderData) => {
               </tbody>
             </table>
             
-            <div style="text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid #000C50;">
-              <p style="font-size: 18px; font-weight: bold; color: #000C50; margin: 0;">
+            <div style="text-align: right; margin-top: 25px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border-left: 5px solid #000C50;">
+              <p style="font-size: 20px; font-weight: bold; color: #000C50; margin: 0;">
                 Total Amount: ₱${Number(totalAmount).toFixed(2)}
               </p>
             </div>
             
-            
-            <p style="color: #666; line-height: 1.6; margin-bottom: 20px;">
-              Please keep this receipt for your records. If you have any questions about your order, please contact our support team.
-            </p>
             
             <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
               <p style="color: #999; font-size: 12px; margin: 0;">
@@ -304,12 +297,18 @@ export const sendOrderReceivedEmail = async (email, userName, orderData) => {
     
     const { orderId, items, totalAmount, paymentMethod, createdAt } = orderData;
     
+    // Generate order name from items (first product name + count if multiple products)
+    const uniqueProducts = [...new Set(items.map(item => item.product_name))];
+    const orderName = uniqueProducts.length > 1 
+      ? `${uniqueProducts[0]} +${uniqueProducts.length - 1}`
+      : uniqueProducts[0] || `Order #${orderId}`;
+    
     // Format items for display
     const itemsHtml = items.map(item => `
-      <tr style="border-bottom: 1px solid #eee;">
-        <td style="padding: 15px 0; color: #333;">${item.quantity}x ${item.product_name}</td>
-        <td style="padding: 15px 0; text-align: right; color: #333;">₱${Number(item.price).toFixed(2)}</td>
-        <td style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">₱${Number(item.price * item.quantity).toFixed(2)}</td>
+      <tr style="border-bottom: 1px solid #eee; background-color: white;">
+        <td style="padding: 18px 15px; color: #333; font-size: 15px;">${item.quantity}x ${item.product_name}</td>
+        <td style="padding: 18px 15px; text-align: right; color: #333; font-size: 15px;">₱${Number(item.unit_price).toFixed(2)}</td>
+        <td style="padding: 18px 15px; text-align: right; color: #333; font-weight: bold; font-size: 15px;">₱${Number(item.total_price).toFixed(2)}</td>
       </tr>
     `).join('');
     
@@ -319,36 +318,36 @@ export const sendOrderReceivedEmail = async (email, userName, orderData) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `CPC Essen - Order Received #${orderId}`,
+      subject: `CPC Essen - Order Received: ${orderName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
-          <div style="background-color: #000C50; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+          <div style="background-color: #000C50; color: white; padding: 25px; text-align: center; border-radius: 15px 15px 0 0;">
             <h1 style="margin: 0; font-size: 24px;">CPC Essen</h1>
             <p style="margin: 5px 0 0 0; font-size: 16px;">Order Received</p>
           </div>
           
-          <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h2 style="color: #333; margin-bottom: 20px;">Thank you for your order, ${userName}!</h2>
+          <div style="background-color: white; padding: 35px; border-radius: 0 0 15px 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <h2 style="color: #333; margin-bottom: 25px; font-size: 24px; font-weight: 600;">Thank you for your order, ${userName}!</h2>
             
             <div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
               <p style="margin: 0; color: #155724; font-weight: bold;">✅ Order Received</p>
               <p style="margin: 5px 0 0 0; color: #155724;">Your order has been successfully received and is being processed. We'll notify you when it's ready for pickup!</p>
             </div>
             
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #000C50;">
-              <p style="margin: 5px 0;"><strong>Order Number:</strong> #${orderId}</p>
-              <p style="margin: 5px 0;"><strong>Order Date:</strong> ${new Date(createdAt).toLocaleDateString()}</p>
-              <p style="margin: 5px 0;"><strong>Status:</strong> Processing</p>
-              <p style="margin: 5px 0;"><strong>Payment Method:</strong> ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
+            <div style="background-color: #f8f9fa; padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 5px solid #000C50; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Order Name:</strong> ${orderName}</p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Order Date:</strong> ${new Date(createdAt).toLocaleDateString()}</p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Status:</strong> <span style="color: #17a2b8; font-weight: bold;">Processing</span></p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Payment Method:</strong> ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
             </div>
             
-            <h3 style="color: #333; margin-bottom: 15px;">Order Details</h3>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <h3 style="color: #333; margin-bottom: 20px; font-size: 20px; font-weight: 600; border-bottom: 2px solid #000C50; padding-bottom: 10px;">Order Details</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
               <thead>
-                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #000C50;">
-                  <th style="padding: 15px 0; text-align: left; color: #333; font-weight: bold;">Item</th>
-                  <th style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">Unit Price</th>
-                  <th style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">Total</th>
+                <tr style="background-color: #000C50; color: white;">
+                  <th style="padding: 18px 15px; text-align: left; font-weight: bold; font-size: 16px;">Item</th>
+                  <th style="padding: 18px 15px; text-align: right; font-weight: bold; font-size: 16px;">Unit Price</th>
+                  <th style="padding: 18px 15px; text-align: right; font-weight: bold; font-size: 16px;">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -356,8 +355,8 @@ export const sendOrderReceivedEmail = async (email, userName, orderData) => {
               </tbody>
             </table>
             
-            <div style="text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid #000C50;">
-              <p style="font-size: 18px; font-weight: bold; color: #000C50; margin: 0;">
+            <div style="text-align: right; margin-top: 25px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border-left: 5px solid #000C50;">
+              <p style="font-size: 20px; font-weight: bold; color: #000C50; margin: 0;">
                 Total Amount: ₱${Number(totalAmount).toFixed(2)}
               </p>
             </div>
@@ -413,12 +412,18 @@ export const sendReadyForPickupEmail = async (email, userName, orderData) => {
     
     const { orderId, items, totalAmount, paymentMethod, createdAt } = orderData;
     
+    // Generate order name from items (first product name + count if multiple products)
+    const uniqueProducts = [...new Set(items.map(item => item.product_name))];
+    const orderName = uniqueProducts.length > 1 
+      ? `${uniqueProducts[0]} +${uniqueProducts.length - 1}`
+      : uniqueProducts[0] || `Order #${orderId}`;
+    
     // Format items for display
     const itemsHtml = items.map(item => `
-      <tr style="border-bottom: 1px solid #eee;">
-        <td style="padding: 15px 0; color: #333;">${item.quantity}x ${item.product_name}</td>
-        <td style="padding: 15px 0; text-align: right; color: #333;">₱${Number(item.price).toFixed(2)}</td>
-        <td style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">₱${Number(item.price * item.quantity).toFixed(2)}</td>
+      <tr style="border-bottom: 1px solid #eee; background-color: white;">
+        <td style="padding: 18px 15px; color: #333; font-size: 15px;">${item.quantity}x ${item.product_name}</td>
+        <td style="padding: 18px 15px; text-align: right; color: #333; font-size: 15px;">₱${Number(item.unit_price).toFixed(2)}</td>
+        <td style="padding: 18px 15px; text-align: right; color: #333; font-weight: bold; font-size: 15px;">₱${Number(item.total_price).toFixed(2)}</td>
       </tr>
     `).join('');
     
@@ -429,36 +434,36 @@ export const sendReadyForPickupEmail = async (email, userName, orderData) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `CPC Essen - Online Receipt #${orderId}`,
+      subject: `CPC Essen - Order Ready for Pickup: ${orderName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
-          <div style="background-color: #000C50; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+          <div style="background-color: #000C50; color: white; padding: 25px; text-align: center; border-radius: 15px 15px 0 0;">
             <h1 style="margin: 0; font-size: 24px;">CPC Essen</h1>
             <p style="margin: 5px 0 0 0; font-size: 16px;">Online Receipt</p>
           </div>
           
-          <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h2 style="color: #333; margin-bottom: 20px;">Thank you for your order, ${userName}!</h2>
+          <div style="background-color: white; padding: 35px; border-radius: 0 0 15px 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <h2 style="color: #333; margin-bottom: 25px; font-size: 24px; font-weight: 600;">Thank you for your order, ${userName}!</h2>
             
             <div style="background-color: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
               <p style="margin: 0; color: #155724; font-weight: bold;">✅ Order Ready for Pickup</p>
               <p style="margin: 5px 0 0 0; color: #155724;">Your order is ready for pickup at the accounting office! Please bring a valid ID when collecting your items.</p>
             </div>
             
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #000C50;">
-              <p style="margin: 5px 0;"><strong>Order Number:</strong> #${orderId}</p>
-              <p style="margin: 5px 0;"><strong>Order Date:</strong> ${new Date(createdAt).toLocaleDateString()}</p>
-              <p style="margin: 5px 0;"><strong>Status:</strong> Ready for Pickup</p>
-              <p style="margin: 5px 0;"><strong>Payment Method:</strong> ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
+            <div style="background-color: #f8f9fa; padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 5px solid #000C50; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Order Name:</strong> ${orderName}</p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Order Date:</strong> ${new Date(createdAt).toLocaleDateString()}</p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Status:</strong> <span style="color: #28a745; font-weight: bold;">Ready for Pickup</span></p>
+              <p style="margin: 8px 0; font-size: 16px;"><strong>Payment Method:</strong> ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
             </div>
             
-            <h3 style="color: #333; margin-bottom: 15px;">Order Details</h3>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <h3 style="color: #333; margin-bottom: 20px; font-size: 20px; font-weight: 600; border-bottom: 2px solid #000C50; padding-bottom: 10px;">Order Details</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
               <thead>
-                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #000C50;">
-                  <th style="padding: 15px 0; text-align: left; color: #333; font-weight: bold;">Item</th>
-                  <th style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">Unit Price</th>
-                  <th style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">Total</th>
+                <tr style="background-color: #000C50; color: white;">
+                  <th style="padding: 18px 15px; text-align: left; font-weight: bold; font-size: 16px;">Item</th>
+                  <th style="padding: 18px 15px; text-align: right; font-weight: bold; font-size: 16px;">Unit Price</th>
+                  <th style="padding: 18px 15px; text-align: right; font-weight: bold; font-size: 16px;">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -466,8 +471,8 @@ export const sendReadyForPickupEmail = async (email, userName, orderData) => {
               </tbody>
             </table>
             
-            <div style="text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid #000C50;">
-              <p style="font-size: 18px; font-weight: bold; color: #000C50; margin: 0;">
+            <div style="text-align: right; margin-top: 25px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border-left: 5px solid #000C50;">
+              <p style="font-size: 20px; font-weight: bold; color: #000C50; margin: 0;">
                 Total Amount: ₱${Number(totalAmount).toFixed(2)}
               </p>
             </div>
@@ -538,28 +543,34 @@ export const sendDeliveredOrderEmail = async (email, userName, orderData) => {
     
     const { orderId, items, totalAmount, paymentMethod, createdAt, deliveredAt } = orderData;
     
+    // Generate order name from items (first product name + count if multiple products)
+    const uniqueProducts = [...new Set(items.map(item => item.product_name))];
+    const orderName = uniqueProducts.length > 1 
+      ? `${uniqueProducts[0]} +${uniqueProducts.length - 1}`
+      : uniqueProducts[0] || `Order #${orderId}`;
+    
     // Format items for display
     const itemsHtml = items.map(item => `
-      <tr style="border-bottom: 1px solid #eee;">
-        <td style="padding: 15px 0; color: #333;">${item.quantity}x ${item.product_name}${item.size ? ` (${item.size})` : ''}</td>
-        <td style="padding: 15px 0; text-align: right; color: #333;">₱${Number(item.price).toFixed(2)}</td>
-        <td style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">₱${Number(item.price * item.quantity).toFixed(2)}</td>
+      <tr style="border-bottom: 1px solid #eee; background-color: white;">
+        <td style="padding: 18px 15px; color: #333; font-size: 15px;">${item.quantity}x ${item.product_name}${item.size ? ` (${item.size})` : ''}</td>
+        <td style="padding: 18px 15px; text-align: right; color: #333; font-size: 15px;">₱${Number(item.unit_price).toFixed(2)}</td>
+        <td style="padding: 18px 15px; text-align: right; color: #333; font-weight: bold; font-size: 15px;">₱${Number(item.total_price).toFixed(2)}</td>
       </tr>
     `).join('');
     
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `CPC Essen - Order Delivered & Thank You #${orderId}`,
+      subject: `CPC Essen - Thank You for Your Order!`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
-          <div style="background-color: #000C50; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+          <div style="background-color: #000C50; color: white; padding: 25px; text-align: center; border-radius: 15px 15px 0 0;">
             <h1 style="margin: 0; font-size: 24px;">CPC Essen</h1>
             <p style="margin: 5px 0 0 0; font-size: 16px;">Order Delivered - Thank You!</p>
           </div>
           
-          <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h2 style="color: #333; margin-bottom: 20px;">Thank you for your order, ${userName}!</h2>
+          <div style="background-color: white; padding: 35px; border-radius: 0 0 15px 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <h2 style="color: #333; margin-bottom: 25px; font-size: 24px; font-weight: 600;">Thank you for your order, ${userName}!</h2>
             
             <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
               <p style="margin: 0; color: #155724; font-weight: bold; font-size: 18px;">🎉 Order Successfully Delivered!</p>
@@ -569,30 +580,20 @@ export const sendDeliveredOrderEmail = async (email, userName, orderData) => {
             </div>
             
             <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #000C50;">
-              <p style="margin: 5px 0;"><strong>Order Number:</strong> #${orderId}</p>
+              <p style="margin: 5px 0;"><strong>Order Name:</strong> ${orderName}</p>
               <p style="margin: 5px 0;"><strong>Order Date:</strong> ${new Date(createdAt).toLocaleDateString()}</p>
               <p style="margin: 5px 0;"><strong>Delivered Date:</strong> ${deliveredAt ? new Date(deliveredAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
               <p style="margin: 5px 0;"><strong>Status:</strong> Delivered & Completed</p>
               <p style="margin: 5px 0;"><strong>Payment Method:</strong> ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
             </div>
             
-            <h3 style="color: #333; margin-bottom: 15px;">Order Summary & Receipt</h3>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-              <thead>
-                <tr style="background-color: #f8f9fa; border-bottom: 2px solid #000C50;">
-                  <th style="padding: 15px 0; text-align: left; color: #333; font-weight: bold;">Item</th>
-                  <th style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">Unit Price</th>
-                  <th style="padding: 15px 0; text-align: right; color: #333; font-weight: bold;">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemsHtml}
-              </tbody>
-            </table>
-            
-            <div style="text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid #000C50;">
-              <p style="font-size: 18px; font-weight: bold; color: #000C50; margin: 0;">
-                Total Amount Paid: ₱${Number(totalAmount).toFixed(2)}
+            <h3 style="color: #333; margin-bottom: 15px;">Order Summary</h3>
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+              <p style="margin: 0; color: #333; font-size: 16px;">
+                <strong>Order Total:</strong> ₱${Number(totalAmount).toFixed(2)}
+              </p>
+              <p style="margin: 10px 0 0 0; color: #666; font-size: 14px;">
+                Thank you for your business! A detailed receipt will be sent to you separately.
               </p>
             </div>
             
@@ -600,7 +601,7 @@ export const sendDeliveredOrderEmail = async (email, userName, orderData) => {
               <p style="margin: 0; color: #155724; font-weight: bold; font-size: 16px;">💝 Thank You Message</p>
               <p style="margin: 10px 0 0 0; color: #155724; line-height: 1.6;">
                 We sincerely appreciate your business and trust in CPC Essen. Your satisfaction is our priority, and we hope this purchase meets your expectations. 
-                Please keep this email as your official receipt for your records.
+                We look forward to serving you again soon!
               </p>
             </div>
             
@@ -618,7 +619,7 @@ export const sendDeliveredOrderEmail = async (email, userName, orderData) => {
             
             <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
               <p style="color: #999; font-size: 12px; margin: 0;">
-                This is your official receipt and thank you message. Please keep this email for your records.
+                This is an automated thank you message. Please do not reply to this email.
               </p>
             </div>
           </div>

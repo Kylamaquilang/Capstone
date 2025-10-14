@@ -1,7 +1,7 @@
 import { pool } from '../database/db.js'
 import { createOrderStatusNotification } from '../utils/notification-helper.js'
 import { emitOrderUpdate, emitNewOrderAlert, createAndEmitNotification, emitUserNotification, emitAdminDataRefresh, emitUserDataRefresh } from '../utils/socket-helper.js'
-import { sendDeliveredOrderEmail } from '../utils/emailService.js'
+import { sendDeliveredOrderEmail, sendOrderReceiptEmail } from '../utils/emailService.js'
 
 // Helper function to create delivered order notification for admin confirmation
 const createDeliveredOrderNotification = async (orderId, userId) => {
@@ -343,7 +343,7 @@ export const updateOrderStatus = async (req, res) => {
   const { status, notes } = req.body
 
   // Enhanced order statuses
-  const validStatuses = ['pending', 'processing', 'ready_for_pickup', 'delivered', 'cancelled', 'refunded']
+  const validStatuses = ['pending', 'processing', 'ready_for_pickup', 'claimed', 'cancelled', 'refunded']
   
   if (!validStatuses.includes(status)) {
     return res.status(400).json({ 
@@ -397,11 +397,11 @@ export const updateOrderStatus = async (req, res) => {
       // Log sales reversal
       await logSalesMovement(id, 'reversal', totalAmount, paymentMethod, `Order ${status}`)
       
-    } else if (status === 'delivered' && oldStatus !== 'delivered') {
-      // Record the sale when order is delivered
-      await logSalesMovement(id, 'sale', totalAmount, paymentMethod, 'Order delivered - Sale recorded')
+    } else if (status === 'claimed' && oldStatus !== 'claimed') {
+      // Record the sale when order is claimed
+      await logSalesMovement(id, 'sale', totalAmount, paymentMethod, 'Order claimed - Sale recorded')
       
-      // Automatically mark payment as paid when order is delivered
+      // Automatically mark payment as paid when order is claimed
       if (paymentStatus !== 'paid') {
         await pool.query(
           'UPDATE orders SET payment_status = ? WHERE id = ?',
@@ -427,7 +427,7 @@ export const updateOrderStatus = async (req, res) => {
           'completed',
           JSON.stringify({ 
             auto_completed: true, 
-            reason: 'Order delivered',
+            reason: 'Order claimed',
             completed_at: new Date().toISOString()
           })
         ])
@@ -461,57 +461,9 @@ export const updateOrderStatus = async (req, res) => {
       console.log(`🔔 Not emitting notification - io: ${!!io}, notificationResult:`, !!notificationResult);
     }
     
-    // Send delivered order email with thank you message and receipt
-    if (status === 'delivered' && oldStatus !== 'delivered') {
-      try {
-        console.log(`📧 Preparing to send delivered order email for order ${id}`);
-        
-        // Get order details for email
-        const [orderDetails] = await pool.query(`
-          SELECT o.id as orderId, o.total_amount, o.payment_method, o.created_at,
-                 u.name as customer_name, u.email as customer_email,
-                 oi.quantity, oi.unit_price as price, p.name as product_name, ps.size
-          FROM orders o
-          JOIN users u ON o.user_id = u.id
-          JOIN order_items oi ON o.id = oi.order_id
-          JOIN products p ON oi.product_id = p.id
-          LEFT JOIN product_sizes ps ON oi.size_id = ps.id
-          WHERE o.id = ?
-        `, [id]);
-        
-        if (orderDetails.length > 0) {
-          const orderData = {
-            orderId: orderDetails[0].orderId,
-            items: orderDetails.map(item => ({
-              quantity: item.quantity,
-              product_name: item.product_name,
-              price: item.price,
-              size: item.size
-            })),
-            totalAmount: orderDetails[0].total_amount,
-            paymentMethod: orderDetails[0].payment_method,
-            createdAt: orderDetails[0].created_at,
-            deliveredAt: new Date().toISOString()
-          };
-          
-          const emailResult = await sendDeliveredOrderEmail(
-            orderDetails[0].customer_email,
-            orderDetails[0].customer_name,
-            orderData
-          );
-          
-          if (emailResult.success) {
-            console.log(`✅ Delivered order email sent successfully to: ${orderDetails[0].customer_email}`);
-          } else {
-            console.log(`⚠️ Delivered order email failed: ${emailResult.message}`);
-          }
-        } else {
-          console.log(`⚠️ Could not find order details for email - order ${id}`);
-        }
-      } catch (emailError) {
-        console.error('❌ Error sending delivered order email:', emailError);
-        // Don't fail the entire operation if email fails
-      }
+    // Send claimed order notification (no email)
+    if (status === 'claimed' && oldStatus !== 'claimed') {
+      console.log(`📧 Order ${id} marked as claimed - no email sent`);
     }
     
     // Email notifications disabled - only in-app notifications are used
@@ -530,8 +482,8 @@ export const updateOrderStatus = async (req, res) => {
       emitUserDataRefresh(io, userId, 'orders', { action: 'updated', orderId: id, status });
     }
     
-    // If order is marked as delivered, create special notification for admin confirmation
-    if (status === 'delivered') {
+    // If order is marked as claimed, create special notification for admin confirmation
+    if (status === 'claimed') {
       await createDeliveredOrderNotification(id, userId)
     }
     
@@ -545,9 +497,9 @@ export const updateOrderStatus = async (req, res) => {
       previousStatus: oldStatus,
       newStatus: status,
       inventoryUpdated: (status === 'cancelled' || status === 'refunded'),
-      salesLogged: (status === 'delivered'),
-      paymentStatusUpdated: (status === 'delivered' && paymentStatus !== 'paid'),
-      paymentStatus: status === 'delivered' ? 'paid' : paymentStatus
+      salesLogged: (status === 'claimed'),
+      paymentStatusUpdated: (status === 'claimed' && paymentStatus !== 'paid'),
+      paymentStatus: status === 'claimed' ? 'paid' : paymentStatus
     })
   } catch (err) {
     console.error('Update status error:', err)
@@ -693,7 +645,7 @@ export const getOrderStats = async (req, res) => {
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders,
         COUNT(CASE WHEN status = 'processing' THEN 1 END) as processing_orders,
         COUNT(CASE WHEN status = 'ready_for_pickup' THEN 1 END) as ready_orders,
-        COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_orders,
+        COUNT(CASE WHEN status = 'claimed' THEN 1 END) as claimed_orders,
         COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_orders
       FROM orders
       WHERE 1=1 ${dateFilter}
@@ -718,7 +670,7 @@ export const getOrderStats = async (req, res) => {
         pending: stats[0].pending_orders,
         processing: stats[0].processing_orders,
         ready: stats[0].ready_orders,
-        delivered: stats[0].delivered_orders,
+        claimed: stats[0].claimed_orders,
         cancelled: stats[0].cancelled_orders
       }
     })
@@ -938,9 +890,9 @@ export const confirmOrderReceipt = async (req, res) => {
     const userId = orderData[0].user_id
     const currentStatus = orderData[0].status
 
-    if (currentStatus !== 'delivered') {
+    if (currentStatus !== 'claimed') {
       return res.status(400).json({ 
-        error: 'Order must be in delivered status to confirm receipt' 
+        error: 'Order must be in claimed status to confirm receipt' 
       })
     }
 
@@ -1058,9 +1010,9 @@ export const userConfirmOrderReceipt = async (req, res) => {
 
     const currentStatus = orderData[0].status
 
-    if (currentStatus !== 'delivered') {
+    if (currentStatus !== 'claimed') {
       return res.status(400).json({ 
-        error: 'Order must be in delivered status to confirm receipt' 
+        error: 'Order must be in claimed status to confirm receipt' 
       })
     }
 
@@ -1283,31 +1235,12 @@ export const confirmOrderReceiptNotification = async (req, res) => {
       ['completed', orderId]
     )
 
-    // Get order items for email receipt
+    // Get order items for notification
     const [orderItems] = await pool.query(`
-      SELECT oi.product_name, oi.quantity, oi.unit_price, oi.total_price
+      SELECT oi.product_name, oi.quantity
       FROM order_items oi
       WHERE oi.order_id = ?
     `, [orderId])
-
-    // Send receipt email
-    try {
-      const orderDataForEmail = {
-        orderId: orderId,
-        items: orderItems,
-        totalAmount: order.total_amount,
-        paymentMethod: order.payment_method,
-        createdAt: order.created_at,
-        status: 'completed',
-        confirmedAt: new Date()
-      }
-
-      await sendOrderReceiptEmail(order.email, order.name, orderDataForEmail)
-      console.log(`✅ Receipt email sent to ${order.email} for order #${orderId}`)
-    } catch (emailError) {
-      console.error('Error sending receipt email:', emailError)
-      // Don't fail the confirmation if email fails
-    }
 
     // Create thank you notification for user
     const productSummary = orderItems.length === 1 
@@ -1385,7 +1318,7 @@ export const getSalesAnalytics = async (req, res) => {
       FROM orders o
       JOIN order_items oi ON o.id = oi.order_id
       ${dateFilter}
-      AND o.status IN ('completed', 'delivered')
+      AND o.status IN ('completed', 'claimed')
       GROUP BY DATE(o.created_at)
       ORDER BY date DESC
       LIMIT 30
@@ -1404,7 +1337,7 @@ export const getSalesAnalytics = async (req, res) => {
       JOIN products p ON oi.product_id = p.id
       JOIN orders o ON oi.order_id = o.id
       ${dateFilter}
-      AND o.status IN ('completed', 'delivered')
+      AND o.status IN ('completed', 'claimed')
       GROUP BY p.id, p.name
       ORDER BY total_profit DESC
       LIMIT 10
@@ -1421,7 +1354,7 @@ export const getSalesAnalytics = async (req, res) => {
       FROM orders o
       JOIN order_items oi ON o.id = oi.order_id
       ${dateFilter}
-      AND o.status IN ('completed', 'delivered')
+      AND o.status IN ('completed', 'claimed')
     `, params);
 
     res.json({
@@ -1678,6 +1611,99 @@ export const confirmOrderReceiptPublic = async (req, res) => {
   } catch (error) {
     console.error('Confirm order receipt error:', error);
     res.status(500).json({ error: 'Failed to confirm order receipt' });
+  }
+}
+
+// 🚫 User cancels their own order (only if not processing)
+export const userCancelOrder = async (req, res) => {
+  const { id } = req.params
+  const userId = req.user.id
+
+  try {
+    // Get order details and verify ownership
+    const [orderData] = await pool.query(
+      'SELECT user_id, status, total_amount, payment_method, payment_status FROM orders WHERE id = ?',
+      [id]
+    )
+
+    if (orderData.length === 0) {
+      return res.status(404).json({ error: 'Order not found' })
+    }
+
+    if (orderData[0].user_id !== userId) {
+      return res.status(403).json({ error: 'You can only cancel your own orders' })
+    }
+
+    const currentStatus = orderData[0].status
+    const totalAmount = orderData[0].total_amount
+    const paymentMethod = orderData[0].payment_method
+
+    // Check if order can be cancelled (only if not processing or beyond)
+    const cancellableStatuses = ['pending']
+    if (!cancellableStatuses.includes(currentStatus)) {
+      return res.status(400).json({ 
+        error: 'Order cannot be cancelled',
+        message: `Orders with status '${currentStatus}' cannot be cancelled. Only pending orders can be cancelled by users.`,
+        currentStatus,
+        cancellableStatuses
+      })
+    }
+
+    // Update order status to cancelled
+    const [result] = await pool.query(
+      'UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?',
+      ['cancelled', id]
+    )
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Order not found' })
+    }
+
+    // Log status change
+    await pool.query(`
+      INSERT INTO order_status_logs (order_id, old_status, new_status, notes, created_at)
+      VALUES (?, ?, ?, ?, NOW())
+    `, [id, currentStatus, 'cancelled', 'Cancelled by user'])
+
+    // Restore stock for cancelled order
+    await restoreOrderStock(id)
+    
+    // Log sales reversal
+    await logSalesMovement(id, 'reversal', totalAmount, paymentMethod, 'Order cancelled by user')
+
+    // Create notification for user
+    await createOrderStatusNotification(userId, id, 'cancelled')
+    
+    // Create admin notification
+    await createCancelledOrderNotification(id, userId)
+
+    // Emit real-time notification to user
+    const io = req.app.get('io')
+    if (io) {
+      emitOrderUpdate(io, userId, {
+        orderId: id,
+        status: 'cancelled',
+        previousStatus: currentStatus,
+        timestamp: new Date().toISOString()
+      })
+      
+      // Emit data refresh signals
+      emitAdminDataRefresh(io, 'orders', { action: 'updated', orderId: id, status: 'cancelled' });
+      emitUserDataRefresh(io, userId, 'orders', { action: 'updated', orderId: id, status: 'cancelled' });
+    }
+
+    res.json({ 
+      success: true,
+      message: 'Order cancelled successfully',
+      previousStatus: currentStatus,
+      newStatus: 'cancelled',
+      inventoryUpdated: true,
+      salesLogged: true
+    })
+
+  } catch (err) {
+    console.error('User cancel order error:', err)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }
 
