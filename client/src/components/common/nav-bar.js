@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 
 export default function Navbar() {
-  const { cartCount, notificationCount } = useNotifications();
+  const { cartCount, notificationCount, orderUpdateCount, clearOrderUpdateCount } = useNotifications();
   const { user } = useAuth();
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -70,8 +70,10 @@ export default function Navbar() {
       <div className="flex gap-4 items-center">
         <NotificationBell userType="user" userId={user?.id?.toString()} />
         
-        <Link href="/active-orders" title="My Orders">
-          <ShoppingBagIcon className="h-6 w-6 text-white hover:text-gray-300 transition-colors" />
+        <Link href="/active-orders" title="My Orders" onClick={() => clearOrderUpdateCount()}>
+          <Badge count={orderUpdateCount}>
+            <ShoppingBagIcon className="h-6 w-6 text-white hover:text-gray-300 transition-colors" />
+          </Badge>
         </Link>
         
         <Link href="/cart">

@@ -3,6 +3,7 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
+import { pool } from '../database/db.js'
 import {
   createProduct,
   getAllProducts,
@@ -95,6 +96,42 @@ router.get('/debug-images', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Proxy endpoint for serving images
+router.get('/proxy-image', (req, res) => {
+  try {
+    const { path: imagePath } = req.query;
+    
+    if (!imagePath) {
+      return res.status(400).json({ error: 'Image path is required' });
+    }
+    
+    // Security check - only allow paths that start with /uploads/
+    if (!imagePath.startsWith('/uploads/')) {
+      return res.status(400).json({ error: 'Invalid image path' });
+    }
+    
+    // Construct full file path
+    const fullPath = path.join(__dirname, '..', '..', imagePath);
+    
+    // Check if file exists
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    // Set appropriate headers
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(fullPath);
+    fileStream.pipe(res);
+    
+  } catch (error) {
+    console.error('Proxy image error:', error);
+    res.status(500).json({ error: 'Failed to serve image' });
   }
 });
 router.get('/stats', verifyToken, isAdmin, getProductStats)

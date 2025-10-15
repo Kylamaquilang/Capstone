@@ -210,17 +210,40 @@ export const checkout = async (req, res) => {
         // Process stock out using new stock management system
         console.log(`📦 Processing stock out for Product ID ${item.product_id}, Quantity ${item.quantity}`);
         
-        // Prepare order items for stock processing
-        const orderItems = [{
-          product_id: item.product_id,
-          quantity: item.quantity,
-          product_name: productName
-        }];
-        
-        // Process stock out using the new system
-        await processOrderStockOut(orderId, orderItems);
-        
-        console.log(`✅ Stock out processed for Product ID ${item.product_id}`);
+        try {
+          // Prepare order items for stock processing
+          const orderItems = [{
+            product_id: item.product_id,
+            quantity: item.quantity,
+            product_name: productName
+          }];
+          
+          // Process stock out using the new system
+          await processOrderStockOut(orderId, orderItems);
+          
+          console.log(`✅ Stock out processed for Product ID ${item.product_id}`);
+        } catch (stockError) {
+          console.error(`❌ Stock out failed for Product ID ${item.product_id}:`, stockError);
+          
+          // Fallback: Simple stock deduction if stored procedure fails
+          console.log(`🔄 Falling back to simple stock deduction for Product ID ${item.product_id}`);
+          
+          if (item.size_id) {
+            // Deduct from size-specific stock
+            await connection.query(
+              `UPDATE product_sizes SET stock = stock - ? WHERE id = ? AND stock >= ?`,
+              [item.quantity, item.size_id, item.quantity]
+            );
+          } else {
+            // Deduct from general product stock
+            await connection.query(
+              `UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`,
+              [item.quantity, item.product_id, item.quantity]
+            );
+          }
+          
+          console.log(`✅ Fallback stock deduction completed for Product ID ${item.product_id}`);
+        }
       }
 
       // Only delete cart items if we processed cart items (not direct products)
@@ -255,26 +278,39 @@ export const checkout = async (req, res) => {
     try {
       if (io) {
         // Emit inventory updates for each product
-        for (const item of items) {
-          emitInventoryUpdate(io, {
-            productId: item.product_id,
-            productName: item.product_name,
-            quantityChange: -item.quantity,
-            movementType: 'sale',
-            reason: 'Order placed',
-            orderId: orderId
-          });
+        for (const item of cartItems) {
+          try {
+            // Get product name for the inventory update
+            const [productInfo] = await pool.query(`SELECT name FROM products WHERE id = ?`, [item.product_id]);
+            const productName = productInfo[0]?.name || 'Unknown Product';
+            
+            emitInventoryUpdate(io, {
+              productId: item.product_id,
+              productName: productName,
+              quantityChange: -item.quantity,
+              movementType: 'sale',
+              reason: 'Order placed',
+              orderId: orderId
+            });
+          } catch (itemError) {
+            console.error(`❌ Error emitting inventory update for product ${item.product_id}:`, itemError);
+            // Continue with other items even if one fails
+          }
         }
         
         // Emit new order event
-        emitNewOrder(io, {
-          orderId: orderId,
-          userId: user_id,
-          totalAmount: total_amount,
-          paymentMethod: payment_method,
-          itemCount: items.length,
-          timestamp: new Date().toISOString()
-        });
+        try {
+          emitNewOrder(io, {
+            orderId: orderId,
+            userId: user_id,
+            totalAmount: total_amount,
+            paymentMethod: payment_method,
+            itemCount: cartItems.length,
+            timestamp: new Date().toISOString()
+          });
+        } catch (orderEmitError) {
+          console.error('❌ Error emitting new order event:', orderEmitError);
+        }
         
         console.log('📡 Real-time inventory updates and new order sent to admin');
       }

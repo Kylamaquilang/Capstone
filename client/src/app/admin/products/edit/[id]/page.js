@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
 import API from '@/lib/axios';
+import { getImageUrl } from '@/utils/imageUtils';
 
 export default function EditProductPage() {
   const [product, setProduct] = useState(null);
@@ -337,9 +338,16 @@ export default function EditProductPage() {
                     Current Image
                   </label>
                   <img
-                    src={product.image}
+                    src={`/api/proxy-image?path=${encodeURIComponent(product.image)}`}
                     alt={product.name}
                     className="w-32 h-32 object-cover rounded border"
+                    onError={(e) => {
+                      console.log('❌ Image failed to load, using fallback');
+                      e.target.src = '/images/polo.png';
+                    }}
+                    onLoad={() => {
+                      console.log('✅ Image loaded successfully');
+                    }}
                   />
                   <p className="text-sm text-gray-500 mt-1">
                     Note: Image cannot be changed from this page. Please contact support if you need to update the image.

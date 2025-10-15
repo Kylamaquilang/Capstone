@@ -1,5 +1,6 @@
 import { pool } from '../database/db.js';
 import { validateId, validateQuantity } from '../utils/validation.js';
+import { ValidationError } from '../utils/errorHandler.js';
 import { emitCartUpdate, emitDataRefresh, emitUserDataRefresh } from '../utils/socket-helper.js';
 
 // ✅ Add to Cart
@@ -28,20 +29,26 @@ export const addToCart = async (req, res) => {
     });
   }
 
-  if (!validateQuantity(quantity)) {
-    return res.status(400).json({ 
-      error: 'Invalid quantity',
-      message: 'Quantity must be at least 1'
-    });
+  try {
+    // Validate input using new validation functions
+    const validatedQuantity = validateQuantity(quantity);
+    const validatedProductId = validateId(product_id);
+    
+    // Continue with validated values
+    await processAddToCart(req, res, validatedProductId, validatedQuantity, size_id, user_id);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return res.status(400).json({ 
+        error: error.message,
+        field: error.field
+      });
+    }
+    throw error;
   }
+}
 
-  if (!validateId(product_id)) {
-    return res.status(400).json({ 
-      error: 'Invalid product ID',
-      message: 'Please select a valid product'
-    });
-  }
-
+// Helper function to process add to cart
+const processAddToCart = async (req, res, product_id, quantity, size_id, user_id) => {
   try {
     // Get product and size information
     let stockQuery, stockParams;

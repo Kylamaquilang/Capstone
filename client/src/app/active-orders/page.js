@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
+import { useSocket } from '@/context/SocketContext';
+import { useNotifications } from '@/context/NotificationContext';
 import { 
   ShoppingBagIcon, 
   ClockIcon, 
@@ -13,7 +15,8 @@ import {
   CurrencyDollarIcon,
   TruckIcon,
   ExclamationTriangleIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
@@ -26,6 +29,8 @@ import ProtectedRoute from '@/components/common/ProtectedRoute';
 export default function ActiveOrdersPage() {
   const router = useRouter();
   const { user: authUser } = useAuth();
+  const { socket, isConnected, joinUserRoom } = useSocket();
+  const { clearOrderUpdateCount } = useNotifications();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -60,6 +65,64 @@ export default function ActiveOrdersPage() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Clear order update count when page loads
+  useEffect(() => {
+    clearOrderUpdateCount();
+  }, [clearOrderUpdateCount]);
+
+  // Set up Socket.io listeners for real-time updates
+  useEffect(() => {
+    let isMounted = true;
+    
+    if (socket && isConnected && authUser?.id) {
+      // Join user room for real-time updates
+      joinUserRoom(authUser.id.toString());
+
+      // Listen for order status updates
+      const handleOrderUpdate = (orderData) => {
+        console.log('📦 Real-time order update received on active-orders:', orderData);
+        if (isMounted) {
+          setOrders(prev => prev.map(order => 
+            order.id === orderData.orderId 
+              ? { ...order, status: orderData.status, updated_at: orderData.timestamp }
+              : order
+          ));
+        }
+      };
+
+      // Listen for new notifications (might indicate order changes)
+      const handleNewNotification = (notificationData) => {
+        console.log('🔔 Real-time notification received on active-orders:', notificationData);
+        // Refresh orders when notifications arrive (might be order-related)
+        if (isMounted) {
+          fetchOrders();
+        }
+      };
+
+      // Listen for user-specific data refresh events
+      const handleUserDataRefresh = (data) => {
+        console.log('🔄 User data refresh received on active-orders:', data);
+        if (isMounted && data.dataType === 'orders') {
+          fetchOrders();
+        }
+      };
+
+      socket.on('order-status-updated', handleOrderUpdate);
+      socket.on('new-notification', handleNewNotification);
+      socket.on('user-data-refresh', handleUserDataRefresh);
+
+      return () => {
+        socket.off('order-status-updated', handleOrderUpdate);
+        socket.off('new-notification', handleNewNotification);
+        socket.off('user-data-refresh', handleUserDataRefresh);
+      };
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [socket, isConnected, authUser?.id, joinUserRoom, fetchOrders]);
 
   const handleOrderClick = (order) => {
     setSelectedOrder(order);
@@ -265,19 +328,9 @@ export default function ActiveOrdersPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">My Orders</h1>
-                  <p className="text-gray-600">Track and manage your orders</p>
-                </div>
-                <button
-                  onClick={refreshOrders}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ArrowPathIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </button>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">My Orders</h1>
+                <p className="text-gray-600">Track and manage your orders</p>
               </div>
             </div>
 
@@ -293,134 +346,145 @@ export default function ActiveOrdersPage() {
               </div>
             )}
 
-            {/* Active Orders */}
-            <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <ShoppingBagIcon className="h-5 w-5 mr-2 text-blue-600" />
-                Active Orders ({activeOrders.length})
-              </h2>
-
-              {activeOrders.length === 0 ? (
-                <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                  <ShoppingBagIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Orders</h3>
-                  <p className="text-gray-600 mb-4">You don't have any active orders at the moment.</p>
-                  <button
-                    onClick={() => router.push('/dashboard')}
-                    className="bg-[#000C50] text-white px-6 py-2 rounded-lg hover:bg-[#000C50]/90 transition-colors"
-                  >
-                    Browse Products
-                  </button>
+            {/* Active Orders Container */}
+            <div className="mx-4 sm:mx-6 lg:mx-8 xl:mx-24 bg-white rounded-lg shadow-sm border border-gray-200 mb-6 mt-5">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <ShoppingBagIcon className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+                  <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Active Orders</h2>
+                  <span className="text-xs sm:text-sm text-gray-500 ml-auto flex-shrink-0">{activeOrders.length} order{activeOrders.length !== 1 ? 's' : ''}</span>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {activeOrders.map((order) => (
-                    <div key={order.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {order.items && order.items.length > 0 
-                                ? order.items[0].product_name
-                                : `Order #${order.id}`
-                              }
-                            </h3>
-                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
-                              {getStatusIcon(order.status)}
-                              {order.status.replace('_', ' ')}
+              </div>
+              
+              <div className="p-4 sm:p-6 max-h-[400px] sm:max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400">
+                {activeOrders.length === 0 ? (
+                  <div className="text-center py-8 sm:py-12">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                      <ShoppingBagIcon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-1">
+                      No Active Orders
+                    </h3>
+                    <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
+                      You don't have any active orders at the moment.
+                    </p>
+                    <button
+                      onClick={() => router.push('/dashboard')}
+                      className="bg-[#000C50] text-white px-4 py-2 text-sm rounded-lg hover:bg-[#000C50]/90 transition-colors"
+                    >
+                      Browse Products
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2 sm:space-y-3 pr-1 sm:pr-2">
+                    {activeOrders.map((order) => (
+                      <div key={order.id} className="bg-gray-50 rounded-lg border border-gray-200 p-3 sm:p-4 hover:shadow-sm transition-shadow">
+                        <div className="flex items-start justify-between mb-2 sm:mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-xs sm:text-sm font-medium text-gray-900">
+                                {order.items && order.items.length > 0 
+                                  ? order.items[0].product_name
+                                  : `Order #${order.id}`
+                                }
+                              </h3>
+                              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}>
+                                {getStatusIcon(order.status)}
+                                {order.status.replace('_', ' ')}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mb-1">{getStatusMessage(order.status)}</p>
+                            <div className="flex items-center gap-3 text-xs text-gray-500">
+                              <div className="flex items-center gap-1">
+                                <CalendarIcon className="h-3 w-3" />
+                                {new Date(order.created_at).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <CurrencyDollarIcon className="h-3 w-3" />
+                                ₱{Number(order.total_amount).toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleOrderClick(order)}
+                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                              title="View Details"
+                            >
+                              <EyeIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Order Items Preview */}
+                        <div className="mb-2 sm:mb-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium text-gray-700">Items:</span>
+                            <span className="text-xs text-gray-600">
+                              {order.items?.length || 0} item{order.items?.length !== 1 ? 's' : ''}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600 mb-2">{getStatusMessage(order.status)}</p>
-                          <div className="flex items-center gap-4 text-sm text-gray-500">
-                            <div className="flex items-center gap-1">
-                              <CalendarIcon className="h-4 w-4" />
-                              {new Date(order.created_at).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric'
-                              })}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <CurrencyDollarIcon className="h-4 w-4" />
-                              ₱{Number(order.total_amount).toFixed(2)}
-                            </div>
+                          <div className="flex flex-wrap gap-1">
+                            {order.items?.slice(0, 3).map((item, index) => (
+                              <div key={index} className="flex items-center gap-1 bg-white rounded px-2 py-1">
+                                {item.image && (
+                                  <Image
+                                    src={getProductImageUrl(item.image)}
+                                    alt={item.product_name}
+                                    width={20}
+                                    height={20}
+                                    className="rounded object-cover"
+                                  />
+                                )}
+                                <span className="text-xs text-gray-700">
+                                  {item.quantity}x {item.product_name}
+                                  {item.size_name && ` (${item.size_name})`}
+                                </span>
+                              </div>
+                            ))}
+                            {order.items?.length > 3 && (
+                              <div className="bg-white rounded px-2 py-1">
+                                <span className="text-xs text-gray-500">
+                                  +{order.items.length - 3} more
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleOrderClick(order)}
-                            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                            title="View Details"
-                          >
-                            <EyeIcon className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </div>
 
-                      {/* Order Items Preview */}
-                      <div className="mb-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-sm font-medium text-gray-700">Items:</span>
-                          <span className="text-sm text-gray-600">
-                            {order.items?.length || 0} item{order.items?.length !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {order.items?.slice(0, 3).map((item, index) => (
-                            <div key={index} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                              {item.image && (
-                                <Image
-                                  src={getProductImageUrl(item.image)}
-                                  alt={item.product_name}
-                                  width={32}
-                                  height={32}
-                                  className="rounded object-cover"
-                                />
-                              )}
-                              <span className="text-sm text-gray-700">
-                                {item.quantity}x {item.product_name}
-                                {item.size_name && ` (${item.size_name})`}
-                              </span>
-                            </div>
-                          ))}
-                          {order.items?.length > 3 && (
-                            <div className="bg-gray-50 rounded-lg px-3 py-2">
-                              <span className="text-sm text-gray-500">
-                                +{order.items.length - 3} more
-                              </span>
-                            </div>
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-2">
+                          {canCancelOrder(order.status) && (
+                            <button
+                              onClick={() => handleCancelOrder(order.id)}
+                              disabled={actionLoading[order.id]}
+                              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              <XMarkIcon className="h-3 w-3" />
+                              {actionLoading[order.id] ? 'Cancelling...' : 'Cancel'}
+                            </button>
+                          )}
+                          
+                          {canConfirmReceipt(order.status) && (
+                            <button
+                              onClick={() => handleConfirmReceipt(order.id)}
+                              disabled={actionLoading[order.id]}
+                              className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              <CheckCircleIcon className="h-3 w-3" />
+                              {actionLoading[order.id] ? 'Claiming...' : 'Order Claimed'}
+                            </button>
                           )}
                         </div>
                       </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center gap-3">
-                        {canCancelOrder(order.status) && (
-                          <button
-                            onClick={() => handleCancelOrder(order.id)}
-                            disabled={actionLoading[order.id]}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            <XMarkIcon className="h-4 w-4" />
-                            {actionLoading[order.id] ? 'Cancelling...' : 'Cancel Order'}
-                          </button>
-                        )}
-                        
-                        {canConfirmReceipt(order.status) && (
-                          <button
-                            onClick={() => handleConfirmReceipt(order.id)}
-                            disabled={actionLoading[order.id]}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            <CheckCircleIcon className="h-4 w-4" />
-                            {actionLoading[order.id] ? 'Claiming...' : 'Order Claimed'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

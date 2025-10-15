@@ -72,7 +72,7 @@ export const emitOrderUpdate = (io, userId, orderData) => {
       timestamp: new Date().toISOString()
     });
     
-    console.log(` Real-time order update sent for order ${orderData.orderId}`);
+    console.log(`📦 Real-time order update sent for order ${orderData.orderId}`);
   }
 };
 

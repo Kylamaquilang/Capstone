@@ -9,6 +9,14 @@ import {
     validateStock
 } from '../utils/validation.js';
 import { emitAdminDataRefresh, emitDataRefresh } from '../utils/socket-helper.js';
+import { 
+  AppError, 
+  ValidationError, 
+  NotFoundError, 
+  ConflictError,
+  logger,
+  asyncHandler 
+} from '../utils/errorHandler.js';
 
 // Low stock threshold
 const LOW_STOCK_THRESHOLD = 5;
@@ -431,23 +439,21 @@ export const getAllProducts = async (req, res) => {
 };
 
 // ✅ Get Product by ID
-export const getProductById = async (req, res) => {
+export const getProductById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  
   try {
-    const { id } = req.params;
+    const validatedId = validateId(id);
     
-    if (!validateId(id)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
-
     const [rows] = await pool.query(`
       SELECT p.*, c.name AS category_name 
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
       WHERE p.id = ?
-    `, [id]);
+    `, [validatedId]);
 
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Product not found' });
+      throw new NotFoundError('Product');
     }
 
     const product = rows[0];
@@ -468,21 +474,25 @@ export const getProductById = async (req, res) => {
              WHEN 'XXL' THEN 6 
              ELSE 7 
            END`,
-        [id]
+        [validatedId]
       );
       product.sizes = sizes;
     } catch (sizeError) {
       // If product_sizes table doesn't exist, just set empty array
-      console.log('Product sizes table not available, setting empty array');
+      logger.debug('Product sizes table not available, setting empty array');
       product.sizes = [];
     }
 
+    logger.info('Product retrieved successfully', { productId: validatedId });
     res.json(product);
   } catch (error) {
-    console.error('Get Product Error:', error.message);
-    res.status(500).json({ error: 'Internal Server Error' });
+    if (error instanceof ValidationError || error instanceof NotFoundError) {
+      throw error;
+    }
+    logger.error('Get Product Error', error, { productId: id });
+    throw new AppError('Failed to retrieve product');
   }
-};
+});
 
 // ✅ Get Product by Name
 export const getProductByName = async (req, res) => {

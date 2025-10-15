@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import cron from 'node-cron';
 
 // Import routes
 import authRoutes from './src/routes/auth.routes.js';
@@ -25,9 +26,24 @@ import paymentRoutes from './src/routes/payment.routes.js';
 import notificationRoutes from './src/routes/notification.routes.js';
 import stockMovementRoutes from './src/routes/stock-movement.routes.js';
 import stockRoutes from './src/routes/stock.routes.js';
+import autoConfirmRoutes from './src/routes/auto-confirm.routes.js';
+
+// Import scheduled tasks
+import { autoConfirmClaimedOrders } from './src/controllers/auto-confirm.controller.js';
 
 // Import error handling middleware
-import { errorHandler, notFound } from './src/middleware/error.middleware.js';
+import { errorHandler, notFoundHandler } from './src/utils/errorHandler.js'
+
+// Import security middleware
+import { 
+  securityHeaders, 
+  requestLogger, 
+  apiRateLimit, 
+  authRateLimit,
+  uploadRateLimit,
+  sanitizeRequest,
+  requestSizeLimit
+} from './src/middleware/security.middleware.js';
 
 dotenv.config();
 const app = express();
@@ -53,28 +69,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-}));
+// Enhanced Security middleware
+app.use(securityHeaders);
+app.use(requestLogger);
+app.use(requestSizeLimit('10mb'));
+app.use(sanitizeRequest);
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Increased limit for development
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/', limiter);
+// Rate limiting with specific limits for different endpoints
+app.use('/api/auth', authRateLimit);
+app.use('/api/upload', uploadRateLimit);
+app.use('/api', apiRateLimit);
 
 // CORS configuration - Always allow localhost in development
 app.use(cors({
@@ -133,9 +137,10 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/stock-movements', stockMovementRoutes);
 app.use('/api/stock', stockRoutes);
+app.use('/api/auto-confirm', autoConfirmRoutes);
 
 // Error handling middleware
-app.use(notFound);
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
@@ -232,7 +237,31 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running in ${NODE_ENV} mode on port ${PORT}`);
   console.log(`📊 Health check available at http://localhost:${PORT}/health`);
   console.log(`🔌 Socket.io server ready for real-time connections`);
+  
+  // Setup scheduled tasks
+  setupScheduledTasks(io);
 });
+
+// Setup scheduled tasks
+const setupScheduledTasks = (ioInstance) => {
+  console.log('⏰ Setting up scheduled tasks...');
+  
+  // Auto-confirm claimed orders every day at 2:00 AM
+  cron.schedule('0 2 * * *', async () => {
+    console.log('🔄 Running daily auto-confirmation check...');
+    try {
+      await autoConfirmClaimedOrders(ioInstance);
+    } catch (error) {
+      console.error('❌ Error in scheduled auto-confirmation:', error);
+    }
+  }, {
+    scheduled: true,
+    timezone: "Asia/Manila"
+  });
+  
+  console.log('✅ Scheduled tasks configured:');
+  console.log('   - Auto-confirm claimed orders: Daily at 2:00 AM (Asia/Manila timezone)');
+};
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

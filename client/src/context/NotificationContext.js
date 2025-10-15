@@ -2,14 +2,17 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import API from '@/lib/axios';
 import { useSocket } from './SocketContext';
+import { useAuth } from './auth-context';
 
 const NotificationContext = createContext();
 
 export function NotificationProvider({ children }) {
   const [cartCount, setCartCount] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [orderUpdateCount, setOrderUpdateCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const { socket, isConnected, connectionFailed } = useSocket();
+  const { user } = useAuth();
 
   const fetchCounts = async () => {
     try {
@@ -87,6 +90,18 @@ export function NotificationProvider({ children }) {
     setNotificationCount(prev => Math.max(0, prev - 1));
   };
 
+  const updateOrderUpdateCount = (count) => {
+    setOrderUpdateCount(count);
+  };
+
+  const incrementOrderUpdateCount = () => {
+    setOrderUpdateCount(prev => prev + 1);
+  };
+
+  const clearOrderUpdateCount = () => {
+    setOrderUpdateCount(0);
+  };
+
   useEffect(() => {
     fetchCounts();
     
@@ -110,28 +125,42 @@ export function NotificationProvider({ children }) {
         setNotificationCount(prev => prev + 1);
       };
 
+      const handleOrderUpdate = (orderData) => {
+        console.log('📦 Real-time order update received:', orderData);
+        // Only increment if it's a status change (not just a refresh)
+        if (orderData.previousStatus && orderData.previousStatus !== orderData.status) {
+          incrementOrderUpdateCount();
+        }
+      };
+
       socket.on('cart-updated', handleCartUpdate);
       socket.on('new-notification', handleNewNotification);
+      socket.on('order-status-updated', handleOrderUpdate);
 
       return () => {
         socket.off('cart-updated', handleCartUpdate);
         socket.off('new-notification', handleNewNotification);
+        socket.off('order-status-updated', handleOrderUpdate);
       };
     }
-  }, [socket, isConnected, connectionFailed]);
+  }, [socket, isConnected, connectionFailed, user]);
 
   return (
     <NotificationContext.Provider
       value={{
         cartCount,
         notificationCount,
+        orderUpdateCount,
         loading,
         fetchCounts,
         updateCartCount,
         updateNotificationCount,
         incrementCartCount,
         decrementCartCount,
-        decrementNotificationCount
+        decrementNotificationCount,
+        updateOrderUpdateCount,
+        incrementOrderUpdateCount,
+        clearOrderUpdateCount
       }}
     >
       {children}
