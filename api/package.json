@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "prod": "NODE_ENV=production node server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "db:setup": "node ./src/scripts/setup_database.js",
     "db:fix-admin": "node ./src/scripts/fix_admin_password.js",

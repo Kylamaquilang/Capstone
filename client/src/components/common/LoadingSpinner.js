@@ -161,3 +161,4 @@ export const LoadingTable = ({ rows = 5, columns = 4, className = '' }) => {
 };
 
 export default LoadingSpinner;
+
