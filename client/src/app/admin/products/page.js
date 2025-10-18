@@ -16,14 +16,13 @@ export default function AdminProductPage() {
   const [subcategories, setSubcategories] = useState([]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
 
-  // Define the tabs
+  // Build tabs dynamically from categories
   const tabs = [
     { id: 'ALL', label: 'ALL' },
-    { id: 'LANYARD', label: 'LANYARD' },
-    { id: 'NSTP', label: 'NSTP' },
-    { id: 'P.E', label: 'P.E' },
-    { id: 'POLO', label: 'POLO' },
-    { id: 'TELA', label: 'TELA' }
+    ...categories.map(cat => ({
+      id: cat.name.toUpperCase(),
+      label: cat.name.toUpperCase()
+    }))
   ];
 
   const refreshCategories = useCallback(async () => {
@@ -68,29 +67,7 @@ export default function AdminProductPage() {
     };
     fetchCategories();
 
-    // Load subcategories when main category is selected
-    const loadSubcategories = async () => {
-      if (activeTab && activeTab !== 'ALL') {
-        try {
-          const { data } = await API.get('/categories');
-          const categorySubcategories = data.filter(cat => cat.parent_id === Number(activeTab));
-          if (isMounted) {
-            setSubcategories(categorySubcategories);
-          }
-        } catch (e) {
-          console.error('Fetch subcategories error:', e);
-          if (isMounted) {
-            setSubcategories([]);
-          }
-        }
-      } else {
-        if (isMounted) {
-          setSubcategories([]);
-          setSelectedSubcategory('');
-        }
-      }
-    };
-    loadSubcategories();
+    // No subcategories - categories are flat
 
     // Set up Socket.io listeners for real-time updates
     if (socket && isConnected) {

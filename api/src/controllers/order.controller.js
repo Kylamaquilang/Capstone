@@ -180,6 +180,8 @@ export const getUserOrders = async (req, res) => {
 // 👩‍💼 Admin views all orders
 export const getAllOrders = async (req, res) => {
   try {
+    console.log('📋 Fetching all orders for admin...');
+    
     const [orders] = await pool.query(`
       SELECT 
         o.id, 
@@ -203,6 +205,8 @@ export const getAllOrders = async (req, res) => {
       JOIN users u ON o.user_id = u.id
       ORDER BY o.created_at DESC
     `)
+
+    console.log(`📋 Found ${orders.length} orders`);
 
     // Get order items for each order to include product names
     for (let order of orders) {
@@ -231,10 +235,16 @@ export const getAllOrders = async (req, res) => {
       order.items = items
     }
 
+    console.log('✅ Orders fetched successfully');
     res.json(orders)
   } catch (err) {
-    console.error('Admin orders fetch error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('❌ Admin orders fetch error:', err.message)
+    console.error('Error details:', err)
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    })
   }
 }
 

@@ -280,7 +280,7 @@ export default function AdminCategoriesPage() {
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-xs font-medium text-gray-900">
+                          <span className="text-xs font-medium text-gray-900 uppercase">
                             {category.name}
                           </span>
                         </td>

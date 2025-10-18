@@ -32,14 +32,29 @@ const STOCK_MOVEMENT_TYPES = {
 // ✅ Get All Products - Simple version for frontend
 export const getAllProductsSimple = async (req, res) => {
   try {
+    const { category } = req.query;
+    
+    // Build WHERE clause
+    let whereConditions = ['p.is_active = 1'];
+    let queryParams = [];
+    
+    if (category) {
+      // Filter by category name
+      whereConditions.push('UPPER(c.name) = UPPER(?)');
+      queryParams.push(category.trim());
+    }
+    
+    const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
+    
     const [products] = await pool.query(`
-      SELECT 
+        SELECT 
         p.id,
         p.name,
         p.description,
         p.price,
         p.original_price,
         p.stock,
+        p.base_stock,
         p.image,
         p.created_at,
         p.last_restock_date,
@@ -47,16 +62,16 @@ export const getAllProductsSimple = async (req, res) => {
         c.name as category
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.is_active = 1
+      ${whereClause}
       ORDER BY p.name, p.created_at DESC
-    `);
+    `, queryParams);
 
     // Get sizes for each product
     const productsWithSizes = await Promise.all(
       products.map(async (product) => {
         try {
           const [sizes] = await pool.query(
-            `SELECT id, size, stock, price, is_active 
+            `SELECT id, size, stock, base_stock, price, is_active 
              FROM product_sizes 
              WHERE product_id = ? AND is_active = 1 
              ORDER BY 
@@ -81,6 +96,7 @@ export const getAllProductsSimple = async (req, res) => {
             price: parseFloat(product.price),
             original_price: parseFloat(product.original_price || 0),
             stock: parseInt(product.stock),
+            base_stock: parseInt(product.base_stock || 0),
             image_url: product.image ? product.image : null,
             image: product.image ? product.image : null,
             unit_of_measure: 'pcs',
@@ -95,6 +111,7 @@ export const getAllProductsSimple = async (req, res) => {
               id: size.id,
               size: size.size,
               stock: parseInt(size.stock),
+              base_stock: parseInt(size.base_stock || 0),
               price: parseFloat(size.price)
             }))
           };
@@ -219,14 +236,15 @@ export const createProduct = async (req, res) => {
     try {
       // Insert product
       const [productResult] = await connection.query(
-        `INSERT INTO products (name, description, price, original_price, stock, category_id, image, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        `INSERT INTO products (name, description, price, original_price, stock, base_stock, category_id, image, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           name.trim(),
           description?.trim() || null,
           parseFloat(price),
           parseFloat(original_price),
           parseInt(stock),
+          parseInt(stock), // Set base_stock = initial stock
           category_id || null,
           image?.trim() || null
         ]
@@ -238,11 +256,14 @@ export const createProduct = async (req, res) => {
       if (parseInt(stock) > 0) {
         console.log(`📦 Creating initial stock transaction for Product ID ${productId} with ${stock} units`);
         
+        // Get the currently logged-in user's ID (admin who created the product)
+        const createdBy = req.user?.id || null;
+        
         // Insert initial stock transaction
         await connection.query(
           `INSERT INTO stock_transactions (product_id, transaction_type, quantity, reference_no, source, note, created_by, created_at)
-           VALUES (?, 'IN', ?, ?, 'initial_stock', 'Initial stock for new product', 1, NOW())`,
-          [productId, parseInt(stock), `INIT-${productId}`]
+           VALUES (?, 'IN', ?, ?, 'initial_stock', 'Initial stock for new product', ?, NOW())`,
+          [productId, parseInt(stock), `INIT-${productId}`, createdBy]
         );
 
         // Initialize stock balance
@@ -278,13 +299,15 @@ export const createProduct = async (req, res) => {
       for (const sizeItem of sizes) {
         console.log('🔍 Processing size item:', sizeItem);
         if (sizeItem.size && sizeItem.size.trim() !== '') {
+          const sizeStock = parseInt(sizeItem.stock) || parseInt(stock);
           await connection.query(
-            `INSERT INTO product_sizes (product_id, size, stock, price, is_active) 
-             VALUES (?, ?, ?, ?, TRUE)`,
+            `INSERT INTO product_sizes (product_id, size, stock, base_stock, price, is_active) 
+             VALUES (?, ?, ?, ?, ?, TRUE)`,
             [
               productId,
               sizeItem.size.trim(),
-              parseInt(sizeItem.stock) || parseInt(stock), // Use size-specific stock or fallback to base stock
+              sizeStock, // Use size-specific stock or fallback to base stock
+              sizeStock, // Set base_stock = initial stock for this size
               parseFloat(sizeItem.price) || parseFloat(price) // Use size-specific price or fallback to base price
             ]
           );
@@ -302,6 +325,16 @@ export const createProduct = async (req, res) => {
       // Emit refresh signal for new product
       const io = req.app.get('io');
       if (io) {
+        // Emit specific new-product event
+        io.to('admin-room').emit('new-product', {
+          productId,
+          name,
+          action: 'created',
+          timestamp: new Date().toISOString()
+        });
+        console.log(`📦 Real-time new product event sent for product ${productId}`);
+        
+        // Also emit general data refresh signals
         emitAdminDataRefresh(io, 'products', { action: 'created', productId });
         emitDataRefresh(io, 'products', { action: 'created', productId });
       }
@@ -335,6 +368,7 @@ export const getAllProducts = async (req, res) => {
     let queryParams = [];
 
     if (category) {
+      // Filter by category name
       whereConditions.push('UPPER(c.name) = UPPER(?)');
       queryParams.push(category.trim());
     }
@@ -386,7 +420,7 @@ export const getAllProducts = async (req, res) => {
       products.map(async (product) => {
         try {
           const [sizes] = await pool.query(
-            `SELECT id, size, stock, price, is_active 
+            `SELECT id, size, stock, base_stock, price, is_active 
              FROM product_sizes 
              WHERE product_id = ? AND is_active = 1 
              ORDER BY 
@@ -409,6 +443,7 @@ export const getAllProducts = async (req, res) => {
               id: size.id,
               size: size.size,
               stock: parseInt(size.stock),
+              base_stock: parseInt(size.base_stock),
               price: parseFloat(size.price)
             }))
           };
@@ -673,21 +708,18 @@ export const updateProduct = async (req, res) => {
 
       // Update product sizes if provided
       if (sizes && Array.isArray(sizes)) {
-        // Validate that total size stock does not exceed base stock
-        const totalSizeStock = sizes.reduce((total, sizeItem) => {
-          if (sizeItem.size && sizeItem.size.trim() !== '') {
-            return total + (parseInt(sizeItem.stock) || 0);
-          }
-          return total;
-        }, 0);
-
-        if (totalSizeStock > parseInt(stock)) {
-          await connection.rollback();
-          connection.release();
-          return res.status(400).json({ 
-            error: `Total size stock (${totalSizeStock}) cannot exceed base stock (${stock}). Please adjust the size quantities.` 
-          });
-        }
+        // Get existing sizes to preserve base_stock and stock
+        const [existingSizes] = await connection.query(
+          'SELECT size, stock, base_stock FROM product_sizes WHERE product_id = ?',
+          [id]
+        );
+        const existingSizeData = {};
+        existingSizes.forEach(s => {
+          existingSizeData[s.size.toUpperCase()] = {
+            stock: s.stock,
+            base_stock: s.base_stock
+          };
+        });
 
         // Delete existing sizes
         await connection.query('DELETE FROM product_sizes WHERE product_id = ?', [id]);
@@ -695,12 +727,19 @@ export const updateProduct = async (req, res) => {
         // Insert new sizes
         for (const sizeData of sizes) {
           if (!validateSize(sizeData.size)) {
-            throw new Error(`Invalid size: ${sizeData.size}. Valid sizes are: NONE, XS, S, M, L, XL, XXL`);
+            throw new Error(`Invalid size: ${sizeData.size}. Valid sizes are: XXS, XS, S, M, L, XL, XXL, NONE`);
           }
 
+          const sizeKey = sizeData.size.toUpperCase();
+          const existingData = existingSizeData[sizeKey];
+          
+          // Preserve existing stock and base_stock, or use 0 for new sizes
+          const sizeStock = existingData ? existingData.stock : 0;
+          const baseStock = existingData ? existingData.base_stock : 0;
+
           await connection.query(
-            `INSERT INTO product_sizes (product_id, size, stock, price, is_active) VALUES (?, ?, ?, ?, TRUE)`,
-            [id, sizeData.size.toUpperCase(), parseInt(sizeData.stock) || parseInt(stock), parseFloat(sizeData.price) || parseFloat(price), 1]
+            `INSERT INTO product_sizes (product_id, size, stock, base_stock, price, is_active) VALUES (?, ?, ?, ?, ?, TRUE)`,
+            [id, sizeKey, sizeStock, baseStock, parseFloat(sizeData.price) || parseFloat(price), 1]
           );
         }
       }
@@ -711,6 +750,16 @@ export const updateProduct = async (req, res) => {
       // Emit refresh signal for updated product
       const io = req.app.get('io');
       if (io) {
+        // Emit specific product-updated event
+        io.to('admin-room').emit('product-updated', {
+          productId: id,
+          name: name || existing[0].name,
+          action: 'updated',
+          timestamp: new Date().toISOString()
+        });
+        console.log(`📦 Real-time product update event sent for product ${id}`);
+        
+        // Also emit general data refresh signals
         emitAdminDataRefresh(io, 'products', { action: 'updated', productId: id });
         emitDataRefresh(io, 'products', { action: 'updated', productId: id });
       }
@@ -722,8 +771,9 @@ export const updateProduct = async (req, res) => {
       throw error;
     }
   } catch (err) {
-    console.error('Update product error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Update product error:', err.message);
+    console.error('Stack:', err.stack);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
@@ -774,6 +824,15 @@ export const deleteProduct = async (req, res) => {
       // Emit refresh signal for deleted product
       const io = req.app.get('io');
       if (io) {
+        // Emit specific product-deleted event
+        io.to('admin-room').emit('product-deleted', {
+          productId: id,
+          action: 'deleted',
+          timestamp: new Date().toISOString()
+        });
+        console.log(`🗑️ Real-time product deletion event sent for product ${id}`);
+        
+        // Also emit general data refresh signals
         emitAdminDataRefresh(io, 'products', { action: 'deleted', productId: id });
         emitDataRefresh(io, 'products', { action: 'deleted', productId: id });
       }
@@ -1028,6 +1087,50 @@ export const getStockMovementHistory = async (req, res) => {
     });
   } catch (err) {
     console.error('Get stock movement history error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ Get Product Sizes
+export const getProductSizes = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!validateId(id)) {
+      return res.status(400).json({ error: 'Invalid product ID' });
+    }
+
+    // Check if product exists
+    const [products] = await pool.query(
+      'SELECT id, name FROM products WHERE id = ? AND is_active = 1',
+      [id]
+    );
+
+    if (products.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    // Get all sizes for this product
+    const [sizes] = await pool.query(
+      `SELECT id, size, stock, price, is_active 
+       FROM product_sizes 
+       WHERE product_id = ? AND is_active = 1
+       ORDER BY 
+         CASE size
+           WHEN 'XS' THEN 1
+           WHEN 'S' THEN 2
+           WHEN 'M' THEN 3
+           WHEN 'L' THEN 4
+           WHEN 'XL' THEN 5
+           WHEN 'XXL' THEN 6
+           ELSE 7
+         END`,
+      [id]
+    );
+
+    res.json(sizes);
+  } catch (err) {
+    console.error('Get product sizes error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };

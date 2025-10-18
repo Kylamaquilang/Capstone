@@ -16,7 +16,8 @@ import {
   getProductStats,
   getInventorySummary,
   updateProductStock,
-  getStockMovementHistory
+  getStockMovementHistory,
+  getProductSizes
 } from '../controllers/product.controller.js'
 
 import { verifyToken, isAdmin } from '../middleware/auth.middleware.js'
@@ -137,6 +138,7 @@ router.get('/proxy-image', (req, res) => {
 router.get('/stats', verifyToken, isAdmin, getProductStats)
 router.get('/low-stock', verifyToken, isAdmin, getLowStockProducts)
 router.get('/name/:name', getProductByName) // Get product by name
+router.get('/:id/sizes', getProductSizes) // Get product sizes (must be before /:id route)
 router.get('/:id', getProductById) // Get product by ID (must be last to avoid conflicts)
 
 // ✅ Admin-only below

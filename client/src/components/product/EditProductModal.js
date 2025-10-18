@@ -126,7 +126,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
         name: name.trim(),
         description: description.trim() || null,
         price: Number(price),
-        original_price: Number(price), // Set cost price same as selling price
+        original_price: Number(costPrice), // Use the actual cost price
         // stock field removed - auto-managed by inventory
         category_id: categoryId ? Number(categoryId) : null,
         image: finalImageUrl,

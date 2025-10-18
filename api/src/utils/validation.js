@@ -262,7 +262,7 @@ export const validateCategory = (category) => {
 export const validateSize = (size) => {
   if (!size) return null;
   
-  const validSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'NONE'];
+  const validSizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'NONE'];
   const upperSize = size.toUpperCase();
   
   if (!validSizes.includes(upperSize)) {

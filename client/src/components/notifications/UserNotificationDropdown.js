@@ -208,6 +208,7 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
                     <div className="flex items-center space-x-2 mt-2">
                       {!notification.read && (
                         <button
+                          key={`mark-read-${notification.id}`}
                           onClick={() => markAsRead(notification.id)}
                           className="p-1 text-gray-600 hover:text-gray-800 hover:bg-blue-100 rounded transition-colors"
                           title="Mark as read"
@@ -218,6 +219,7 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
                         </button>
                       )}
                       <button
+                        key={`delete-${notification.id}`}
                         onClick={() => deleteNotification(notification.id)}
                         className="p-1 text-gray-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
                         title="Delete notification"

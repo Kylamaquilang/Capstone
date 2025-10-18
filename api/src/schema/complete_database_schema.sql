@@ -7,9 +7,9 @@
 -- =====================================================
 
 -- Drop existing database and create new one
-DROP DATABASE IF EXISTS capstone_db;
-CREATE DATABASE capstone_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE capstone_db;
+DROP DATABASE IF EXISTS capstone;
+CREATE DATABASE capstone CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE capstone;
 
 -- =====================================================
 -- 1. USERS TABLE
@@ -21,15 +21,26 @@ CREATE TABLE users (
     password VARCHAR(255) NOT NULL,
     role ENUM('admin', 'student', 'staff') NOT NULL DEFAULT 'student',
     student_id VARCHAR(50) UNIQUE,
-    phone VARCHAR(20),
     address TEXT,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    middle_name VARCHAR(100),
+    suffix VARCHAR(20),
+    degree ENUM('BEED', 'BSED', 'BSIT', 'BSHM'),
+    year_level ENUM('1st Year', '2nd Year', '3rd Year', '4th Year'),
+    section VARCHAR(10),
+    status ENUM('regular', 'irregular') DEFAULT 'regular',
+    contact_number VARCHAR(20),
+    profile_image VARCHAR(255),
     is_active BOOLEAN DEFAULT TRUE,
     must_change_password BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_email (email),
     INDEX idx_student_id (student_id),
-    INDEX idx_role (role)
+    INDEX idx_role (role),
+    INDEX idx_degree (degree),
+    INDEX idx_status (status)
 );
 
 -- =====================================================
@@ -54,11 +65,9 @@ CREATE TABLE products (
     price DECIMAL(10,2) NOT NULL,
     original_price DECIMAL(10,2),
     stock INT DEFAULT 0,
-    category_id INT NOT NULL,
+    base_stock INT DEFAULT 0,
+    category_id INT,
     image VARCHAR(255),
-    size VARCHAR(20),
-    color VARCHAR(50),
-    brand VARCHAR(100),
     is_active BOOLEAN DEFAULT TRUE,
     reorder_point INT DEFAULT 5,
     max_stock INT,
@@ -81,6 +90,7 @@ CREATE TABLE product_sizes (
     product_id INT NOT NULL,
     size VARCHAR(20) NOT NULL,
     stock INT DEFAULT 0,
+    base_stock INT DEFAULT 0,
     price DECIMAL(10,2),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -169,6 +179,7 @@ CREATE TABLE orders (
     status ENUM('pending', 'processing', 'ready_for_pickup', 'claimed', 'completed', 'cancelled', 'refunded') DEFAULT 'pending',
     payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
     payment_method VARCHAR(50),
+    pay_at_counter BOOLEAN DEFAULT FALSE,
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -184,17 +195,21 @@ CREATE TABLE orders (
 CREATE TABLE order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
-    product_id INT NOT NULL,
+    product_id INT,
     product_name VARCHAR(200) NOT NULL,
     size VARCHAR(20),
+    size_id INT,
     quantity INT NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
+    unit_cost DECIMAL(10,2) DEFAULT 0,
     total_price DECIMAL(10,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+    FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL,
     INDEX idx_order_id (order_id),
-    INDEX idx_product_id (product_id)
+    INDEX idx_product_id (product_id),
+    INDEX idx_size_id (size_id)
 );
 
 -- Order Status Logs (Audit trail)
@@ -203,11 +218,12 @@ CREATE TABLE order_status_logs (
     order_id INT NOT NULL,
     old_status VARCHAR(50),
     new_status VARCHAR(50) NOT NULL,
-    changed_by INT,
+    admin_id INT,
+    notes TEXT,
     reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_order_id (order_id),
     INDEX idx_created_at (created_at)
 );
@@ -677,44 +693,26 @@ CREATE INDEX idx_cart_items_user_product ON cart_items(user_id, product_id);
 -- 16. INITIAL DATA
 -- =====================================================
 
--- Insert default admin user
-INSERT INTO users (name, email, password, role, is_active) VALUES
-('System Administrator', 'admin@cpcessen.com', '$2b$10$rQZ8K9L2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9u', 'admin', TRUE),
-('Accounting Office', 'accounting.office.cpc@gmail.com', '$2b$10$rQZ8K9L2mN3oP4qR5sT6uV7wX8yZ9aB0cD1eF2gH3iJ4kL5mN6oP7qR8sT9u', 'admin', TRUE);
-
--- Insert default categories
-INSERT INTO categories (name, description) VALUES
-('Uniforms', 'School uniforms and official clothing'),
-('Accessories', 'School accessories and supplies'),
-('Food & Beverages', 'Food items and drinks'),
-('Electronics', 'Electronic devices and accessories'),
-('Books & Supplies', 'Educational materials and stationery');
-
--- Insert sample products
-INSERT INTO products (name, description, price, original_price, stock, category_id, reorder_point, max_stock) VALUES
-('BEED POLO', 'Official BEED program polo shirt', 250.00, 200.00, 100, 1, 5, 200),
-('BSIT POLO', 'Official BSIT program polo shirt', 250.00, 200.00, 80, 1, 5, 200),
-('School ID Lace', 'Official school ID lace', 15.00, 12.00, 200, 2, 10, 500),
-('Sandwich', 'Fresh sandwich with ham and cheese', 35.00, 30.00, 50, 3, 10, 100),
-('Coffee', 'Hot brewed coffee', 25.00, 20.00, 30, 3, 5, 100),
-('Calculator', 'Scientific calculator', 450.00, 400.00, 15, 4, 3, 50),
-('Notebook', 'Spiral notebook 200 pages', 45.00, 40.00, 100, 5, 20, 300),
-('Pen Set', 'Set of 3 ballpoint pens', 25.00, 20.00, 150, 5, 30, 500);
-
--- Insert initial stock balance
-INSERT INTO stock_balance (product_id, qty) 
-SELECT id, stock FROM products WHERE stock > 0;
-
--- Insert sample stock transactions
-INSERT INTO stock_transactions (product_id, transaction_type, quantity, reference_no, source, note, created_by) VALUES
-(1, 'IN', 100, 'INIT-001', 'initial', 'Initial stock setup', 1),
-(2, 'IN', 80, 'INIT-002', 'initial', 'Initial stock setup', 1),
-(3, 'IN', 200, 'INIT-003', 'initial', 'Initial stock setup', 1),
-(4, 'IN', 50, 'INIT-004', 'initial', 'Initial stock setup', 1),
-(5, 'IN', 30, 'INIT-005', 'initial', 'Initial stock setup', 1),
-(6, 'IN', 15, 'INIT-006', 'initial', 'Initial stock setup', 1),
-(7, 'IN', 100, 'INIT-007', 'initial', 'Initial stock setup', 1),
-(8, 'IN', 150, 'INIT-008', 'initial', 'Initial stock setup', 1);
+-- Insert Default Admin Account
+-- Email: acounting.office.cpc@gmail.com
+-- Password: accountingoffice (hashed with bcrypt)
+INSERT INTO users (
+  name,
+  email, 
+  password, 
+  role, 
+  first_name, 
+  last_name,
+  created_at
+) VALUES (
+  'accounting office',
+  'acounting.office.cpc@gmail.com',
+  '$2b$10$q5TO2hXTQ/wm5qd6klvA6uJ/ZnY..BSd67XYfXIgIYI/zF9pKVa1m',  -- Password: accountingoffice
+  'admin',
+  'Accounting',
+  'Office',
+  NOW()
+);
 
 -- =====================================================
 -- 17. GRANTS AND PERMISSIONS
@@ -722,7 +720,7 @@ INSERT INTO stock_transactions (product_id, transaction_type, quantity, referenc
 
 -- Create application user (if needed)
 -- CREATE USER 'capstone_user'@'localhost' IDENTIFIED BY 'capstone_password';
--- GRANT SELECT, INSERT, UPDATE, DELETE ON capstone_db.* TO 'capstone_user'@'localhost';
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON capstone.* TO 'capstone_user'@'localhost';
 -- FLUSH PRIVILEGES;
 
 -- =====================================================
@@ -732,4 +730,4 @@ SELECT 'CPC ESSEN DATABASE SCHEMA CREATED SUCCESSFULLY!' as message;
 SELECT 'Tables created: users, categories, products, product_sizes, stock_transactions, stock_balance, stock_items, cart_items, orders, order_items, order_status_logs, payment_transactions, inventory_movements, notifications, password_reset_codes' as tables;
 SELECT 'Stored procedures: GenerateOrderNumber, sp_stock_in, sp_stock_out, sp_stock_adjustment' as procedures;
 SELECT 'Views: v_order_summary, v_product_inventory, v_sales_summary, v_current_stock, v_low_stock_products, v_stock_history' as views;
-SELECT 'Sample data inserted: 2 admin users, 5 categories, 8 products, initial stock transactions' as sample_data;
+SELECT 'No sample data inserted - database is empty and ready for use' as sample_data;

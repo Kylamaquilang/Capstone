@@ -4,9 +4,11 @@ import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import API from '@/lib/axios';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
+import { useSocket } from '@/context/SocketContext';
 import { 
   CubeIcon, 
   PlusIcon, 
+  MinusIcon,
   ClockIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
@@ -21,31 +23,55 @@ import { useRouter } from 'next/navigation';
 
 export default function AdminInventoryPage() {
   const router = useRouter();
+  const { socket, isConnected, joinAdminRoom } = useSocket();
   const [currentStock, setCurrentStock] = useState([]);
   const [stockHistory, setStockHistory] = useState([]);
   const [lowStockAlerts, setLowStockAlerts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+  const [productSizes, setProductSizes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showStockInModal, setShowStockInModal] = useState(false);
   const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [showStockOutModal, setShowStockOutModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [currentActionType, setCurrentActionType] = useState('stockIn');
   const [activeTab, setActiveTab] = useState('overview');
   
   // Form states
   const [stockInForm, setStockInForm] = useState({
+    productId: '',
     quantity: '',
-    referenceNo: '',
+    size: '',
     batchNo: '',
-    expiryDate: '',
-    source: 'supplier',
     note: ''
   });
   const [adjustForm, setAdjustForm] = useState({
+    productId: '',
+    size: '',
     physicalCount: '',
     reason: '',
     note: ''
   });
+  const [stockOutForm, setStockOutForm] = useState({
+    productId: '',
+    quantity: '',
+    size: '',
+    reason: '',
+    note: ''
+  });
+  const [adjustProductSizes, setAdjustProductSizes] = useState([]);
+  const [stockOutProductSizes, setStockOutProductSizes] = useState([]);
+
+  // Fetch all products
+  const fetchAllProducts = async () => {
+    try {
+      const response = await API.get('/products');
+      setAllProducts(response.data || []);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
 
   // Fetch current stock
   const fetchCurrentStock = async () => {
@@ -82,6 +108,7 @@ export default function AdminInventoryPage() {
   const handleStockActionSuccess = () => {
     setShowStockInModal(false);
     setShowAdjustModal(false);
+    setShowStockOutModal(false);
     setSelectedProduct(null);
     setCurrentActionType('stockIn');
     fetchAllData();
@@ -96,6 +123,26 @@ export default function AdminInventoryPage() {
       setShowStockInModal(true);
     } else if (actionType === 'adjust') {
       setShowAdjustModal(true);
+    } else if (actionType === 'stockOut') {
+      setShowStockOutModal(true);
+    }
+  };
+
+  // Handle product selection in modal
+  const handleProductSelect = async (productId) => {
+    setStockInForm({ ...stockInForm, productId, size: '' });
+    
+    // Fetch sizes for selected product
+    if (productId) {
+      try {
+        const response = await API.get(`/products/${productId}/sizes`);
+        setProductSizes(response.data || []);
+      } catch (error) {
+        console.error('Error fetching product sizes:', error);
+        setProductSizes([]);
+      }
+    } else {
+      setProductSizes([]);
     }
   };
 
@@ -104,40 +151,123 @@ export default function AdminInventoryPage() {
     e.preventDefault();
     try {
       await API.post('/stock/in', {
-        productId: selectedProduct?.id,
+        productId: parseInt(stockInForm.productId),
         quantity: parseInt(stockInForm.quantity),
-        referenceNo: stockInForm.referenceNo,
+        size: stockInForm.size || null,
         batchNo: stockInForm.batchNo || null,
-        expiryDate: stockInForm.expiryDate || null,
-        source: stockInForm.source,
+        source: 'restock', // Default source
         note: stockInForm.note
       });
 
       handleStockActionSuccess();
+      // Reset form
+      setStockInForm({
+        productId: '',
+        quantity: '',
+        size: '',
+        batchNo: '',
+        note: ''
+      });
+      setProductSizes([]);
       alert('Stock added successfully!');
     } catch (error) {
       console.error('Error adding stock:', error);
-      alert('Error adding stock. Please try again.');
+      alert(error.response?.data?.error || 'Error adding stock. Please try again.');
     }
   };
 
+
+  // Handle product selection in adjust modal
+  const handleAdjustProductSelect = async (productId) => {
+    setAdjustForm({ ...adjustForm, productId, size: '', physicalCount: '' });
+    
+    // Fetch sizes for selected product
+    if (productId) {
+      try {
+        const response = await API.get(`/products/${productId}/sizes`);
+        setAdjustProductSizes(response.data || []);
+      } catch (error) {
+        console.error('Error fetching product sizes:', error);
+        setAdjustProductSizes([]);
+      }
+    } else {
+      setAdjustProductSizes([]);
+    }
+  };
+
+  // Handle product selection in stock out modal
+  const handleStockOutProductSelect = async (productId) => {
+    setStockOutForm({ ...stockOutForm, productId, size: '' });
+    
+    // Fetch sizes for selected product
+    if (productId) {
+      try {
+        const response = await API.get(`/products/${productId}/sizes`);
+        setStockOutProductSizes(response.data || []);
+      } catch (error) {
+        console.error('Error fetching product sizes:', error);
+        setStockOutProductSizes([]);
+      }
+    } else {
+      setStockOutProductSizes([]);
+    }
+  };
+
+  // Handle stock out form submission
+  const handleStockOut = async (e) => {
+    e.preventDefault();
+    try {
+      await API.post('/stock/out', {
+        productId: parseInt(stockOutForm.productId),
+        quantity: parseInt(stockOutForm.quantity),
+        size: stockOutForm.size || null,
+        source: stockOutForm.reason, // reason becomes source
+        note: stockOutForm.note
+      });
+
+      handleStockActionSuccess();
+      // Reset form
+      setStockOutForm({
+        productId: '',
+        quantity: '',
+        size: '',
+        reason: '',
+        note: ''
+      });
+      setStockOutProductSizes([]);
+      alert('Stock removed successfully!');
+    } catch (error) {
+      console.error('Error removing stock:', error);
+      alert(error.response?.data?.error || 'Error removing stock. Please try again.');
+    }
+  };
 
   // Handle stock adjustment form submission
   const handleAdjustStock = async (e) => {
     e.preventDefault();
     try {
       await API.post('/stock/adjust', {
-        productId: selectedProduct?.id,
+        productId: parseInt(adjustForm.productId),
+        size: adjustForm.size || null,
         physicalCount: parseInt(adjustForm.physicalCount),
         reason: adjustForm.reason,
         note: adjustForm.note
       });
 
       handleStockActionSuccess();
+      // Reset form
+      setAdjustForm({
+        productId: '',
+        size: '',
+        physicalCount: '',
+        reason: '',
+        note: ''
+      });
+      setAdjustProductSizes([]);
       alert('Stock adjustment completed successfully!');
     } catch (error) {
       console.error('Error adjusting stock:', error);
-      alert('Error adjusting stock. Please try again.');
+      alert(error.response?.data?.error || 'Error adjusting stock. Please try again.');
     }
   };
 
@@ -146,6 +276,7 @@ export default function AdminInventoryPage() {
     setLoading(true);
     try {
       await Promise.all([
+        fetchAllProducts(),
         fetchCurrentStock(),
         fetchStockHistory(),
         fetchLowStockAlerts()
@@ -159,8 +290,84 @@ export default function AdminInventoryPage() {
   };
 
   useEffect(() => {
+    let isMounted = true;
+
     fetchAllData();
-  }, []);
+
+    // Set up Socket.io listeners for real-time updates
+    if (socket && isConnected) {
+      // Join admin room for real-time updates
+      joinAdminRoom();
+
+      // Listen for new products
+      const handleNewProduct = (productData) => {
+        console.log('📦 Real-time new product received in inventory:', productData);
+        if (isMounted) {
+          // Refresh products list
+          fetchAllProducts();
+        }
+      };
+
+      // Listen for product updates
+      const handleProductUpdate = (productData) => {
+        console.log('📦 Real-time product update received in inventory:', productData);
+        if (isMounted) {
+          // Refresh all data to update stock levels
+          fetchAllProducts();
+          fetchCurrentStock();
+        }
+      };
+
+      // Listen for product deletions
+      const handleProductDelete = (productData) => {
+        console.log('🗑️ Real-time product deletion received in inventory:', productData);
+        if (isMounted) {
+          // Refresh products list and stock
+          fetchAllProducts();
+          fetchCurrentStock();
+        }
+      };
+
+      // Listen for inventory updates
+      const handleInventoryUpdate = (inventoryData) => {
+        console.log('📦 Real-time inventory update received:', inventoryData);
+        if (isMounted) {
+          // Refresh all inventory data
+          fetchCurrentStock();
+          fetchStockHistory();
+          fetchLowStockAlerts();
+        }
+      };
+
+      // Listen for admin notifications
+      const handleAdminNotification = (notificationData) => {
+        console.log('🔔 Real-time admin notification received in inventory:', notificationData);
+        if (isMounted) {
+          // Refresh all data when admin notifications arrive
+          fetchAllData();
+        }
+      };
+
+      // Register socket event listeners
+      socket.on('new-product', handleNewProduct);
+      socket.on('product-updated', handleProductUpdate);
+      socket.on('product-deleted', handleProductDelete);
+      socket.on('inventory-updated', handleInventoryUpdate);
+      socket.on('admin-notification', handleAdminNotification);
+
+      return () => {
+        socket.off('new-product', handleNewProduct);
+        socket.off('product-updated', handleProductUpdate);
+        socket.off('product-deleted', handleProductDelete);
+        socket.off('inventory-updated', handleInventoryUpdate);
+        socket.off('admin-notification', handleAdminNotification);
+      };
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [socket, isConnected, joinAdminRoom]);
 
   // Auto-refresh for inventory
   useAdminAutoRefresh(fetchAllData, 'inventory');
@@ -201,8 +408,29 @@ export default function AdminInventoryPage() {
   // Calculate summary statistics
   const getSummaryStats = () => {
     const totalProducts = currentStock.length;
-    const totalStock = currentStock.reduce((sum, product) => sum + (product.current_stock || 0), 0);
-    const totalValue = currentStock.reduce((sum, product) => sum + (product.current_stock || 0) * (product.price || 0), 0);
+    
+    // Calculate total stock and value
+    let totalStock = 0;
+    let totalValue = 0;
+    
+    currentStock.forEach(product => {
+      if (product.sizes && product.sizes.length > 0) {
+        // Product has sizes - sum up each size's stock and value
+        product.sizes.forEach(size => {
+          const sizeStock = size.stock || 0;
+          const sizePrice = size.price || product.price || 0;
+          totalStock += sizeStock;
+          totalValue += sizeStock * sizePrice;
+        });
+      } else {
+        // Product without sizes - use main stock and price
+        const stock = product.current_stock || 0;
+        const price = product.price || 0;
+        totalStock += stock;
+        totalValue += stock * price;
+      }
+    });
+    
     const lowStockCount = lowStockAlerts.length;
     const outOfStockCount = currentStock.filter(p => (p.current_stock || 0) === 0).length;
 
@@ -371,6 +599,16 @@ export default function AdminInventoryPage() {
                     <button
                       onClick={() => {
                         setSelectedProduct(null);
+                        setShowStockOutModal(true);
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium flex items-center space-x-2"
+                    >
+                      <MinusIcon className="h-4 w-4" />
+                      <span>Stock Out</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedProduct(null);
                         setShowAdjustModal(true);
                       }}
                       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center space-x-2"
@@ -418,66 +656,78 @@ export default function AdminInventoryPage() {
                           Product
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          SKU
+                          Size
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Base Stock
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Current Stock
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Reorder Level
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
                         </th>
                          </tr>
                        </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {currentStock.map((product) => (
+                      {currentStock.map((product) => {
+                        // If product has sizes, display each size as a separate row
+                        if (product.sizes && product.sizes.length > 0) {
+                          return product.sizes.map((size, index) => {
+                            const sizeStock = size.stock || 0;
+                            const sizeStatus = sizeStock <= 5 ? 'LOW' : sizeStock <= 10 ? 'MEDIUM' : 'GOOD';
+                            
+                            return (
+                              <tr key={`${product.id}-${size.id}`}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 uppercase">
+                                  {product.name}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                                    {size.size}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
+                                  {size.base_stock || 0}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
+                                  {sizeStock}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockStatusColor(sizeStatus)}`}>
+                                    {sizeStatus}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        } else {
+                          // Product has no sizes, display as single row
+                          return (
                         <tr key={product.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 uppercase">
                             {product.name}
                              </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {product.sku}
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-500">
+                                  No sizes
+                                </span>
                              </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
+                                {product.base_stock || 0}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
                             {product.current_stock}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {product.reorder_level}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockStatusColor(product.stock_status)}`}>
                               {product.stock_status}
                                    </span>
                              </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                                 <button
-                                onClick={() => {
-                                  setSelectedProduct(product);
-                                  setShowStockInModal(true);
-                                }}
-                                className="text-[#000C50] hover:text-blue-700"
-                              >
-                                Add Stock
-                                 </button>
-                                 <button
-                                onClick={() => {
-                                  setSelectedProduct(product);
-                                  setShowAdjustModal(true);
-                                }}
-                                className="text-orange-600 hover:text-orange-700"
-                              >
-                                Adjust
-                                 </button>
-                               </div>
-                             </td>
                            </tr>
-                         ))}
+                          );
+                        }
+                      })}
                        </tbody>
                      </table>
                    </div>
@@ -508,9 +758,6 @@ export default function AdminInventoryPage() {
                           Quantity
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Reference
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Source
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -534,9 +781,6 @@ export default function AdminInventoryPage() {
                            </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {transaction.quantity}
-                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {transaction.reference_no}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {transaction.source}
@@ -573,6 +817,9 @@ export default function AdminInventoryPage() {
                             Product
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Base Stock
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Current Stock
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -589,10 +836,13 @@ export default function AdminInventoryPage() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {lowStockAlerts.map((product) => (
                           <tr key={product.id}>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 uppercase">
                               {product.name}
                                </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
+                              {product.base_stock || 0}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
                               {product.current_stock}
                                </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -605,8 +855,23 @@ export default function AdminInventoryPage() {
                                </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   setSelectedProduct(product);
+                                  setStockInForm({ 
+                                    productId: product.id.toString(), 
+                                    quantity: '', 
+                                    size: '', 
+                                    batchNo: '', 
+                                    note: '' 
+                                  });
+                                  // Fetch sizes for this product
+                                  try {
+                                    const response = await API.get(`/products/${product.id}/sizes`);
+                                    setProductSizes(response.data || []);
+                                  } catch (error) {
+                                    console.error('Error fetching product sizes:', error);
+                                    setProductSizes([]);
+                                  }
                                   setShowStockInModal(true);
                                 }}
                                 className="text-[#000C50] hover:text-blue-700"
@@ -632,29 +897,85 @@ export default function AdminInventoryPage() {
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Add Stock {selectedProduct && `- ${selectedProduct.name}`}
+                Add Stock
               </h3>
               <form onSubmit={handleStockIn}>
                 <div className="space-y-4">
+                  {/* Product Dropdown */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Quantity</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Select Product <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={stockInForm.productId}
+                      onChange={(e) => handleProductSelect(e.target.value)}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                    >
+                      <option value="">-- Select a product --</option>
+                      {allProducts.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name.toUpperCase()} - Stock: {product.stock || 0}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Size Dropdown (shows when product has sizes) */}
+                  {productSizes.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Size <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={stockInForm.size}
+                        onChange={(e) => setStockInForm({ ...stockInForm, size: e.target.value })}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                      >
+                        <option value="">-- Select size --</option>
+                        {productSizes.map((sizeObj) => (
+                          <option key={sizeObj.id} value={sizeObj.size}>
+                            {sizeObj.size.toUpperCase()} - Stock: {sizeObj.stock || 0}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">This product has size variants</p>
+                    </div>
+                  )}
+
+                  {/* Size Text Input (shows when product selected but no sizes available) */}
+                  {stockInForm.productId && productSizes.length === 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Size (Optional)</label>
+                      <input
+                        type="text"
+                        value={stockInForm.size}
+                        onChange={(e) => setStockInForm({ ...stockInForm, size: e.target.value })}
+                        placeholder="e.g., S, M, L, XL"
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    />
+                      <p className="text-xs text-gray-500 mt-1">Leave empty if not applicable</p>
+        </div>
+                  )}
+
+                  {/* Quantity */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Quantity <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="number"
                       required
+                      min="1"
                       value={stockInForm.quantity}
                       onChange={(e) => setStockInForm({ ...stockInForm, quantity: e.target.value })}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    />
-        </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Reference No</label>
-                    <input
-                      type="text"
-                      value={stockInForm.referenceNo}
-                      onChange={(e) => setStockInForm({ ...stockInForm, referenceNo: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Enter quantity to add"
                     />
       </div>
+
+                  {/* Batch No */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Batch No (Optional)</label>
                     <input
@@ -662,30 +983,11 @@ export default function AdminInventoryPage() {
                       value={stockInForm.batchNo}
                       onChange={(e) => setStockInForm({ ...stockInForm, batchNo: e.target.value })}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="e.g., BATCH-001"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Expiry Date (Optional)</label>
-                    <input
-                      type="date"
-                      value={stockInForm.expiryDate}
-                      onChange={(e) => setStockInForm({ ...stockInForm, expiryDate: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Source</label>
-                    <select
-                      value={stockInForm.source}
-                      onChange={(e) => setStockInForm({ ...stockInForm, source: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    >
-                      <option value="supplier">Supplier</option>
-                      <option value="purchase">Purchase</option>
-                      <option value="return">Return</option>
-                      <option value="adjustment">Adjustment</option>
-                    </select>
-                  </div>
+
+                  {/* Note */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Note</label>
                     <textarea
@@ -693,13 +995,24 @@ export default function AdminInventoryPage() {
                       onChange={(e) => setStockInForm({ ...stockInForm, note: e.target.value })}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                       rows="3"
+                      placeholder="Additional notes or remarks"
                     />
                   </div>
                 </div>
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
-                    onClick={() => setShowStockInModal(false)}
+                    onClick={() => {
+                      setShowStockInModal(false);
+                      setStockInForm({
+                        productId: '',
+                        quantity: '',
+                        size: '',
+                        batchNo: '',
+                        note: ''
+                      });
+                      setProductSizes([]);
+                    }}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
                     Cancel
@@ -724,45 +1037,126 @@ export default function AdminInventoryPage() {
           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Adjust Stock {selectedProduct && `- ${selectedProduct.name}`}
+                Adjust Stock
               </h3>
               <form onSubmit={handleAdjustStock}>
                 <div className="space-y-4">
+                  {/* Product Dropdown */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Select Product <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={adjustForm.productId}
+                      onChange={(e) => handleAdjustProductSelect(e.target.value)}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                    >
+                      <option value="">-- Select a product --</option>
+                      {allProducts.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name.toUpperCase()} - Stock: {product.stock || 0}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Size Dropdown (shows when product has sizes) */}
+                  {adjustProductSizes.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Size <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={adjustForm.size}
+                        onChange={(e) => setAdjustForm({ ...adjustForm, size: e.target.value })}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                      >
+                        <option value="">-- Select size --</option>
+                        {adjustProductSizes.map((sizeObj) => (
+                          <option key={sizeObj.id} value={sizeObj.size}>
+                            {sizeObj.size.toUpperCase()} - Stock: {sizeObj.stock || 0}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">This product has size variants</p>
+                    </div>
+                  )}
+
+                  {/* Size Text Input (shows when product selected but no sizes available) */}
+                  {adjustForm.productId && adjustProductSizes.length === 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Size (Optional)</label>
+                      <input
+                        type="text"
+                        value={adjustForm.size}
+                        onChange={(e) => setAdjustForm({ ...adjustForm, size: e.target.value })}
+                        placeholder="e.g., S, M, L, XL"
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Leave empty if not applicable</p>
+                    </div>
+                  )}
+
+                  {/* Current System Stock */}
+                  {adjustForm.productId && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Current System Stock</label>
                     <input
                       type="number"
-                      value={selectedProduct?.current_stock || 0}
+                        value={
+                          adjustProductSizes.length > 0
+                            ? (adjustForm.size 
+                                ? adjustProductSizes.find(s => s.size === adjustForm.size)?.stock || 0
+                                : 0)
+                            : allProducts.find(p => p.id === parseInt(adjustForm.productId))?.stock || 0
+                        }
                       disabled
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100"
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 text-gray-700 font-semibold"
                     />
+                    {adjustProductSizes.length > 0 && !adjustForm.size && (
+                      <p className="text-xs text-amber-600 mt-1">Please select a size to see available stock</p>
+                    )}
                   </div>
+                  )}
+
+                  {/* Physical Count */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Physical Count</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Physical Count <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="number"
                       required
+                      min="0"
                       value={adjustForm.physicalCount}
                       onChange={(e) => setAdjustForm({ ...adjustForm, physicalCount: e.target.value })}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                      placeholder="Enter actual physical count"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Enter the actual count you physically verified</p>
                   </div>
+
+                  {/* Reason */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Reason</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Reason <span className="text-red-500">*</span>
+                    </label>
                     <select
                       required
                       value={adjustForm.reason}
                       onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                     >
-                      <option value="">Select reason</option>
+                      <option value="">-- Select reason --</option>
                       <option value="Physical Count">Physical Count</option>
                       <option value="Damaged Goods">Damaged Goods</option>
-                      <option value="Theft">Theft</option>
-                      <option value="Expired">Expired</option>
                       <option value="Other">Other</option>
                     </select>
                   </div>
+
+                  {/* Note */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Note</label>
                     <textarea
@@ -770,13 +1164,24 @@ export default function AdminInventoryPage() {
                       onChange={(e) => setAdjustForm({ ...adjustForm, note: e.target.value })}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                       rows="3"
+                      placeholder="Additional notes or remarks"
                     />
                   </div>
                 </div>
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
-                    onClick={() => setShowAdjustModal(false)}
+                    onClick={() => {
+                      setShowAdjustModal(false);
+                      setAdjustForm({
+                        productId: '',
+                        size: '',
+                        physicalCount: '',
+                        reason: '',
+                        note: ''
+                      });
+                      setAdjustProductSizes([]);
+                    }}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
                     Cancel
@@ -789,6 +1194,177 @@ export default function AdminInventoryPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Out Modal */}
+      {showStockOutModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+              <div className="mt-3">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  Stock Out (Remove Stock)
+                </h3>
+                <form onSubmit={handleStockOut}>
+                  <div className="space-y-4">
+                    {/* Product Dropdown */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Select Product <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={stockOutForm.productId}
+                        onChange={(e) => handleStockOutProductSelect(e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                      >
+                        <option value="">-- Select a product --</option>
+                        {allProducts.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name.toUpperCase()} - Stock: {product.stock || 0}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Size Dropdown (shows when product has sizes) */}
+                    {stockOutProductSizes.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Size <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          required
+                          value={stockOutForm.size}
+                          onChange={(e) => setStockOutForm({ ...stockOutForm, size: e.target.value })}
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                        >
+                          <option value="">-- Select size --</option>
+                          {stockOutProductSizes.map((sizeObj) => (
+                            <option key={sizeObj.id} value={sizeObj.size}>
+                              {sizeObj.size.toUpperCase()} - Stock: {sizeObj.stock || 0}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">This product has size variants</p>
+                      </div>
+                    )}
+
+                    {/* Size Text Input (shows when product selected but no sizes available) */}
+                    {stockOutForm.productId && stockOutProductSizes.length === 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Size (Optional)</label>
+                        <input
+                          type="text"
+                          value={stockOutForm.size}
+                          onChange={(e) => setStockOutForm({ ...stockOutForm, size: e.target.value })}
+                          placeholder="e.g., S, M, L, XL"
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Leave empty if not applicable</p>
+                      </div>
+                    )}
+
+                    {/* Current Stock Display */}
+                    {stockOutForm.productId && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Current Stock</label>
+                        <input
+                          type="number"
+                          value={
+                            stockOutProductSizes.length > 0
+                              ? (stockOutForm.size 
+                                  ? stockOutProductSizes.find(s => s.size === stockOutForm.size)?.stock || 0
+                                  : 0)
+                              : allProducts.find(p => p.id === parseInt(stockOutForm.productId))?.stock || 0
+                          }
+                          disabled
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 text-gray-700 font-semibold"
+                        />
+                        {stockOutProductSizes.length > 0 && !stockOutForm.size && (
+                          <p className="text-xs text-amber-600 mt-1">Please select a size to see available stock</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Quantity to Remove */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Quantity to Remove <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={stockOutForm.quantity}
+                        onChange={(e) => setStockOutForm({ ...stockOutForm, quantity: e.target.value })}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        placeholder="Enter quantity"
+                      />
+                    </div>
+
+                    {/* Reason Dropdown */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Reason <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={stockOutForm.reason}
+                        onChange={(e) => setStockOutForm({ ...stockOutForm, reason: e.target.value })}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                      >
+                        <option value="">-- Select reason --</option>
+                        <option value="Damaged">Damaged</option>
+                        <option value="Quality Issue">Quality Issue</option>
+                      </select>
+                    </div>
+
+                    {/* Note */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Note</label>
+                      <textarea
+                        value={stockOutForm.note}
+                        onChange={(e) => setStockOutForm({ ...stockOutForm, note: e.target.value })}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        rows="3"
+                        placeholder="Additional notes or remarks"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowStockOutModal(false);
+                        setStockOutForm({
+                          productId: '',
+                          quantity: '',
+                          size: '',
+                          reason: '',
+                          note: ''
+                        });
+                        setStockOutProductSizes([]);
+                      }}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                    >
+                      Remove Stock
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         </div>

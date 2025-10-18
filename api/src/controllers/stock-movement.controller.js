@@ -300,7 +300,14 @@ export const getStockMovements = async (req, res) => {
         sm.new_stock,
         sm.created_at,
         p.name as product_name,
-        u.name as user_name
+        CASE 
+          WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
+            THEN CONCAT(u.first_name, ' ', u.last_name)
+          WHEN u.email IS NOT NULL 
+            THEN u.email
+          ELSE 'System'
+        END as user_name,
+        u.role as user_role
        FROM stock_movements sm
        LEFT JOIN products p ON sm.product_id = p.id
        LEFT JOIN users u ON sm.user_id = u.id
@@ -437,33 +444,100 @@ export const getCurrentInventoryReport = async (req, res) => {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    const [inventory] = await pool.query(
+    const [products] = await pool.query(
       `SELECT 
         p.id,
         p.name as product_name,
         p.stock as current_stock,
+        p.base_stock,
         p.price as selling_price,
         p.original_price as cost_price,
         c.name as category_name,
-        CASE 
-          WHEN p.stock = 0 THEN 'Out of Stock'
-          WHEN p.stock <= ? THEN 'Low Stock'
-          ELSE 'In Stock'
-        END as stock_status,
+        p.reorder_point,
         p.created_at,
         p.updated_at
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        ${whereClause}
        ORDER BY p.name`,
-      [...queryParams, parseInt(low_stock_threshold)]
+      queryParams
     );
+
+    // For each product, get its sizes and create rows for each size
+    const inventory = [];
+    const threshold = parseInt(low_stock_threshold);
+
+    for (const product of products) {
+      // Get sizes for this product
+      const [sizes] = await pool.query(
+        `SELECT 
+          id,
+          size,
+          stock,
+          base_stock,
+          price,
+          is_active
+         FROM product_sizes
+         WHERE product_id = ? AND is_active = 1
+         ORDER BY 
+           CASE size
+             WHEN 'XXS' THEN 1
+             WHEN 'XS' THEN 2
+             WHEN 'S' THEN 3
+             WHEN 'M' THEN 4
+             WHEN 'L' THEN 5
+             WHEN 'XL' THEN 6
+             WHEN 'XXL' THEN 7
+             ELSE 8
+           END`,
+        [product.id]
+      );
+
+      if (sizes.length > 0) {
+        // Product has sizes - add a row for each size
+        for (const size of sizes) {
+          inventory.push({
+            id: `${product.id}-${size.id}`,
+            product_id: product.id,
+            product_name: product.product_name,
+            size: size.size,
+            current_stock: size.stock,
+            base_stock: size.base_stock,
+            selling_price: size.price || product.selling_price,
+            cost_price: product.cost_price,
+            category_name: product.category_name,
+            stock_status: size.stock === 0 ? 'Out of Stock' : size.stock <= threshold ? 'Low Stock' : 'In Stock',
+            reorder_point: product.reorder_point,
+            created_at: product.created_at,
+            updated_at: product.updated_at
+          });
+        }
+      } else {
+        // Product has no sizes - add single row
+        inventory.push({
+          id: product.id,
+          product_id: product.id,
+          product_name: product.product_name,
+          size: 'No sizes',
+          current_stock: product.current_stock,
+          base_stock: product.base_stock,
+          selling_price: product.selling_price,
+          cost_price: product.cost_price,
+          category_name: product.category_name,
+          stock_status: product.current_stock === 0 ? 'Out of Stock' : product.current_stock <= threshold ? 'Low Stock' : 'In Stock',
+          reorder_point: product.reorder_point,
+          created_at: product.created_at,
+          updated_at: product.updated_at
+        });
+      }
+    }
 
     res.json({
       report_type: 'current_inventory',
       generated_at: new Date().toISOString(),
-      total_products: inventory.length,
-      low_stock_threshold: parseInt(low_stock_threshold),
+      total_products: products.length,
+      total_rows: inventory.length,
+      low_stock_threshold: threshold,
       inventory
     });
 

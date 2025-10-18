@@ -131,8 +131,13 @@ export default function ProductTable({ category = '', subcategory = '', category
     .filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (product.category_name || product.category || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = !category || product.category_name === category || product.category === category;
-      const matchesSubcategory = !subcategory || product.category_name === subcategory || product.category === subcategory;
+      // Case-insensitive category matching
+      const matchesCategory = !category || 
+                             (product.category_name || '').toUpperCase() === category.toUpperCase() || 
+                             (product.category || '').toUpperCase() === category.toUpperCase();
+      const matchesSubcategory = !subcategory || 
+                                (product.category_name || '').toUpperCase() === subcategory.toUpperCase() || 
+                                (product.category || '').toUpperCase() === subcategory.toUpperCase();
       return matchesSearch && matchesCategory && matchesSubcategory;
     })
     .sort((a, b) => {
@@ -507,14 +512,8 @@ export default function ProductTable({ category = '', subcategory = '', category
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    Number(row.stock) === 0 
-                          ? 'bg-red-50 text-red-700' 
-                      : Number(row.stock) <= 5 
-                          ? 'bg-yellow-50 text-yellow-700' 
-                          : 'bg-green-50 text-green-700'
-                      }`}>
-                    {row.stock}
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                    {row.base_stock || 0}
                       </span>
                     </td>
                     <td className="px-4 py-3">

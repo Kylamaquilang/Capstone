@@ -9,25 +9,63 @@ const getCurrentStock = async (req, res) => {
         p.name,
         p.category_id,
         c.name as category_name,
-        COALESCE(sb.qty, p.stock, 0) as current_stock,
-        p.stock as base_stock,
+        p.stock as current_stock,
+        p.base_stock as base_stock,
+        p.price,
+        p.original_price,
         p.reorder_point,
         p.max_stock,
         CASE 
-          WHEN COALESCE(sb.qty, p.stock, 0) <= p.reorder_point THEN 'LOW'
-          WHEN COALESCE(sb.qty, p.stock, 0) <= (p.reorder_point * 2) THEN 'MEDIUM'
+          WHEN p.stock <= p.reorder_point THEN 'LOW'
+          WHEN p.stock <= (p.reorder_point * 2) THEN 'MEDIUM'
           ELSE 'GOOD'
         END as stock_status,
-        sb.updated_at as last_updated
+        p.updated_at as last_updated
       FROM products p
-      LEFT JOIN stock_balance sb ON p.id = sb.product_id
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.is_active = TRUE
       ORDER BY p.name
     `;
     
-    const [rows] = await pool.query(query);
-    res.json({ success: true, data: rows });
+    const [products] = await pool.query(query);
+    
+    // Get sizes for each product
+    const productsWithSizes = await Promise.all(
+      products.map(async (product) => {
+        try {
+          const [sizes] = await pool.query(
+            `SELECT id, size, stock, base_stock, price, is_active 
+             FROM product_sizes 
+             WHERE product_id = ? AND is_active = 1 
+             ORDER BY 
+               CASE size 
+                 WHEN 'NONE' THEN 0
+                 WHEN 'XS' THEN 1 
+                 WHEN 'S' THEN 2 
+                 WHEN 'M' THEN 3 
+                 WHEN 'L' THEN 4 
+                 WHEN 'XL' THEN 5 
+                 WHEN 'XXL' THEN 6 
+                 ELSE 7 
+               END`,
+            [product.id]
+          );
+          
+          return {
+            ...product,
+            sizes: sizes || []
+          };
+        } catch (error) {
+          console.error(`Error fetching sizes for product ${product.id}:`, error);
+          return {
+            ...product,
+            sizes: []
+          };
+        }
+      })
+    );
+    
+    res.json({ success: true, data: productsWithSizes });
   } catch (error) {
     console.error('Error fetching current stock:', error);
     res.status(500).json({ error: 'Failed to fetch current stock' });
@@ -76,8 +114,10 @@ const getProductStock = async (req, res) => {
 // Add stock in (using stored procedure)
 const addStockIn = async (req, res) => {
   try {
-    const { productId, quantity, referenceNo, batchNo, expiryDate, source, note } = req.body;
-    const userId = req.user.id;
+    const { productId, quantity, referenceNo, batchNo, expiryDate, source, note, size } = req.body;
+    const userId = req.user?.id || null;
+    
+    console.log('📦 Stock In Request:', { productId, quantity, size, source, note, userId });
     
     // Validate required fields
     if (!productId || !quantity || !source) {
@@ -88,27 +128,94 @@ const addStockIn = async (req, res) => {
       return res.status(400).json({ error: 'Quantity must be greater than 0' });
     }
     
-    // Call stored procedure
-    await pool.query(
-      'CALL sp_stock_in(?, ?, ?, ?, ?, ?, ?, ?)',
-      [productId, quantity, referenceNo, batchNo, expiryDate, source, note, userId]
-    );
+    // Start transaction for handling both product and size stock
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     
-    res.json({ 
-      success: true, 
-      message: `Successfully added ${quantity} units to stock`,
-      data: { productId, quantity, referenceNo, batchNo, expiryDate, source }
-    });
+    try {
+      // Verify user exists if userId is provided
+      if (userId) {
+        const [userCheck] = await connection.query(
+          'SELECT id FROM users WHERE id = ?',
+          [userId]
+        );
+        
+        if (userCheck.length === 0) {
+          console.log(`⚠️ User ID ${userId} not found, setting created_by to NULL`);
+        }
+      }
+      // If size is provided, update product_sizes table
+      if (size && size.trim() !== '') {
+        console.log(`📦 Updating size-specific stock for size: ${size}`);
+        
+        // Check if size exists for this product
+        const [sizeExists] = await connection.query(
+          'SELECT id, stock FROM product_sizes WHERE product_id = ? AND size = ? AND is_active = 1',
+          [productId, size.trim()]
+        );
+        
+        if (sizeExists.length === 0) {
+          throw new Error(`Size "${size}" not found for this product`);
+        }
+        
+        // Update size-specific stock
+        await connection.query(
+          'UPDATE product_sizes SET stock = stock + ? WHERE product_id = ? AND size = ?',
+          [quantity, productId, size.trim()]
+        );
+        
+        console.log(`✅ Updated stock for size ${size} by +${quantity}`);
+      }
+      
+      // Call stored procedure for main product stock (this handles products table and transactions)
+      // Note: userId can be NULL if user is not found or not authenticated
+      await connection.query(
+        'CALL sp_stock_in(?, ?, ?, ?, ?, ?, ?, ?)',
+        [productId, quantity, referenceNo || null, batchNo || null, expiryDate || null, source, note || null, userId]
+      );
+      
+      await connection.commit();
+      connection.release();
+      
+      console.log(`✅ Successfully added ${quantity} units to stock for product ${productId}${size ? ` (size: ${size})` : ''}`);
+      
+      // Emit real-time inventory update
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin-room').emit('inventory-updated', {
+          productId,
+          quantityChange: quantity,
+          size: size || null,
+          movementType: 'stock_in',
+          reason: 'Stock added',
+          timestamp: new Date().toISOString()
+        });
+        console.log(`📡 Real-time inventory update sent for product ${productId}`);
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully added ${quantity} units to stock${size ? ` for size ${size}` : ''}`,
+        data: { productId, quantity, size, referenceNo, batchNo, expiryDate, source }
+      });
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
   } catch (error) {
-    console.error('Error adding stock in:', error);
-    res.status(500).json({ error: 'Failed to add stock' });
+    console.error('❌ Error adding stock in:', error);
+    res.status(500).json({ 
+      error: 'Failed to add stock',
+      message: error.message || 'An error occurred while adding stock'
+    });
   }
 };
 
 // Stock out (using stored procedure)
 const stockOut = async (req, res) => {
   try {
-    const { productId, quantity, referenceNo, source, note } = req.body;
+    const { productId, quantity, referenceNo, source, note, size } = req.body;
     const userId = req.user.id;
     
     // Validate required fields
@@ -120,17 +227,68 @@ const stockOut = async (req, res) => {
       return res.status(400).json({ error: 'Quantity must be greater than 0' });
     }
     
-    // Call stored procedure
-    await pool.query(
-      'CALL sp_stock_out(?, ?, ?, ?, ?, ?)',
-      [productId, quantity, referenceNo, source, note, userId]
-    );
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     
-    res.json({ 
-      success: true, 
-      message: `Successfully deducted ${quantity} units from stock`,
-      data: { productId, quantity, referenceNo, source }
-    });
+    try {
+      // If size is provided, update product_sizes table
+      if (size && size.trim() !== '') {
+        const [sizeRows] = await connection.query(
+          'SELECT id, stock FROM product_sizes WHERE product_id = ? AND size = ?',
+          [productId, size]
+        );
+        
+        if (sizeRows.length === 0) {
+          await connection.rollback();
+          connection.release();
+          return res.status(404).json({ error: `Size ${size} not found for this product` });
+        }
+        
+        const currentSizeStock = sizeRows[0].stock;
+        if (currentSizeStock < quantity) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({ error: `Insufficient stock for size ${size}. Available: ${currentSizeStock}` });
+        }
+        
+        // Deduct from product_sizes
+        await connection.query(
+          'UPDATE product_sizes SET stock = stock - ? WHERE product_id = ? AND size = ?',
+          [quantity, productId, size]
+        );
+      }
+      
+      // Call stored procedure for main stock
+      await connection.query(
+        'CALL sp_stock_out(?, ?, ?, ?, ?, ?)',
+        [productId, quantity, referenceNo || null, source, note || null, userId]
+      );
+      
+      await connection.commit();
+      connection.release();
+      
+      // Emit socket event for real-time updates
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin-room').emit('inventory-updated', {
+          productId,
+          quantity,
+          type: 'stock_out',
+          size: size || null,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully deducted ${quantity} units from stock${size ? ` for size ${size}` : ''}`,
+        data: { productId, quantity, size, referenceNo, source }
+      });
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
   } catch (error) {
     console.error('Error processing stock out:', error);
     if (error.message.includes('Insufficient stock')) {
@@ -191,7 +349,14 @@ const getStockHistory = async (req, res) => {
         st.expiry_date,
         st.source,
         st.note,
-        u.name as created_by_name,
+        CASE 
+          WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
+            THEN CONCAT(u.first_name, ' ', u.last_name)
+          WHEN u.email IS NOT NULL 
+            THEN u.email
+          ELSE 'System'
+        END as created_by_name,
+        u.role as created_by_role,
         st.created_at
       FROM stock_transactions st
       JOIN products p ON st.product_id = p.id
@@ -355,20 +520,22 @@ const getLowStockAlerts = async (req, res) => {
         p.id,
         p.name,
         c.name as category_name,
-        COALESCE(sb.qty, p.stock, 0) as current_stock,
+        p.stock as current_stock,
+        p.base_stock,
+        p.price,
+        p.original_price,
         p.reorder_point,
         p.max_stock,
         CASE 
-          WHEN COALESCE(sb.qty, p.stock, 0) = 0 THEN 'CRITICAL'
-          WHEN COALESCE(sb.qty, p.stock, 0) <= p.reorder_point THEN 'LOW'
+          WHEN p.stock = 0 THEN 'CRITICAL'
+          WHEN p.stock <= p.reorder_point THEN 'LOW'
           ELSE 'GOOD'
         END as alert_level
       FROM products p
-      LEFT JOIN stock_balance sb ON p.id = sb.product_id
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.is_active = TRUE 
-        AND COALESCE(sb.qty, p.stock, 0) <= p.reorder_point
-      ORDER BY COALESCE(sb.qty, p.stock, 0) ASC, p.name
+        AND p.stock <= p.reorder_point
+      ORDER BY p.stock ASC, p.name
     `;
     
     const [rows] = await pool.query(query);

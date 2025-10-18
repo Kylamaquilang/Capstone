@@ -68,6 +68,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
         const totalSizeStock = getTotalSizeStock();
         const baseStock = Number(stock);
         
+        // Only warn if total size stock exceeds base stock
         if (totalSizeStock > baseStock) {
           await Swal.fire({
             title: 'Stock Mismatch Warning!',
@@ -76,17 +77,11 @@ export default function AddProductModal({ onClose, onSuccess }) {
             confirmButtonText: 'OK',
             confirmButtonColor: '#F59E0B'
           });
-        } else if (totalSizeStock < baseStock) {
-          await Swal.fire({
-            title: 'Stock Mismatch Warning!',
-            text: `Total size stock (${totalSizeStock}) is below base stock (${baseStock}). The total size stock should match the base stock.`,
-            icon: 'warning',
-            confirmButtonText: 'OK',
-            confirmButtonColor: '#F59E0B'
-          });
+          setLoading(false);
+          return;
         }
-        setLoading(false);
-        return;
+        
+        // If sizes have no stock specified (totalSizeStock = 0), they will use base stock automatically
       }
 
       let finalImageUrl = null;
@@ -202,10 +197,11 @@ export default function AddProductModal({ onClose, onSuccess }) {
   };
 
   // Check if total size stock matches base stock exactly
+  // Also valid if totalSizeStock is 0 (sizes will use base stock automatically)
   const isSizeStockValid = () => {
     const baseStock = Number(stock) || 0;
     const totalSizeStock = getTotalSizeStock();
-    return totalSizeStock === baseStock;
+    return totalSizeStock === baseStock || totalSizeStock === 0;
   };
 
   // Get remaining stock available for sizes

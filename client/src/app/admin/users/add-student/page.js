@@ -12,7 +12,9 @@ export default function AddStudentPage() {
     middle_name: '', 
     suffix: '', 
     email: '', 
-    degree: 'BSIT', 
+    degree: 'BSIT',
+    year_level: '1st Year',
+    section: 'A',
     status: 'regular' 
   });
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +41,9 @@ export default function AddStudentPage() {
         middle_name: '', 
         suffix: '', 
         email: '', 
-        degree: 'BSIT', 
+        degree: 'BSIT',
+        year_level: '1st Year',
+        section: 'A',
         status: 'regular' 
       });
       // Redirect to users page so it displays immediately
@@ -168,6 +172,38 @@ export default function AddStudentPage() {
                 
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">
+                    Year Level <span className="text-red-500">*</span>
+                  </label>
+                  <select 
+                    name="year_level" 
+                    value={form.year_level} 
+                    onChange={handleChange} 
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    Section <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    name="section" 
+                    value={form.section} 
+                    onChange={handleChange} 
+                    placeholder="e.g., A, B, C"
+                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    required 
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
                     Status <span className="text-red-500">*</span>
                   </label>
                   <select 
@@ -215,7 +251,9 @@ export default function AddStudentPage() {
                       middle_name: '', 
                       suffix: '', 
                       email: '', 
-                      degree: 'BSIT', 
+                      degree: 'BSIT',
+                      year_level: '1st Year',
+                      section: 'A',
                       status: 'regular' 
                     });
                     setError('');

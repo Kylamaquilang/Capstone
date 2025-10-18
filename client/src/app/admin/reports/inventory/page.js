@@ -67,7 +67,18 @@ export default function InventoryReportsPage() {
       if (filters.actionType) params.append('actionType', filters.actionType);
 
       const response = await API.get(`/stock-movements/reports/${reportType}?${params}`);
-      setReportData(response.data);
+      // Extract the data array based on report type
+      if (reportType === 'current-inventory' && response.data.inventory) {
+        setReportData(response.data.inventory);
+      } else if (reportType === 'restock' && response.data.restocks) {
+        setReportData(response.data.restocks);
+      } else if (reportType === 'sales-usage' && response.data.sales) {
+        setReportData(response.data.sales);
+      } else if (reportType === 'low-stock-alert' && response.data.products) {
+        setReportData(response.data.products);
+      } else {
+        setReportData(response.data);
+      }
     } catch (err) {
       console.error('Failed to generate report:', err);
       setError('Failed to generate report. Please try again.');
@@ -371,6 +382,8 @@ export default function InventoryReportsPage() {
                           <>
                             <th className="px-4 py-3 text-xs font-medium text-gray-700">Product</th>
                             <th className="px-4 py-3 text-xs font-medium text-gray-700">Category</th>
+                            <th className="px-4 py-3 text-xs font-medium text-gray-700">Size</th>
+                            <th className="px-4 py-3 text-xs font-medium text-gray-700">Base Stock</th>
                             <th className="px-4 py-3 text-xs font-medium text-gray-700">Current Stock</th>
                             <th className="px-4 py-3 text-xs font-medium text-gray-700">Status</th>
                           </>
@@ -410,18 +423,20 @@ export default function InventoryReportsPage() {
                         <tr key={item.id || index} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
                           {reportType === 'current-inventory' && (
                             <>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.category_name || 'N/A'}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.stock || 0}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.product_name}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.category_name || 'N/A'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.size || 'N/A'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{item.base_stock || 0}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{item.current_stock || 0}</td>
                               <td className="px-4 py-3">
                                 <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                                  item.stock === 0 
+                                  item.current_stock === 0 
                                     ? 'bg-red-100 text-red-800' 
-                                    : item.stock <= 5
+                                    : item.current_stock <= 5
                                     ? 'bg-yellow-100 text-yellow-800'
                                     : 'bg-green-100 text-green-800'
                                 }`}>
-                                  {item.stock === 0 ? 'Out of Stock' : item.stock <= 5 ? 'Low Stock' : 'In Stock'}
+                                  {item.stock_status || (item.current_stock === 0 ? 'Out of Stock' : item.current_stock <= 5 ? 'Low Stock' : 'In Stock')}
                                 </span>
                               </td>
                             </>
@@ -431,8 +446,8 @@ export default function InventoryReportsPage() {
                               <td className="px-4 py-3 text-sm text-gray-900">
                                 {new Date(item.created_at).toLocaleDateString()}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.product_name}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.size || 'Base'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.product_name}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.size || 'Base'}</td>
                               <td className="px-4 py-3 text-sm text-green-600 font-medium">+{item.quantity}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">{item.user_name || 'System'}</td>
                             </>
@@ -442,8 +457,8 @@ export default function InventoryReportsPage() {
                               <td className="px-4 py-3 text-sm text-gray-900">
                                 {new Date(item.created_at).toLocaleDateString()}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.product_name}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.size || 'Base'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.product_name}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.size || 'Base'}</td>
                               <td className="px-4 py-3 text-sm text-red-600 font-medium">-{Math.abs(item.quantity)}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">{item.reason || 'N/A'}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">{item.user_name || 'System'}</td>
@@ -451,13 +466,17 @@ export default function InventoryReportsPage() {
                           )}
                           {reportType === 'low-stock-alert' && (
                             <>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.name}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.category_name || 'N/A'}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.stock || 0}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.product_name}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.category_name || 'N/A'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{item.current_stock || 0}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">{item.reorder_level || 5}</td>
                               <td className="px-4 py-3">
-                                <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                                  Low Stock
+                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                  item.current_stock === 0 
+                                    ? 'bg-red-100 text-red-800' 
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {item.alert_level || (item.current_stock === 0 ? 'Out of Stock' : 'Low Stock')}
                                 </span>
                               </td>
                             </>

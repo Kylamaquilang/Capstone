@@ -179,7 +179,7 @@ export default function OrderDetailPage() {
                 <h3 className="text-lg font-semibold mb-3">Customer Information</h3>
                 <div className="space-y-2">
                   <div>
-                    <span className="font-medium">Name:</span> {order.user_name || 'N/A'}
+                    <span className="font-medium">Name:</span> <span className="uppercase">{order.user_name || 'N/A'}</span>
                   </div>
                   <div>
                     <span className="font-medium">Student ID:</span> {order.student_id || 'N/A'}
@@ -205,7 +205,7 @@ export default function OrderDetailPage() {
                     <span className="font-semibold text-green-600 ml-1">₱{Number(order.total_amount || 0).toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="font-medium">Payment Method:</span> {order.payment_method}
+                    <span className="font-medium">Payment Method:</span> <span className="uppercase">{order.payment_method}</span>
                   </div>
                   <div>
                     <span className="font-medium">Status:</span>
@@ -252,12 +252,12 @@ export default function OrderDetailPage() {
                               />
                             )}
                             <div>
-                              <div className="font-medium">{item.product_name || 'Unknown Product'}</div>
+                              <div className="font-medium uppercase">{item.product_name || 'Unknown Product'}</div>
                               <div className="text-sm text-gray-500">ID: {item.product_id}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">{item.size_name || item.size || 'N/A'}</td>
+                        <td className="px-4 py-3 uppercase">{item.size_name || item.size || 'N/A'}</td>
                         <td className="px-4 py-3">{item.quantity}</td>
                         <td className="px-4 py-3">₱{Number(item.unit_price || 0).toFixed(2)}</td>
                         <td className="px-4 py-3 font-medium">
