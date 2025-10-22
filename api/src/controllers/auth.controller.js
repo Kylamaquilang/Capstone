@@ -11,7 +11,9 @@ const SALT_ROUNDS = 12;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 const DEFAULT_STUDENT_PASSWORD = process.env.DEFAULT_STUDENT_PASSWORD || 'cpc123';
 
-// ✅ SIGNUP for both roles
+// ⚠️ DEPRECATED: User self-registration is DISABLED
+// Users cannot register themselves. Only admins can add users via /students/add endpoint.
+// This function is kept for reference but is not exposed via routes.
 export const signup = async (req, res) => {
   try {
     const { role, name, student_id, email, password, contact_number } = req.body;

@@ -407,11 +407,11 @@ export const updateOrderStatus = async (req, res) => {
       // Log sales reversal
       await logSalesMovement(id, 'reversal', totalAmount, paymentMethod, `Order ${status}`)
       
-    } else if (status === 'claimed' && oldStatus !== 'claimed') {
-      // Record the sale when order is claimed
-      await logSalesMovement(id, 'sale', totalAmount, paymentMethod, 'Order claimed - Sale recorded')
+    } else if ((status === 'claimed' || status === 'completed') && (oldStatus !== 'claimed' && oldStatus !== 'completed')) {
+      // Record the sale when order is claimed or completed
+      await logSalesMovement(id, 'sale', totalAmount, paymentMethod, `Order ${status} - Sale recorded`)
       
-      // Automatically mark payment as paid when order is claimed
+      // Automatically mark payment as paid when order is claimed or completed
       if (paymentStatus !== 'paid') {
         await pool.query(
           'UPDATE orders SET payment_status = ? WHERE id = ?',
@@ -471,9 +471,9 @@ export const updateOrderStatus = async (req, res) => {
       console.log(`🔔 Not emitting notification - io: ${!!io}, notificationResult:`, !!notificationResult);
     }
     
-    // Send claimed order notification (no email)
-    if (status === 'claimed' && oldStatus !== 'claimed') {
-      console.log(`📧 Order ${id} marked as claimed - no email sent`);
+    // Send claimed/completed order notification (no email)
+    if ((status === 'claimed' || status === 'completed') && (oldStatus !== 'claimed' && oldStatus !== 'completed')) {
+      console.log(`📧 Order ${id} marked as ${status} - no email sent`);
     }
     
     // Email notifications disabled - only in-app notifications are used
@@ -492,8 +492,8 @@ export const updateOrderStatus = async (req, res) => {
       emitUserDataRefresh(io, userId, 'orders', { action: 'updated', orderId: id, status });
     }
     
-    // If order is marked as claimed, create special notification for admin confirmation
-    if (status === 'claimed') {
+    // If order is marked as claimed or completed, create special notification for admin confirmation
+    if (status === 'claimed' || status === 'completed') {
       await createDeliveredOrderNotification(id, userId)
     }
     
@@ -507,9 +507,9 @@ export const updateOrderStatus = async (req, res) => {
       previousStatus: oldStatus,
       newStatus: status,
       inventoryUpdated: (status === 'cancelled' || status === 'refunded'),
-      salesLogged: (status === 'claimed'),
-      paymentStatusUpdated: (status === 'claimed' && paymentStatus !== 'paid'),
-      paymentStatus: status === 'claimed' ? 'paid' : paymentStatus
+      salesLogged: (status === 'claimed' || status === 'completed'),
+      paymentStatusUpdated: ((status === 'claimed' || status === 'completed') && paymentStatus !== 'paid'),
+      paymentStatus: (status === 'claimed' || status === 'completed') ? 'paid' : paymentStatus
     })
   } catch (err) {
     console.error('Update status error:', err)
@@ -689,12 +689,112 @@ export const getOrderStats = async (req, res) => {
   }
 }
 
+// 📋 Get detailed sales report (order items)
+export const getDetailedSalesReport = async (req, res) => {
+  try {
+    console.log('📊 Detailed sales report request received:', req.query)
+    
+    const { start_date, end_date } = req.query
+    
+    // Build date filter
+    let dateFilter = '';
+    let dateParams = [];
+    
+    if (start_date) {
+      dateFilter += 'AND DATE(o.created_at) >= ? ';
+      dateParams.push(start_date);
+    }
+    if (end_date) {
+      dateFilter += 'AND DATE(o.created_at) <= ? ';
+      dateParams.push(end_date);
+    }
+    
+    // Get detailed order items for claimed/completed orders
+    // Note: size is saved to order_items during checkout
+    const [orderItems] = await pool.query(`
+      SELECT 
+        o.created_at as order_date,
+        p.name as product_name,
+        oi.size as size,
+        oi.quantity,
+        oi.unit_price,
+        oi.total_price as item_total,
+        o.payment_method,
+        o.status
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      WHERE o.status IN ('claimed', 'completed')
+      ${dateFilter}
+      ORDER BY o.created_at DESC, p.name
+    `, dateParams);
+    
+    console.log(`📊 Found ${orderItems.length} order items for sales report`);
+    if (orderItems.length > 0) {
+      console.log('📊 Detailed sample of first 3 items:');
+      orderItems.slice(0, 3).forEach((item, idx) => {
+        console.log(`   Item ${idx + 1}:`);
+        console.log(`   - Product: ${item.product_name}`);
+        console.log(`   - Size: "${item.size || 'NULL/EMPTY'}" (type: ${typeof item.size})`);
+        console.log(`   - Quantity: ${item.quantity}`);
+        console.log(`   - Unit Price: ${item.unit_price}`);
+        console.log(`   - Total: ${item.item_total}`);
+        console.log(`   - Payment: ${item.payment_method}`);
+        console.log('   ---');
+      });
+    } else {
+      console.log('📊 No order items found for sales report!');
+    }
+    
+    // Calculate summary
+    const [summary] = await pool.query(`
+      SELECT 
+        COUNT(DISTINCT o.id) as total_orders,
+        SUM(oi.total_price) as total_revenue,
+        COUNT(DISTINCT CASE WHEN LOWER(o.payment_method) = 'gcash' THEN o.id END) as gcash_orders,
+        COUNT(DISTINCT CASE WHEN LOWER(o.payment_method) = 'cash' THEN o.id END) as cash_orders,
+        SUM(CASE WHEN LOWER(o.payment_method) = 'gcash' THEN oi.total_price ELSE 0 END) as gcash_revenue,
+        SUM(CASE WHEN LOWER(o.payment_method) = 'cash' THEN oi.total_price ELSE 0 END) as cash_revenue
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.status IN ('claimed', 'completed')
+      ${dateFilter}
+    `, dateParams);
+    
+    console.log(`📊 Found ${orderItems.length} order items`);
+    
+    res.json({
+      orderItems,
+      summary: summary[0] || {
+        total_orders: 0,
+        total_revenue: 0,
+        gcash_orders: 0,
+        cash_orders: 0,
+        gcash_revenue: 0,
+        cash_revenue: 0
+      }
+    });
+  } catch (err) {
+    console.error('Detailed sales report error:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+};
+
 // 📈 Get sales performance
 export const getSalesPerformance = async (req, res) => {
   try {
     console.log('📊 Sales performance request received:', req.query)
     
     const { start_date, end_date, group_by = 'day' } = req.query
+    
+    // Debug: Check what payment methods exist in claimed/completed orders
+    const [paymentMethods] = await pool.query(`
+      SELECT DISTINCT payment_method, COUNT(*) as count
+      FROM orders 
+      WHERE status IN ('claimed', 'completed')
+      GROUP BY payment_method
+    `);
+    console.log('📊 Payment methods in claimed/completed orders:', paymentMethods)
     
     let groupClause = 'DATE(created_at)'
     if (group_by === 'month') {
@@ -724,18 +824,19 @@ export const getSalesPerformance = async (req, res) => {
         COUNT(*) as orders,
         SUM(o.total_amount) as revenue,
         AVG(o.total_amount) as avg_order_value,
-        COUNT(CASE WHEN o.payment_method = 'gcash' THEN 1 END) as gcash_orders,
-        COUNT(CASE WHEN o.payment_method = 'cash' THEN 1 END) as cash_orders,
-        SUM(CASE WHEN o.payment_method = 'gcash' THEN o.total_amount ELSE 0 END) as gcash_revenue,
-        SUM(CASE WHEN o.payment_method = 'cash' THEN o.total_amount ELSE 0 END) as cash_revenue
+        COUNT(CASE WHEN LOWER(o.payment_method) = 'gcash' THEN 1 END) as gcash_orders,
+        COUNT(CASE WHEN LOWER(o.payment_method) = 'cash' THEN 1 END) as cash_orders,
+        SUM(CASE WHEN LOWER(o.payment_method) = 'gcash' THEN o.total_amount ELSE 0 END) as gcash_revenue,
+        SUM(CASE WHEN LOWER(o.payment_method) = 'cash' THEN o.total_amount ELSE 0 END) as cash_revenue
       FROM orders o
-      WHERE o.status != 'cancelled'
+      WHERE o.status IN ('claimed', 'completed')
       ${dateFilter}
       GROUP BY ${groupClause.replace('created_at', 'o.created_at')}
       ORDER BY period DESC
     `, dateParams)
 
-    console.log('📊 Sales data query completed, executing top products query...')
+    console.log('📊 Sales data query completed. Sample data:', salesData.slice(0, 2))
+    console.log('📊 Executing top products query...')
     
     // Check if we have any orders first
     const [orderCount] = await pool.query('SELECT COUNT(*) as count FROM orders');
@@ -752,7 +853,7 @@ export const getSalesPerformance = async (req, res) => {
         FROM order_items oi
         JOIN products p ON oi.product_id = p.id
         JOIN orders o ON oi.order_id = o.id
-        WHERE o.status != 'cancelled'
+        WHERE o.status IN ('claimed', 'completed')
         ${dateFilter}
         GROUP BY p.id, p.name, p.image
         ORDER BY total_sold DESC
@@ -767,14 +868,14 @@ export const getSalesPerformance = async (req, res) => {
     console.log('📊 Executing payment breakdown query...')
     const [paymentBreakdown] = await pool.query(`
       SELECT 
-        o.payment_method,
+        LOWER(o.payment_method) as payment_method,
         COUNT(*) as order_count,
         SUM(o.total_amount) as total_revenue,
         AVG(o.total_amount) as avg_order_value
       FROM orders o
-      WHERE o.status != 'cancelled'
+      WHERE o.status IN ('claimed', 'completed')
       ${dateFilter}
-      GROUP BY o.payment_method
+      GROUP BY LOWER(o.payment_method)
       ORDER BY total_revenue DESC
     `, dateParams)
 
@@ -828,12 +929,12 @@ export const getSalesPerformance = async (req, res) => {
         COUNT(*) as total_orders,
         SUM(o.total_amount) as total_revenue,
         AVG(o.total_amount) as avg_order_value,
-        COUNT(CASE WHEN o.payment_method = 'gcash' THEN 1 END) as gcash_orders,
-        COUNT(CASE WHEN o.payment_method = 'cash' THEN 1 END) as cash_orders,
-        SUM(CASE WHEN o.payment_method = 'gcash' THEN o.total_amount ELSE 0 END) as gcash_revenue,
-        SUM(CASE WHEN o.payment_method = 'cash' THEN o.total_amount ELSE 0 END) as cash_revenue
+        COUNT(CASE WHEN LOWER(o.payment_method) = 'gcash' THEN 1 END) as gcash_orders,
+        COUNT(CASE WHEN LOWER(o.payment_method) = 'cash' THEN 1 END) as cash_orders,
+        SUM(CASE WHEN LOWER(o.payment_method) = 'gcash' THEN o.total_amount ELSE 0 END) as gcash_revenue,
+        SUM(CASE WHEN LOWER(o.payment_method) = 'cash' THEN o.total_amount ELSE 0 END) as cash_revenue
       FROM orders o
-      WHERE o.status != 'cancelled'
+      WHERE o.status IN ('claimed', 'completed')
       ${dateFilter}
     `, dateParams);
     

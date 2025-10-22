@@ -1,6 +1,6 @@
 import express from 'express';
 import { 
-  signup, 
+  // signup,  // Not used - user registration is disabled
   signin, 
   logout, 
   changePassword, 
@@ -31,7 +31,8 @@ router.get('/test-db', async (req, res) => {
 });
 
 // Public routes
-router.post('/signup', signup);
+// NOTE: User registration is disabled. Only admins can add users via /students/add endpoint
+// router.post('/signup', signup); // DISABLED - No self-registration allowed
 router.post('/signin', signin);
 router.post('/logout', logout);
 router.post('/change-password', changePassword);

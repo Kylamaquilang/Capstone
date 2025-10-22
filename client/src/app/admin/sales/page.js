@@ -130,13 +130,13 @@ export default function AdminSalesPage() {
           console.log('📊 Raw orders data:', orders.length, 'orders found');
           
           if (Array.isArray(orders) && orders.length > 0) {
-            // Filter orders by date range and status
+            // Filter orders by date range and status - only include claimed/completed orders
             let filteredOrders = orders.filter(order => {
-              const isNotCancelled = order.status !== 'cancelled';
+              const isSuccessful = order.status === 'claimed' || order.status === 'completed';
               
-              // If no date range is specified, return all non-cancelled orders
+              // If no date range is specified, return all successful orders
               if (!dateRange.start_date && !dateRange.end_date) {
-                return isNotCancelled;
+                return isSuccessful;
               }
               
               const orderDate = new Date(order.created_at);
@@ -153,28 +153,28 @@ export default function AdminSalesPage() {
                 isInDateRange = isInDateRange && orderDate <= endDate;
               }
               
-              console.log(`Order ${order.id}: ${order.created_at} - In range: ${isInDateRange}, Not cancelled: ${isNotCancelled}`);
+              console.log(`Order ${order.id}: ${order.created_at} - In range: ${isInDateRange}, Successful: ${isSuccessful}`);
               
-              return isInDateRange && isNotCancelled;
+              return isInDateRange && isSuccessful;
             });
             
             console.log(`📊 Filtered orders: ${filteredOrders.length} orders in date range`);
             
             if (filteredOrders.length === 0 && (dateRange.start_date || dateRange.end_date)) {
-              console.log('📊 No orders found in date range, trying without date filter...');
-              // Try without date filter to see all orders
-              const allNonCancelledOrders = orders.filter(order => order.status !== 'cancelled');
-              console.log(`📊 All non-cancelled orders: ${allNonCancelledOrders.length}`);
+              console.log('📊 No successful orders found in date range, trying without date filter...');
+              // Try without date filter to see all successful orders
+              const allClaimedOrders = orders.filter(order => order.status === 'claimed' || order.status === 'completed');
+              console.log(`📊 All successful orders: ${allClaimedOrders.length}`);
               
-              if (allNonCancelledOrders.length > 0) {
-                // Use all non-cancelled orders
-                const totalRevenue = allNonCancelledOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
-                const totalOrders = allNonCancelledOrders.length;
+              if (allClaimedOrders.length > 0) {
+                // Use all claimed orders
+                const totalRevenue = allClaimedOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+                const totalOrders = allClaimedOrders.length;
                 const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
                 
                 // Group by period based on groupBy setting
                 const groupedData = {};
-                allNonCancelledOrders.forEach(order => {
+                allClaimedOrders.forEach(order => {
                   const orderDate = new Date(order.created_at);
                   let periodKey;
                   
@@ -206,18 +206,18 @@ export default function AdminSalesPage() {
                 
                 const salesDataArray = Object.values(groupedData).sort((a, b) => a.period.localeCompare(b.period));
                 
-                // Calculate payment breakdown from orders
+                // Calculate payment breakdown from claimed orders
                 const paymentBreakdown = [
                   {
                     payment_method: 'gcash',
-                    order_count: allNonCancelledOrders.filter(o => o.payment_method === 'gcash').length,
-                    total_revenue: allNonCancelledOrders.filter(o => o.payment_method === 'gcash').reduce((sum, o) => sum + (o.total_amount || 0), 0),
+                    order_count: allClaimedOrders.filter(o => o.payment_method?.toLowerCase() === 'gcash').length,
+                    total_revenue: allClaimedOrders.filter(o => o.payment_method?.toLowerCase() === 'gcash').reduce((sum, o) => sum + (o.total_amount || 0), 0),
                     avg_order_value: 0
                   },
                   {
                     payment_method: 'cash',
-                    order_count: allNonCancelledOrders.filter(o => o.payment_method === 'cash').length,
-                    total_revenue: allNonCancelledOrders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + (o.total_amount || 0), 0),
+                    order_count: allClaimedOrders.filter(o => o.payment_method?.toLowerCase() === 'cash').length,
+                    total_revenue: allClaimedOrders.filter(o => o.payment_method?.toLowerCase() === 'cash').reduce((sum, o) => sum + (o.total_amount || 0), 0),
                     avg_order_value: 0
                   }
                 ];
@@ -227,9 +227,9 @@ export default function AdminSalesPage() {
                   payment.avg_order_value = payment.order_count > 0 ? payment.total_revenue / payment.order_count : 0;
                 });
                 
-                // Calculate top products from order items
+                // Calculate top products from claimed order items
                 const productSales = {};
-                allNonCancelledOrders.forEach(order => {
+                allClaimedOrders.forEach(order => {
                   if (order.items && Array.isArray(order.items)) {
                     order.items.forEach(item => {
                       const productKey = `${item.product_id}-${item.product_name}`;
@@ -331,14 +331,14 @@ export default function AdminSalesPage() {
             const paymentBreakdown = [
               {
                 payment_method: 'gcash',
-                order_count: filteredOrders.filter(o => o.payment_method === 'gcash').length,
-                total_revenue: filteredOrders.filter(o => o.payment_method === 'gcash').reduce((sum, o) => sum + (o.total_amount || 0), 0),
+                order_count: filteredOrders.filter(o => o.payment_method?.toLowerCase() === 'gcash').length,
+                total_revenue: filteredOrders.filter(o => o.payment_method?.toLowerCase() === 'gcash').reduce((sum, o) => sum + (o.total_amount || 0), 0),
                 avg_order_value: 0
               },
               {
                 payment_method: 'cash',
-                order_count: filteredOrders.filter(o => o.payment_method === 'cash').length,
-                total_revenue: filteredOrders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + (o.total_amount || 0), 0),
+                order_count: filteredOrders.filter(o => o.payment_method?.toLowerCase() === 'cash').length,
+                total_revenue: filteredOrders.filter(o => o.payment_method?.toLowerCase() === 'cash').reduce((sum, o) => sum + (o.total_amount || 0), 0),
                 avg_order_value: 0
               }
             ];

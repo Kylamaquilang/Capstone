@@ -30,6 +30,11 @@ const nextConfig = {
         port: '5000',
         pathname: '/images/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '/**',
+      },
     ],
   },
   webpack: (config) => {

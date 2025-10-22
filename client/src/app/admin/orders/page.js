@@ -524,8 +524,7 @@ export default function AdminOrdersPage() {
           order.degree || 'N/A',
           order.total_quantity?.toString() || '0',
           formatCurrency(order.total_amount),
-          order.payment_method === 'gcash' ? 'GCash' : 'Cash',
-          order.payment_status?.charAt(0).toUpperCase() + order.payment_status?.slice(1) || 'N/A',
+          order.status === 'claimed' ? 'Paid' : (order.payment_method === 'gcash' ? 'GCash' : 'Cash'),
           order.status === 'ready_for_pickup' ? 'For Pickup' : 
           order.status === 'claimed' ? 'Claimed' :
           order.status?.replace('_', ' ').charAt(0).toUpperCase() + order.status?.replace('_', ' ').slice(1) || 'N/A',
@@ -536,22 +535,21 @@ export default function AdminOrdersPage() {
       // Create table
       autoTable(pdf, {
         startY: yPos + 10,
-        head: [['Order ID', 'Products', 'Customer', 'Department', 'Quantity', 'Amount', 'Payment Method', 'Payment Status', 'Order Status', 'Date']],
+        head: [['Order ID', 'Products', 'Customer', 'Department', 'Quantity', 'Amount', 'Payment', 'Order Status', 'Date']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: [0, 12, 80] },
         styles: { fontSize: 8 },
         columnStyles: {
           0: { cellWidth: 20 },
-          1: { cellWidth: 50 },
-          2: { cellWidth: 30 },
+          1: { cellWidth: 55 },
+          2: { cellWidth: 35 },
           3: { cellWidth: 25 },
           4: { cellWidth: 20 },
           5: { cellWidth: 25 },
           6: { cellWidth: 25 },
-          7: { cellWidth: 25 },
-          8: { cellWidth: 25 },
-          9: { cellWidth: 25 }
+          7: { cellWidth: 30 },
+          8: { cellWidth: 25 }
         }
       });
       
@@ -678,8 +676,7 @@ export default function AdminOrdersPage() {
             <th>Department</th>
             <th>Quantity</th>
             <th>Amount</th>
-            <th>Payment Method</th>
-            <th>Payment Status</th>
+            <th>Payment</th>
             <th>Order Status</th>
             <th>Date</th>
           </tr>
@@ -704,8 +701,7 @@ export default function AdminOrdersPage() {
                 <td>${order.degree || 'N/A'}</td>
                 <td style="text-align: center;">${order.total_quantity || 0}</td>
                 <td style="text-align: right; font-weight: 500;">${formatCurrency(order.total_amount)}</td>
-                <td>${order.payment_method === 'gcash' ? 'GCash' : 'Cash'}</td>
-                <td>${order.payment_status?.charAt(0).toUpperCase() + order.payment_status?.slice(1) || 'N/A'}</td>
+                <td>${order.status === 'claimed' ? 'Paid' : (order.payment_method === 'gcash' ? 'GCash' : 'Cash')}</td>
                 <td>${order.status === 'ready_for_pickup' ? 'For Pickup' : 
                     order.status === 'claimed' ? 'Claimed' :
                     order.status?.replace('_', ' ').charAt(0).toUpperCase() + order.status?.replace('_', ' ').slice(1) || 'N/A'}</td>
@@ -964,32 +960,23 @@ export default function AdminOrdersPage() {
                           </div>
                         </td>
                         <td className="px-3 sm:px-4 py-3">
-                          <div className="space-y-1">
-                            {order.payment_method === 'gcash' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 uppercase whitespace-nowrap">
-                                GCash
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 uppercase whitespace-nowrap">
-                                Cash
-                              </span>
-                            )}
-                            <div>
-                              {order.payment_status === 'paid' ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 uppercase whitespace-nowrap">
-                                  Paid
-                                </span>
-                              ) : order.payment_status === 'pending' ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 uppercase whitespace-nowrap">
-                                  Pending
+                          {(order.status === 'claimed' || order.status === 'completed') ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 uppercase whitespace-nowrap">
+                              Paid
+                            </span>
+                          ) : (
+                            <div className="space-y-1">
+                              {order.payment_method === 'gcash' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 uppercase whitespace-nowrap">
+                                  GCash
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 uppercase whitespace-nowrap">
-                                  Unpaid
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 uppercase whitespace-nowrap">
+                                  Cash
                                 </span>
                               )}
                             </div>
-                          </div>
+                          )}
                         </td>
                         <td className="px-3 sm:px-4 py-3">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)} uppercase whitespace-nowrap`}>

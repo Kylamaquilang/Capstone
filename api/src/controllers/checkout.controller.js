@@ -42,7 +42,7 @@ export const checkout = async (req, res) => {
         }
         
         const [productData] = await pool.query(`
-          SELECT p.id as product_id, p.stock, p.price, ps.id as size_id, ps.stock as size_stock, ps.price as size_price
+          SELECT p.id as product_id, p.stock, p.price, ps.id as size_id, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
           FROM products p
           LEFT JOIN product_sizes ps ON p.id = ps.product_id AND ps.id = ?
           WHERE p.id = ?
@@ -74,6 +74,7 @@ export const checkout = async (req, res) => {
           quantity: product.quantity,
           product_id: item.product_id,
           size_id: product.size_id || null,
+          size_name: item.size_name || null,
           stock: item.size_id ? item.size_stock : item.stock,
           price: parseFloat(price),
           size_price: parseFloat(item.size_price || 0)
@@ -84,7 +85,7 @@ export const checkout = async (req, res) => {
       const placeholders = cart_item_ids.map(() => '?').join(',');
       [cartItems] = await pool.query(`
         SELECT c.id AS cart_id, c.quantity, c.product_id, c.size_id,
-               p.stock, p.price, ps.stock as size_stock, ps.price as size_price
+               p.stock, p.price, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
         FROM cart_items c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN product_sizes ps ON c.size_id = ps.id
@@ -94,7 +95,7 @@ export const checkout = async (req, res) => {
       // Fallback: process all cart items
       [cartItems] = await pool.query(`
         SELECT c.id AS cart_id, c.quantity, c.product_id, c.size_id,
-               p.stock, p.price, ps.stock as size_stock, ps.price as size_price
+               p.stock, p.price, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
         FROM cart_items c
         JOIN products p ON c.product_id = p.id
         LEFT JOIN product_sizes ps ON c.size_id = ps.id
@@ -133,6 +134,7 @@ export const checkout = async (req, res) => {
     console.log('🔍 Cart items after processing:', cartItems.map(item => ({
       product_id: item.product_id,
       size_id: item.size_id,
+      size_name: item.size_name,
       quantity: item.quantity,
       price: item.price,
       size_price: item.size_price,
@@ -199,12 +201,29 @@ export const checkout = async (req, res) => {
         );
         const costPrice = productData[0]?.original_price || 0;
 
-        // Insert order item
-        await connection.query(
-          `INSERT INTO order_items (order_id, product_id, size_id, product_name, quantity, unit_price, unit_cost, total_price)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [orderId, item.product_id, item.size_id || null, productName, item.quantity, item.size_price || item.price, costPrice, (item.size_price || item.price) * item.quantity]
+        // Get size name from cart item (already fetched from product_sizes table)
+        const sizeName = item.size_name || null;
+        
+        console.log(`📦 Creating order item:`);
+        console.log(`   - Product: "${productName}"`);
+        console.log(`   - Size Name: "${sizeName || 'NULL'}"`);
+        console.log(`   - Size ID: ${item.size_id || 'NULL'}`);
+        console.log(`   - Quantity: ${item.quantity}`);
+        console.log(`   - Item object:`, JSON.stringify(item, null, 2));
+
+        // Insert order item with size name
+        const insertResult = await connection.query(
+          `INSERT INTO order_items (order_id, product_id, size_id, size, product_name, quantity, unit_price, unit_cost, total_price)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [orderId, item.product_id, item.size_id || null, sizeName, productName, item.quantity, item.size_price || item.price, costPrice, (item.size_price || item.price) * item.quantity]
         )
+        
+        // Verify what was actually saved
+        const [savedItem] = await connection.query(
+          `SELECT id, product_name, size, size_id, quantity FROM order_items WHERE id = ?`,
+          [insertResult[0].insertId]
+        );
+        console.log(`✅ Order item saved to database:`, savedItem[0])
 
         // Process stock deduction directly (optimized for speed)
         console.log(`📦 Processing stock deduction for Product ID ${item.product_id}, Quantity ${item.quantity}`);

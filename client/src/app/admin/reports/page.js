@@ -143,19 +143,30 @@ export default function AdminReportsPage() {
     }
   };
 
-  // Fetch sales data
+  // Fetch sales data (detailed order items)
   const fetchSalesData = async () => {
     try {
       setLoading(true);
       setError('');
       
-      // Use URLSearchParams like the working sales page
+      // Fetch detailed order items for sales report
       const params = new URLSearchParams();
       if (dateFilter.startDate) params.append('start_date', dateFilter.startDate);
       if (dateFilter.endDate) params.append('end_date', dateFilter.endDate);
-      if (dateFilter.period) params.append('group_by', dateFilter.period);
       
-      const response = await API.get(`/orders/sales-performance/public?${params}`);
+      const response = await API.get(`/orders/detailed-sales-report?${params}`);
+      console.log('📊 Frontend - Sales report data received:', response.data);
+      if (response.data?.orderItems && response.data.orderItems.length > 0) {
+        console.log('📊 Frontend - First 3 items:');
+        response.data.orderItems.slice(0, 3).forEach((item, idx) => {
+          console.log(`   Item ${idx + 1}:`, {
+            product: item.product_name,
+            size: item.size,
+            hasSize: !!item.size,
+            sizeType: typeof item.size
+          });
+        });
+      }
       setSalesData(response.data || {});
     } catch (err) {
       console.error('Sales data error:', err);
@@ -168,24 +179,19 @@ export default function AdminReportsPage() {
       } else if (err.response?.status === 403) {
         setError('Admin access required for sales data');
       } else if (err.response?.status === 404) {
-        setError('Sales performance endpoint not found');
+        setError('Sales report endpoint not found');
       } else if (err.response?.status >= 500) {
         setError('Server error while fetching sales data');
       } else {
         setError('Failed to fetch sales data');
       }
       
-      // Set fallback data structure
+      // Set fallback data structure for detailed report
       setSalesData({
-        salesData: [],
-        topProducts: [],
-        paymentBreakdown: [],
-        inventorySummary: [],
-        salesLogsSummary: {},
+        orderItems: [],
         summary: {
           total_orders: 0,
           total_revenue: 0,
-          avg_order_value: 0,
           gcash_orders: 0,
           cash_orders: 0,
           gcash_revenue: 0,
@@ -226,10 +232,7 @@ export default function AdminReportsPage() {
         fetchRestockData();
         break;
       case 'sales':
-        // Set default start date to 2025-01-01 for sales report
-        if (!dateFilter.startDate) {
-          setDateFilter(prev => ({ ...prev, startDate: '2025-01-01' }));
-        }
+        // Fetch sales data without default date restrictions
         fetchSalesData();
         break;
       default:
@@ -849,7 +852,7 @@ export default function AdminReportsPage() {
   };
 
   const generateSalesPDF = (pdf, data, yPosition) => {
-    if (!data.salesData || !Array.isArray(data.salesData) || data.salesData.length === 0) {
+    if (!data.orderItems || !Array.isArray(data.orderItems) || data.orderItems.length === 0) {
       pdf.setFontSize(12);
       pdf.text('No sales data available for the selected period.', 20, yPosition);
       return yPosition + 20;
@@ -858,34 +861,44 @@ export default function AdminReportsPage() {
     // Add section title
     pdf.setFontSize(14);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Sales Report', 20, yPosition);
-    yPosition += 20;
+    pdf.text('Sales Report - Product Sales Details', 20, yPosition);
+    yPosition += 10;
+
+    // Add summary info
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`Total Orders: ${data.summary?.total_orders || 0}`, 20, yPosition);
+    yPosition += 7;
+    pdf.text(`Total Revenue: ${formatCurrency(data.summary?.total_revenue || 0)}`, 20, yPosition);
+    yPosition += 15;
 
     // Prepare table data
-    const tableData = data.salesData.map(item => [
-      item.period || 'N/A',
-      item.orders?.toString() || '0',
-      formatCurrency(item.revenue),
-      formatCurrency(item.avg_order_value),
-      item.gcash_orders?.toString() || '0',
-      item.cash_orders?.toString() || '0'
+    const tableData = data.orderItems.map(item => [
+      new Date(item.order_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      item.product_name || 'N/A',
+      item.size || '—',
+      item.quantity?.toString() || '0',
+      formatCurrency(item.unit_price || 0),
+      formatCurrency(item.item_total || 0),
+      (item.payment_method?.toUpperCase() || 'N/A')
     ]);
 
     // Create table
     autoTable(pdf, {
       startY: yPosition,
-      head: [['Period', 'Orders', 'Revenue', 'Avg Order Value', 'GCash Orders', 'Cash Orders']],
+      head: [['Date', 'Product Name', 'Size', 'Qty', 'Unit Price', 'Total', 'Payment']],
       body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [0, 12, 80] },
-      styles: { fontSize: 8 },
+      headStyles: { fillColor: [0, 12, 80], fontSize: 8 },
+      styles: { fontSize: 7 },
       columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 20 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 30 },
-        4: { cellWidth: 25 },
-        5: { cellWidth: 25 }
+        0: { cellWidth: 26 },
+        1: { cellWidth: 50 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 15 },
+        4: { cellWidth: 24 },
+        5: { cellWidth: 24 },
+        6: { cellWidth: 22 }
       }
     });
 
@@ -992,7 +1005,9 @@ export default function AdminReportsPage() {
       content += `   Revenue: ${formatCurrency(item.revenue)}\n`;
       content += `   Average Order Value: ${formatCurrency(item.avg_order_value)}\n`;
       content += `   GCash Orders: ${item.gcash_orders}\n`;
-      content += `   Cash Orders: ${item.cash_orders}\n\n`;
+      content += `   GCash Revenue: ${formatCurrency(item.gcash_revenue || 0)}\n`;
+      content += `   Cash Orders: ${item.cash_orders}\n`;
+      content += `   Cash Revenue: ${formatCurrency(item.cash_revenue || 0)}\n\n`;
     });
     
     return content;
@@ -1401,105 +1416,117 @@ export default function AdminReportsPage() {
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     {/* Header Section */}
                     <div className="px-6 py-5 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-100">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Sales Report</h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            Products sold, quantities, and revenue within a specific period
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {/* Year/Month Dropdown */}
-                          <select className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                            <option>2024</option>
-                            <option>2023</option>
-                            <option>2022</option>
-                          </select>
-                          {/* Search Input */}
-                          <div className="relative">
-                            <input
-                              type="text"
-                              placeholder="Search periods..."
-                              className="pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent w-48"
-                            />
-                            <svg className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
+                      <div className="flex flex-col gap-3">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h3 className="text-xl font-semibold text-gray-900">Sales Report</h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Product sales details from claimed and completed orders
+                            </p>
                           </div>
-                          {/* Download Button */}
-                          <button
-                            onClick={handleDownload}
-                            className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm"
-                          >
-                            <ArrowDownTrayIcon className="h-4 w-4" />
-                            Download
-                          </button>
+                          <div className="flex items-center gap-3">
+                            {/* Download Button */}
+                            <button
+                              onClick={handleDownload}
+                              className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm"
+                            >
+                              <ArrowDownTrayIcon className="h-4 w-4" />
+                              Download
+                            </button>
+                          </div>
                         </div>
+                        
+                        {/* Summary Info */}
+                        {salesData.summary && (
+                          <div className="flex flex-wrap gap-4 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600">Total Orders:</span>
+                              <span className="font-semibold text-gray-900">{salesData.summary.total_orders || 0}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-600">Total Revenue:</span>
+                              <span className="font-semibold text-green-600">{formatCurrency(salesData.summary.total_revenue || 0)}</span>
+                            </div>
+                            {(dateFilter.startDate || dateFilter.endDate) && (
+                              <button
+                                onClick={() => setDateFilter({ startDate: '', endDate: '', period: 'month' })}
+                                className="text-xs px-2 py-1 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                              >
+                                Clear Filters
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Table */}
-                    {salesData.salesData && Array.isArray(salesData.salesData) && salesData.salesData.length > 0 ? (
+                    {salesData.orderItems && Array.isArray(salesData.orderItems) && salesData.orderItems.length > 0 ? (
                       <>
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead className="bg-gray-50/50">
                               <tr>
-                                <th className="px-6 py-4 text-left">
-                                  <input type="checkbox" className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
-                                </th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Period</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Orders</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Revenue</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Avg Order Value</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">GCash Orders</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Cash Orders</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date & Time</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Price</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment Method</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                              {salesData.salesData.map((item, index) => (
+                              {salesData.orderItems.map((item, index) => (
                                 <tr key={index} className={`hover:bg-green-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                                   <td className="px-6 py-4">
-                                    <input type="checkbox" className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                      </div>
-                                      <div>
-                                        <div className="text-sm font-medium text-gray-900">{item.period}</div>
-                                        <div className="text-xs text-gray-500">Sales period</div>
-                                      </div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {new Date(item.order_date).toLocaleDateString('en-US', { 
+                                        month: 'short', 
+                                        day: 'numeric', 
+                                        year: 'numeric' 
+                                      })}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {new Date(item.order_date).toLocaleTimeString('en-US', { 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                      })}
                                     </div>
                                   </td>
                                   <td className="px-6 py-4">
+                                    <div className="text-sm font-medium text-gray-900">{item.product_name}</div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    {item.size ? (
+                                      <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded">
+                                        {item.size}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400">—</span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4">
                                     <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                                      {item.orders}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{formatCurrency(item.revenue)}</td>
-                                  <td className="px-6 py-4 text-sm text-gray-900">{formatCurrency(item.avg_order_value)}</td>
-                                  <td className="px-6 py-4">
-                                    <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
-                                      {item.gcash_orders}
+                                      {item.quantity}
                                     </span>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
-                                      {item.cash_orders}
-                                    </span>
+                                    <span className="text-sm font-medium text-gray-900">{formatCurrency(item.unit_price)}</span>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <button className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors">
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                      </svg>
-                                    </button>
+                                    <span className="text-sm font-bold text-gray-900">{formatCurrency(item.item_total)}</span>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    {item.payment_method?.toLowerCase() === 'gcash' ? (
+                                      <span className="inline-flex px-3 py-1.5 text-xs font-medium bg-purple-100 text-purple-800 rounded-full uppercase">
+                                        GCash
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex px-3 py-1.5 text-xs font-medium bg-orange-100 text-orange-800 rounded-full uppercase">
+                                        Cash
+                                      </span>
+                                    )}
                                   </td>
                                 </tr>
                               ))}
@@ -1507,34 +1534,17 @@ export default function AdminReportsPage() {
                           </table>
                         </div>
 
-                        {/* Pagination */}
+                        {/* Summary Footer */}
                         <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">
+                              Showing {salesData.orderItems.length} item{salesData.orderItems.length !== 1 ? 's' : ''} from {salesData.summary?.total_orders || 0} order{salesData.summary?.total_orders !== 1 ? 's' : ''}
+                            </span>
                             <div className="flex items-center gap-4">
-                              <span className="text-sm text-gray-600">Rows per page:</span>
-                              <select className="text-sm border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                                <option>10</option>
-                                <option>25</option>
-                                <option>50</option>
-                                <option>100</option>
-                              </select>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <span className="text-sm text-gray-600">
-                                1-{Math.min(10, salesData.salesData.length)} of {salesData.salesData.length}
+                              <span className="text-gray-600">Total Revenue:</span>
+                              <span className="font-semibold text-green-600">
+                                {formatCurrency(salesData.summary?.total_revenue || 0)}
                               </span>
-                              <div className="flex items-center gap-1">
-                                <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                  </svg>
-                                </button>
-                                <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                  </svg>
-                                </button>
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -1549,7 +1559,14 @@ export default function AdminReportsPage() {
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900">No sales data available</p>
-                            <p className="text-xs text-gray-500">No sales data for the selected period</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {dateFilter.startDate || dateFilter.endDate 
+                                ? 'No product sales found for the selected date range'
+                                : 'No product sales have been recorded yet. Sales are recorded when orders are marked as "claimed" or "completed".'}
+                            </p>
+                            {error && (
+                              <p className="text-xs text-red-500 mt-2">{error}</p>
+                            )}
                           </div>
                         </div>
                       </div>
