@@ -44,6 +44,7 @@ export default function UserProfilePage() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordChangeStep, setPasswordChangeStep] = useState(1); // 1: verification, 2: new password
   const [verificationCode, setVerificationCode] = useState('');
+  const [resetToken, setResetToken] = useState(''); // Store reset token from verification
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [sendingCode, setSendingCode] = useState(false);
@@ -268,6 +269,12 @@ export default function UserProfilePage() {
         confirmButtonColor: '#000C50',
       });
       
+      // Reset all password change states
+      setVerificationCode('');
+      setResetToken('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setCodeVerified(false);
       setShowChangePassword(true);
       setPasswordChangeStep(1);
     } catch (err) {
@@ -293,8 +300,11 @@ export default function UserProfilePage() {
         confirmButtonColor: '#000C50',
       });
       
-      // Clear the current verification code input
+      // Clear the current verification code and reset token
       setVerificationCode('');
+      setResetToken('');
+      setCodeVerified(false);
+      setPasswordChangeStep(1);
     } catch (err) {
       setError(err?.response?.data?.error || 'Failed to resend verification code');
       Swal.fire({
@@ -339,10 +349,15 @@ export default function UserProfilePage() {
       setVerifyingCode(true);
       setError('');
       
-      await API.post('/auth/verify-code', {
+      const response = await API.post('/auth/verify-code', {
         email: profile.email,
         verificationCode
       });
+      
+      // Store the reset token from the response
+      if (response.data.resetToken) {
+        setResetToken(response.data.resetToken);
+      }
       
       setCodeVerified(true);
       setPasswordChangeStep(2);
@@ -419,39 +434,124 @@ export default function UserProfilePage() {
     
     // Enhanced frontend validation for password step
     if (!newPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Required',
+        text: 'Please enter a new password',
+        confirmButtonColor: '#000C50',
+      });
       setError('New password is required');
       return;
     }
 
     if (newPassword !== confirmPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Passwords Don\'t Match',
+        text: 'The passwords you entered do not match. Please try again.',
+        confirmButtonColor: '#000C50',
+      });
       setError('Passwords do not match');
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters long');
+    // Match backend validation requirements
+    if (newPassword.length < 8) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Too Short',
+        text: 'Password must be at least 8 characters long',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must be at least 8 characters long');
       return;
     }
 
     if (newPassword.length > 128) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Too Long',
+        text: 'Password must be less than 128 characters',
+        confirmButtonColor: '#000C50',
+      });
       setError('Password must be less than 128 characters');
+      return;
+    }
+
+    // Check for uppercase letter
+    if (!/[A-Z]/.test(newPassword)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid Password',
+        text: 'Password must contain at least one uppercase letter (A-Z)',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must contain at least one uppercase letter');
+      return;
+    }
+
+    // Check for lowercase letter
+    if (!/[a-z]/.test(newPassword)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid Password',
+        text: 'Password must contain at least one lowercase letter (a-z)',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must contain at least one lowercase letter');
+      return;
+    }
+
+    // Check for number
+    if (!/\d/.test(newPassword)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid Password',
+        text: 'Password must contain at least one number (0-9)',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must contain at least one number');
+      return;
+    }
+
+    // Check for special character
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid Password',
+        text: 'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
       return;
     }
 
     // Check for common weak passwords
     const weakPasswords = ['password', '123456', 'qwerty', 'abc123', 'password123'];
     if (weakPasswords.includes(newPassword.toLowerCase())) {
-      setError('Please choose a stronger password');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Weak Password',
+        text: 'Please choose a stronger password. Avoid common passwords like "password", "123456", etc.',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Please choose a stronger password. Avoid common passwords like "password", "123456", etc.');
       return;
     }
-
+    
     try {
       setVerifyingCode(true);
       setError('');
       
-      await API.post('/auth/change-password', {
-        email: profile.email,
-        verificationCode,
+      if (!resetToken) {
+        setError('Session expired. Please request a new verification code.');
+        setVerifyingCode(false);
+        return;
+      }
+      
+      // Use reset-password endpoint with the resetToken
+      const response = await API.post('/auth/reset-password', {
+        resetToken,
         newPassword
       });
       
@@ -465,25 +565,14 @@ export default function UserProfilePage() {
         router.push('/auth/login');
       });
     } catch (err) {
-      const errorMessage = err?.response?.data?.error || 'Failed to change password';
+      const errorMessage = err?.response?.data?.error || err?.response?.data?.details || 'Failed to change password. Please try again.';
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Change Failed',
+        text: errorMessage,
+        confirmButtonColor: '#000C50',
+      });
       setError(errorMessage);
-      
-      // Show specific error messages for better UX
-      if (errorMessage.includes('expired')) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Code Expired',
-          text: 'Your verification code has expired. Please request a new one.',
-          confirmButtonColor: '#000C50',
-        });
-      } else if (errorMessage.includes('Invalid')) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Invalid Code',
-          text: 'The verification code you entered is incorrect. Please check and try again.',
-          confirmButtonColor: '#000C50',
-        });
-      }
     } finally {
       setVerifyingCode(false);
     }
@@ -710,7 +799,7 @@ export default function UserProfilePage() {
         {/* Error/Success Messages */}
         {error && (
           <div className="mx-4 sm:mx-6 lg:mx-8 xl:mx-24 mb-4 sm:mb-6 p-3 sm:p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-            {error}
+            {typeof error === 'string' ? error : error?.message || 'An error occurred'}
           </div>
         )}
         {success && (
@@ -748,6 +837,13 @@ export default function UserProfilePage() {
                     <p className="text-gray-600">Enter the 6-digit verification code sent to your email</p>
                   </div>
                   
+                  {/* Error Message */}
+                  {error && (
+                    <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-sm">
+                      {error}
+                    </div>
+                  )}
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Verification Code
@@ -755,7 +851,10 @@ export default function UserProfilePage() {
                     <input
                       type="text"
                       value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value)}
+                      onChange={(e) => {
+                        setVerificationCode(e.target.value);
+                        setError(''); // Clear error when typing
+                      }}
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50] text-center text-lg tracking-widest"
                       placeholder="000000"
                       maxLength="6"
@@ -778,6 +877,7 @@ export default function UserProfilePage() {
                           setShowChangePassword(false);
                           setPasswordChangeStep(1);
                         setVerificationCode('');
+                        setResetToken('');
                         setNewPassword('');
                         setConfirmPassword('');
                         setCodeVerified(false);
@@ -809,6 +909,40 @@ export default function UserProfilePage() {
                     <p className="text-gray-600">Code verified! Now set your new password</p>
                   </div>
                   
+                  {/* Error Message */}
+                  {error && (
+                    <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-sm">
+                      {error}
+                    </div>
+                  )}
+                  
+                  {/* Password Requirements */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-gray-700">
+                    <p className="font-semibold mb-2 text-[#000C50]">Password Requirements:</p>
+                    <ul className="space-y-1 pl-4">
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>At least 8 characters long</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>One uppercase letter (A-Z)</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>One lowercase letter (a-z)</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>One number (0-9)</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>One special character (!@#$%^&*)</span>
+                      </li>
+                    </ul>
+                  </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       New Password
@@ -816,7 +950,10 @@ export default function UserProfilePage() {
                     <input
                       type="password"
                       value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        setError(''); // Clear error when typing
+                      }}
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
                       placeholder="Enter new password"
                       required
@@ -830,7 +967,10 @@ export default function UserProfilePage() {
                     <input
                       type="password"
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setError(''); // Clear error when typing
+                      }}
                       className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
                       placeholder="Confirm new password"
                       required

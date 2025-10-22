@@ -41,11 +41,11 @@ export const createRateLimit = (options = {}) => {
 // Specific rate limits for different endpoints
 export const authRateLimit = createRateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 login attempts per 15 minutes
+  max: 20, // 20 auth attempts per 15 minutes (increased for better UX during testing)
   message: {
     success: false,
     error: {
-      message: 'Too many login attempts, please try again later',
+      message: 'Too many authentication attempts, please try again after 15 minutes',
       type: 'AUTH_RATE_LIMIT_EXCEEDED',
       timestamp: new Date().toISOString()
     }

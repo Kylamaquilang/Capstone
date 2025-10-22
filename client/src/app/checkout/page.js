@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
@@ -255,18 +254,16 @@ const CheckoutPage = () => {
                   <div key={item.id} className="flex items-center gap-3 sm:gap-4 py-3 sm:py-4 border-b border-gray-100 last:border-b-0">
                     {/* Product Image */}
                     <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
-                      <Image
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
                         src={getImageUrl(item.product_image) || '/images/polo.png'}
                         alt={item.product_name}
-                        width={64}
-                        height={64}
                         className="w-full h-full object-cover"
+                        crossOrigin="anonymous"
+                        loading="lazy"
                         onError={(e) => {
-                          console.log('Image failed to load:', e.target.src);
+                          e.target.onerror = null;
                           e.target.src = '/images/polo.png';
-                        }}
-                        onLoad={() => {
-                          console.log('Image loaded successfully:', item.product_name);
                         }}
                       />
                     </div>

@@ -125,8 +125,14 @@ export default function AdminReportsPage() {
     try {
       setLoading(true);
       setError('');
-      // For now, we'll use a placeholder since restock history endpoint doesn't exist yet
-      setRestockData([]);
+      
+      // Fetch restock report from backend
+      const params = new URLSearchParams();
+      params.append('days', 30); // Default to last 30 days
+      
+      const response = await API.get(`/stock-movements/reports/restock?${params}`);
+      console.log('📦 Restock data received:', response.data);
+      setRestockData(response.data?.restocks || []);
     } catch (err) {
       console.error('Restock error:', err);
       setError('Failed to fetch restock data');
@@ -712,8 +718,6 @@ export default function AdminReportsPage() {
             <th>Date</th>
             <th>Product</th>
             <th>Quantity</th>
-            <th>Supplier</th>
-            <th>Admin</th>
             <th>Stock Before</th>
             <th>Stock After</th>
           </tr>
@@ -724,8 +728,6 @@ export default function AdminReportsPage() {
               <td>${formatDate(item.date)}</td>
               <td>${item.product_name}</td>
               <td style="text-align: center;">${item.quantity}</td>
-              <td>${item.supplier || 'N/A'}</td>
-              <td>${item.admin_name || 'N/A'}</td>
               <td style="text-align: center;">${item.stock_before}</td>
               <td style="text-align: center;">${item.stock_after}</td>
             </tr>
@@ -1323,8 +1325,6 @@ export default function AdminReportsPage() {
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Supplier</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Admin</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock Before</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock After</th>
                           </tr>
@@ -1336,15 +1336,13 @@ export default function AdminReportsPage() {
                                 <td className="px-6 py-4 text-sm text-gray-900">{formatDate(item.date)}</td>
                                 <td className="px-6 py-4 text-sm font-medium text-gray-900 uppercase">{item.product_name}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900 text-center">{item.quantity}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{item.supplier || 'N/A'}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{item.admin_name || 'N/A'}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900 text-center">{item.stock_before}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900 text-center">{item.stock_after}</td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan="7" className="px-6 py-12 text-center">
+                              <td colSpan="5" className="px-6 py-12 text-center">
                                 <div className="flex flex-col items-center gap-3">
                                   <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

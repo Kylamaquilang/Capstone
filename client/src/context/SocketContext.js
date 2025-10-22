@@ -87,6 +87,20 @@ export function SocketProvider({ children }) {
     socketInstance.on('connect_error', (error) => {
       console.error('🔌 Socket.io connection error:', error.message);
       setIsConnected(false);
+      
+      // If authentication error, clear invalid token
+      if (error.message && error.message.includes('Authentication error')) {
+        console.log('❌ Invalid token detected - clearing storage');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        socketInstance.disconnect();
+        
+        // Redirect to login if we're not already there
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/auth/login')) {
+          console.log('🔄 Redirecting to login due to invalid token');
+          window.location.href = '/auth/login';
+        }
+      }
     });
 
     return () => {

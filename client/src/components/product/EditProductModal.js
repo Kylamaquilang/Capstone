@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import Swal from '@/lib/sweetalert-config';
+import { getImageUrl } from '@/utils/imageUtils';
 
 export default function EditProductModal({ isOpen, onClose, productId, onSuccess }) {
   const [product, setProduct] = useState(null);
@@ -30,12 +31,23 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
     }
   }, [isOpen, productId]);
 
+  // Debug: Watch previewUrl changes
+  useEffect(() => {
+    console.log('🖼️ PreviewUrl changed:', previewUrl);
+  }, [previewUrl]);
+
   const loadProduct = async () => {
     try {
       setLoading(true);
       setError('');
       const { data } = await API.get(`/products/${productId}`);
       setProduct(data);
+      
+      console.log('🔍 Product data received:', data);
+      console.log('🔍 Product image path:', data.image);
+      
+      const imageUrl = data.image ? getImageUrl(data.image) : '';
+      console.log('🔍 Generated image URL:', imageUrl);
       
       // Set form values
       setName(data.name || '');
@@ -44,7 +56,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       setStock(data.stock || '');
       setCategoryId(data.category_id || '');
       setDescription(data.description || '');
-      setPreviewUrl(data.image || '');
+      setPreviewUrl(imageUrl);
       
       // Handle sizes
       if (data.sizes && data.sizes.length > 0) {
@@ -248,7 +260,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
                       <input
-                        type="number"
+                        type=""
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
                         className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -330,7 +342,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                             onChange={(e) => {
                               const f = e.target.files?.[0] || null;
                               setFile(f);
-                              setPreviewUrl(f ? URL.createObjectURL(f) : product?.image || '');
+                              setPreviewUrl(f ? URL.createObjectURL(f) : (product?.image ? getImageUrl(product.image) : ''));
                             }}
                           />
                         </div>
@@ -357,7 +369,18 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                         >
                           {previewUrl ? (
                             <div className="space-y-2">
-                              <img src={previewUrl} alt="Preview" className="w-24 h-24 object-cover rounded-lg mx-auto border-2 border-gray-200" />
+                              <img 
+                                src={previewUrl} 
+                                alt="Preview" 
+                                className="w-24 h-24 object-cover rounded-lg mx-auto border-2 border-gray-200"
+                                onError={(e) => {
+                                  console.error('Failed to load preview image:', previewUrl);
+                                  e.target.src = '/images/polo.png';
+                                }}
+                                onLoad={() => {
+                                  console.log('Preview image loaded successfully:', previewUrl);
+                                }}
+                              />
                               <div>
                                 <p className="text-xs font-medium text-gray-900">{file?.name || 'Current image'}</p>
                                 <p className="text-xs text-gray-500">Click to change image</p>

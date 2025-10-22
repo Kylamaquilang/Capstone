@@ -573,10 +573,18 @@ export const getRestockReport = async (req, res) => {
         sm.quantity,
         sm.reason,
         sm.supplier,
-        sm.previous_stock,
-        sm.new_stock,
-        sm.created_at,
-        u.name as user_name
+        sm.previous_stock as stock_before,
+        sm.new_stock as stock_after,
+        sm.created_at as date,
+        CASE 
+          WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
+            THEN CONCAT(u.first_name, ' ', u.last_name)
+          WHEN u.name IS NOT NULL 
+            THEN u.name
+          WHEN u.email IS NOT NULL 
+            THEN u.email
+          ELSE 'System'
+        END as admin_name
        FROM stock_movements sm
        LEFT JOIN products p ON sm.product_id = p.id
        LEFT JOIN users u ON sm.user_id = u.id

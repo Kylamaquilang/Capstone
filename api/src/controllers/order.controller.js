@@ -541,6 +541,8 @@ const recordOrderStockOut = async (orderId, userId) => {
             user_id INT NOT NULL,
             movement_type ENUM('stock_in', 'stock_out') NOT NULL,
             quantity INT NOT NULL,
+            previous_stock INT DEFAULT 0,
+            new_stock INT DEFAULT 0,
             reason VARCHAR(100) NOT NULL,
             supplier VARCHAR(200),
             notes TEXT,
@@ -1381,7 +1383,7 @@ export const updateOrderPaymentMethod = async (req, res) => {
   const { payment_method, payment_status, notes } = req.body;
 
   // Validate payment method
-  const validPaymentMethods = ['cash', 'gcash', 'card'];
+  const validPaymentMethods = ['cash', 'gcash'];
   if (!validPaymentMethods.includes(payment_method)) {
     return res.status(400).json({ 
       error: 'Invalid payment method',

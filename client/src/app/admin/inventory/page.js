@@ -893,8 +893,8 @@ export default function AdminInventoryPage() {
 
       {/* Stock In Modal */}
       {showStockInModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="fixed inset-0 overflow-y-auto h-full w-full z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
+          <div className="relative top-20 mx-auto p-5 border-2 border-gray-300 w-96 shadow-2xl rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Add Stock
@@ -915,7 +915,8 @@ export default function AdminInventoryPage() {
                       <option value="">-- Select a product --</option>
                       {allProducts.map((product) => (
                         <option key={product.id} value={product.id}>
-                          {product.name.toUpperCase()} - Stock: {product.stock || 0}
+                          {product.name.toUpperCase()}
+                          {(!product.sizes || product.sizes.length === 0) && ` - Stock: ${product.stock || 0}`}
                         </option>
                       ))}
                     </select>
@@ -936,11 +937,12 @@ export default function AdminInventoryPage() {
                         <option value="">-- Select size --</option>
                         {productSizes.map((sizeObj) => (
                           <option key={sizeObj.id} value={sizeObj.size}>
-                            {sizeObj.size.toUpperCase()} - Stock: {sizeObj.stock || 0}
+                            {sizeObj.size.toUpperCase()}
+                            {sizeObj.size.toLowerCase() !== 'none' && ` - Stock: ${sizeObj.stock || 0}`}
                           </option>
                         ))}
                       </select>
-                      <p className="text-xs text-gray-500 mt-1">This product has size variants</p>
+                      <p className="text-xs text-gray-500 mt-1">This product has size variants. Stock shown is for each size.</p>
                     </div>
                   )}
 
@@ -965,7 +967,7 @@ export default function AdminInventoryPage() {
                       Quantity <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="number"
+                      type=""
                       required
                       min="1"
                       value={stockInForm.quantity}
@@ -1033,8 +1035,8 @@ export default function AdminInventoryPage() {
 
       {/* Adjust Stock Modal */}
       {showAdjustModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="fixed inset-0 overflow-y-auto h-full w-full z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
+          <div className="relative top-20 mx-auto p-5 border-2 border-gray-300 w-96 shadow-2xl rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Adjust Stock
@@ -1055,7 +1057,8 @@ export default function AdminInventoryPage() {
                       <option value="">-- Select a product --</option>
                       {allProducts.map((product) => (
                         <option key={product.id} value={product.id}>
-                          {product.name.toUpperCase()} - Stock: {product.stock || 0}
+                          {product.name.toUpperCase()}
+                          {(!product.sizes || product.sizes.length === 0) && ` - Stock: ${product.stock || 0}`}
                         </option>
                       ))}
                     </select>
@@ -1076,11 +1079,12 @@ export default function AdminInventoryPage() {
                         <option value="">-- Select size --</option>
                         {adjustProductSizes.map((sizeObj) => (
                           <option key={sizeObj.id} value={sizeObj.size}>
-                            {sizeObj.size.toUpperCase()} - Stock: {sizeObj.stock || 0}
+                            {sizeObj.size.toUpperCase()}
+                            {sizeObj.size.toLowerCase() !== 'none' && ` - Stock: ${sizeObj.stock || 0}`}
                           </option>
                         ))}
                       </select>
-                      <p className="text-xs text-gray-500 mt-1">This product has size variants</p>
+                      <p className="text-xs text-gray-500 mt-1">This product has size variants. Stock shown is for each size.</p>
                     </div>
                   )}
 
@@ -1201,12 +1205,8 @@ export default function AdminInventoryPage() {
 
       {/* Stock Out Modal */}
       {showStockOutModal && (
-        <div className="fixed z-10 inset-0 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="fixed inset-0 overflow-y-auto h-full w-full z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
+          <div className="relative top-20 mx-auto p-5 border-2 border-gray-300 w-96 shadow-2xl rounded-md bg-white">
               <div className="mt-3">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
                   Stock Out (Remove Stock)
@@ -1227,7 +1227,8 @@ export default function AdminInventoryPage() {
                         <option value="">-- Select a product --</option>
                         {allProducts.map((product) => (
                           <option key={product.id} value={product.id}>
-                            {product.name.toUpperCase()} - Stock: {product.stock || 0}
+                            {product.name.toUpperCase()}
+                            {(!product.sizes || product.sizes.length === 0) && ` - Stock: ${product.stock || 0}`}
                           </option>
                         ))}
                       </select>
@@ -1248,11 +1249,12 @@ export default function AdminInventoryPage() {
                           <option value="">-- Select size --</option>
                           {stockOutProductSizes.map((sizeObj) => (
                             <option key={sizeObj.id} value={sizeObj.size}>
-                              {sizeObj.size.toUpperCase()} - Stock: {sizeObj.stock || 0}
+                              {sizeObj.size.toUpperCase()}
+                              {sizeObj.size.toLowerCase() !== 'none' && ` - Stock: ${sizeObj.stock || 0}`}
                             </option>
                           ))}
                         </select>
-                        <p className="text-xs text-gray-500 mt-1">This product has size variants</p>
+                        <p className="text-xs text-gray-500 mt-1">This product has size variants. Stock shown is for each size.</p>
                       </div>
                     )}
 
@@ -1299,7 +1301,7 @@ export default function AdminInventoryPage() {
                         Quantity to Remove <span className="text-red-500">*</span>
                       </label>
                       <input
-                        type="number"
+                        type=""
                         required
                         min="1"
                         value={stockOutForm.quantity}
@@ -1365,7 +1367,6 @@ export default function AdminInventoryPage() {
                   </div>
                 </form>
               </div>
-            </div>
           </div>
         </div>
       )}

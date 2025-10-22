@@ -1,7 +1,6 @@
 import { pool } from '../database/db.js'
 import { createOrderStatusNotification, createAdminOrderNotification } from '../utils/notification-helper.js'
 import { emitUserNotification, emitAdminNotification, emitInventoryUpdate, emitNewOrder, emitDataRefresh, emitAdminDataRefresh, emitUserDataRefresh } from '../utils/socket-helper.js'
-import { processOrderStockOut } from './stock.controller.js'
 
 
 export const checkout = async (req, res) => {
@@ -182,7 +181,7 @@ export const checkout = async (req, res) => {
       // Create order
       const [orderResult] = await connection.query(`
         INSERT INTO orders (user_id, order_number, total_amount, payment_method, payment_status, status, pay_at_counter)
-        VALUES (?, ?, ?, ?, 'unpaid', 'pending', ?)
+        VALUES (?, ?, ?, ?, 'pending', 'pending', ?)
       `, [user_id, orderNumber, total_amount, payment_method, pay_at_counter || false])
 
       orderId = orderResult.insertId
@@ -207,43 +206,24 @@ export const checkout = async (req, res) => {
           [orderId, item.product_id, item.size_id || null, productName, item.quantity, item.size_price || item.price, costPrice, (item.size_price || item.price) * item.quantity]
         )
 
-        // Process stock out using new stock management system
-        console.log(`📦 Processing stock out for Product ID ${item.product_id}, Quantity ${item.quantity}`);
+        // Process stock deduction directly (optimized for speed)
+        console.log(`📦 Processing stock deduction for Product ID ${item.product_id}, Quantity ${item.quantity}`);
         
-        try {
-          // Prepare order items for stock processing
-          const orderItems = [{
-            product_id: item.product_id,
-            quantity: item.quantity,
-            product_name: productName
-          }];
-          
-          // Process stock out using the new system
-          await processOrderStockOut(orderId, orderItems);
-          
-          console.log(`✅ Stock out processed for Product ID ${item.product_id}`);
-        } catch (stockError) {
-          console.error(`❌ Stock out failed for Product ID ${item.product_id}:`, stockError);
-          
-          // Fallback: Simple stock deduction if stored procedure fails
-          console.log(`🔄 Falling back to simple stock deduction for Product ID ${item.product_id}`);
-          
-          if (item.size_id) {
-            // Deduct from size-specific stock
-            await connection.query(
-              `UPDATE product_sizes SET stock = stock - ? WHERE id = ? AND stock >= ?`,
-              [item.quantity, item.size_id, item.quantity]
-            );
-          } else {
-            // Deduct from general product stock
-            await connection.query(
-              `UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`,
-              [item.quantity, item.product_id, item.quantity]
-            );
-          }
-          
-          console.log(`✅ Fallback stock deduction completed for Product ID ${item.product_id}`);
+        if (item.size_id) {
+          // Deduct from size-specific stock
+          await connection.query(
+            `UPDATE product_sizes SET stock = stock - ? WHERE id = ? AND stock >= ?`,
+            [item.quantity, item.size_id, item.quantity]
+          );
+        } else {
+          // Deduct from general product stock
+          await connection.query(
+            `UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`,
+            [item.quantity, item.product_id, item.quantity]
+          );
         }
+        
+        console.log(`✅ Stock deduction completed for Product ID ${item.product_id}`)
       }
 
       // Only delete cart items if we processed cart items (not direct products)
@@ -385,7 +365,7 @@ export const checkout = async (req, res) => {
       orderId,
       total_amount,
       payment_method,
-      payment_status: payment_method === 'gcash' ? 'unpaid' : 'pending'
+      payment_status: 'pending'
     })
   } catch (err) {
     console.error('❌ Checkout error:', err);

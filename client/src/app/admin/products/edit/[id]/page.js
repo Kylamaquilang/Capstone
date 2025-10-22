@@ -338,7 +338,7 @@ export default function EditProductPage() {
                     Current Image
                   </label>
                   <img
-                    src={`/api/proxy-image?path=${encodeURIComponent(product.image)}`}
+                    src={getImageUrl(product.image)}
                     alt={product.name}
                     className="w-32 h-32 object-cover rounded border"
                     onError={(e) => {

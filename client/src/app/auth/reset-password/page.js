@@ -1,10 +1,24 @@
 'use client';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import API from '@/lib/axios';
+import Swal from '@/lib/sweetalert-config';
 
 export default function ResetPasswordPage() {
+  // Ensure body styles are properly set
+  useEffect(() => {
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.overflow = 'hidden';
+    
+    return () => {
+      document.body.style.margin = '';
+      document.body.style.padding = '';
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   const [step, setStep] = useState(1); // 1: request reset, 2: verify code, 3: new password
   const [email, setEmail] = useState('');
   const [studentId, setStudentId] = useState('');
@@ -66,13 +80,90 @@ export default function ResetPasswordPage() {
     setError('');
 
     if (newPassword !== confirmPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Passwords Don\'t Match',
+        text: 'The passwords you entered do not match. Please try again.',
+        confirmButtonColor: '#000C50',
+      });
       setError('Passwords do not match');
       setLoading(false);
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters long');
+    // Match backend validation requirements
+    if (newPassword.length < 8) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Too Short',
+        text: 'Password must be at least 8 characters long',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must be at least 8 characters long');
+      setLoading(false);
+      return;
+    }
+
+    if (newPassword.length > 128) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Too Long',
+        text: 'Password must be less than 128 characters',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must be less than 128 characters');
+      setLoading(false);
+      return;
+    }
+
+    // Check for uppercase letter
+    if (!/[A-Z]/.test(newPassword)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid Password',
+        text: 'Password must contain at least one uppercase letter (A-Z)',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must contain at least one uppercase letter');
+      setLoading(false);
+      return;
+    }
+
+    // Check for lowercase letter
+    if (!/[a-z]/.test(newPassword)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid Password',
+        text: 'Password must contain at least one lowercase letter (a-z)',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must contain at least one lowercase letter');
+      setLoading(false);
+      return;
+    }
+
+    // Check for number
+    if (!/\d/.test(newPassword)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid Password',
+        text: 'Password must contain at least one number (0-9)',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must contain at least one number');
+      setLoading(false);
+      return;
+    }
+
+    // Check for special character
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Invalid Password',
+        text: 'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)',
+        confirmButtonColor: '#000C50',
+      });
+      setError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
       setLoading(false);
       return;
     }
@@ -83,12 +174,28 @@ export default function ResetPasswordPage() {
         newPassword
       });
 
+      Swal.fire({
+        icon: 'success',
+        title: 'Password Reset Successful!',
+        text: 'Your password has been reset successfully. Redirecting to login...',
+        confirmButtonColor: '#000C50',
+        timer: 2000,
+        timerProgressBar: true,
+      });
+
       setSuccess('Password reset successfully! Redirecting to login...');
       setTimeout(() => {
         router.push('/auth/login');
       }, 2000);
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to reset password');
+      const errorMessage = err?.response?.data?.error || 'Failed to reset password';
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Reset Failed',
+        text: errorMessage,
+        confirmButtonColor: '#000C50',
+      });
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -103,7 +210,7 @@ export default function ResetPasswordPage() {
   };
 
   const renderStep1 = () => (
-    <form onSubmit={handleRequestReset} className="space-y-6">
+    <form onSubmit={handleRequestReset} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Email Address
@@ -111,13 +218,16 @@ export default function ResetPasswordPage() {
         <input
           type="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError(''); // Clear error when typing
+          }}
           placeholder="Enter your email address"
           className="w-full border border-gray-300 px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
         />
       </div>
       
-      <div className="text-center text-gray-500 ">
+      <div className="text-center text-gray-500">
         <span>OR</span>
       </div>
       
@@ -128,7 +238,10 @@ export default function ResetPasswordPage() {
         <input
           type="text"
           value={studentId}
-          onChange={(e) => setStudentId(e.target.value)}
+          onChange={(e) => {
+            setStudentId(e.target.value);
+            setError(''); // Clear error when typing
+          }}
           placeholder="Enter your student ID"
           className="w-full border border-gray-300 px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
         />
@@ -153,7 +266,7 @@ export default function ResetPasswordPage() {
   );
 
   const renderStep2 = () => (
-    <form onSubmit={handleVerifyCode} className="space-y-6">
+    <form onSubmit={handleVerifyCode} className="space-y-4">
       <div className="text-center mb-4">
         <p className="text-sm text-gray-600">
           We've sent a 6-digit verification code to your email address.
@@ -167,7 +280,10 @@ export default function ResetPasswordPage() {
         <input
           type="text"
           value={verificationCode}
-          onChange={(e) => setVerificationCode(e.target.value)}
+          onChange={(e) => {
+            setVerificationCode(e.target.value);
+            setError(''); // Clear error when typing
+          }}
           placeholder="Enter 6-digit code"
           maxLength={6}
           className="w-full border border-gray-300 px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent text-center text-lg tracking-widest"
@@ -193,7 +309,34 @@ export default function ResetPasswordPage() {
   );
 
   const renderStep3 = () => (
-    <form onSubmit={handleResetPassword} className="space-y-6">
+    <form onSubmit={handleResetPassword} className="space-y-3">
+      {/* Password Requirements */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-gray-700">
+        <p className="font-semibold mb-1 text-[#000C50] text-xs">Password Requirements:</p>
+        <ul className="space-y-0.5 pl-3 text-xs">
+          <li className="flex items-start">
+            <span className="mr-2">•</span>
+            <span>At least 8 characters long</span>
+          </li>
+          <li className="flex items-start">
+            <span className="mr-2">•</span>
+            <span>One uppercase letter (A-Z)</span>
+          </li>
+          <li className="flex items-start">
+            <span className="mr-2">•</span>
+            <span>One lowercase letter (a-z)</span>
+          </li>
+          <li className="flex items-start">
+            <span className="mr-2">•</span>
+            <span>One number (0-9)</span>
+          </li>
+          <li className="flex items-start">
+            <span className="mr-2">•</span>
+            <span>One special character (!@#$%^&*)</span>
+          </li>
+        </ul>
+      </div>
+      
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           New Password
@@ -201,7 +344,10 @@ export default function ResetPasswordPage() {
         <input
           type="password"
           value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
+          onChange={(e) => {
+            setNewPassword(e.target.value);
+            setError(''); // Clear error when typing
+          }}
           placeholder="Enter new password"
           className="w-full border border-gray-300 px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
         />
@@ -214,7 +360,10 @@ export default function ResetPasswordPage() {
         <input
           type="password"
           value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          onChange={(e) => {
+            setConfirmPassword(e.target.value);
+            setError(''); // Clear error when typing
+          }}
           placeholder="Confirm new password"
           className="w-full border border-gray-300 px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
         />
@@ -258,18 +407,18 @@ export default function ResetPasswordPage() {
 
   return (
     <div
-      className="flex justify-center items-center min-h-screen text-black py-0"
-      style={{ backgroundColor: '#000C50' }}
+      className="flex justify-center items-center h-screen w-screen text-black"
+      style={{ backgroundColor: '#000C50', margin: 0, padding: 0 }}
     >
-      <div className="bg-white w-full max-w-4xl h-[550px] rounded-xl shadow-lg flex overflow-hidden">
+      <div className="bg-white w-full max-w-4xl h-[85vh] max-h-[600px] rounded-xl shadow-lg flex overflow-hidden">
         {/* Left Side - Form */}
         <div
-          className="w-1/2 p-8 border-r-4 flex flex-col justify-center"
+          className="w-1/2 p-8 border-r-4 flex flex-col justify-center overflow-y-auto"
           style={{ borderColor: '#000C50' }}
         >
-          <div>
-            <h2 className="text-2xl font-bold text-black mb-2">{getStepTitle()}</h2>
-            <p className="text-sm text-gray-600 mb-6">{getStepDescription()}</p>
+          <div className="max-w-md mx-auto w-full py-4">
+            <h2 className="text-xl font-bold text-black mb-2">{getStepTitle()}</h2>
+            <p className="text-xs text-gray-600 mb-4">{getStepDescription()}</p>
             
             {/* Error Message */}
             {error && (
@@ -286,7 +435,7 @@ export default function ResetPasswordPage() {
             )}
 
             {/* Step Indicator */}
-            <div className="flex items-center justify-center mb-6">
+            <div className="flex items-center justify-center mb-4">
               {[1, 2, 3].map((stepNumber) => (
                 <div key={stepNumber} className="flex items-center">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium ${

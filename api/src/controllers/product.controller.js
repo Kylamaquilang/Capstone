@@ -599,11 +599,14 @@ export const updateProduct = async (req, res) => {
       return res.status(400).json({ error: 'Invalid product ID' });
     }
 
-    // Check if product exists
+    // Check if product exists and get current stock
     const [existing] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
+
+    const oldStock = existing[0].stock;
+    const userId = req.user?.id || 1; // Get user ID from auth middleware
 
     // Validate input fields
     if (name && !validateName(name)) {
@@ -746,6 +749,36 @@ export const updateProduct = async (req, res) => {
 
       await connection.commit();
       connection.release();
+
+      // Record stock movement if stock changed
+      if (stock !== undefined && stock !== oldStock) {
+        const stockDifference = stock - oldStock;
+        const movementType = stockDifference > 0 ? 'stock_in' : 'stock_out';
+        const quantity = Math.abs(stockDifference);
+        const reason = stockDifference > 0 ? 'restock' : 'adjustment';
+
+        try {
+          await pool.query(`
+            INSERT INTO stock_movements 
+            (product_id, user_id, movement_type, quantity, previous_stock, new_stock, reason, notes, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+          `, [
+            id,
+            userId,
+            movementType,
+            quantity,
+            oldStock,
+            stock,
+            reason,
+            `Stock updated from ${oldStock} to ${stock}`
+          ]);
+
+          console.log(`📦 Stock movement recorded: Product ${id}, ${movementType}, Quantity: ${quantity}, Old: ${oldStock}, New: ${stock}`);
+        } catch (movementError) {
+          console.error('❌ Failed to record stock movement:', movementError);
+          // Don't fail the whole update if stock movement recording fails
+        }
+      }
 
       // Emit refresh signal for updated product
       const io = req.app.get('io');
@@ -974,6 +1007,7 @@ export const updateProductStock = async (req, res) => {
   try {
     const { id } = req.params;
     const { stock, reason, movement_type } = req.body;
+    const userId = req.user?.id || 1; // Get user ID from auth middleware, default to 1 if not available
 
     if (!stock || !reason || !movement_type) {
       return res.status(400).json({ 
@@ -1004,11 +1038,13 @@ export const updateProductStock = async (req, res) => {
       [newStock, id]
     );
 
-    // Log stock movement
+    // Log stock movement with user_id
     await pool.query(`
-      INSERT INTO stock_movements (product_id, movement_type, quantity, previous_stock, new_stock, reason, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, NOW())
-    `, [id, movement_type, stock, currentStock, newStock, reason]);
+      INSERT INTO stock_movements (product_id, user_id, movement_type, quantity, previous_stock, new_stock, reason, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+    `, [id, userId, movement_type, stock, currentStock, newStock, reason]);
+
+    console.log(`📦 Stock movement recorded: Product ${id}, Type: ${movement_type}, Quantity: ${stock}, User: ${userId}`);
 
     res.json({ 
       message: 'Stock updated successfully',

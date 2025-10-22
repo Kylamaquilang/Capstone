@@ -64,23 +64,18 @@ const io = new Server(server, {
   allowEIO3: true
 });
 
-// Static uploads directory
+// Static uploads directory with CORS support
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', (req, res, next) => {
+  // Set CORS headers for images
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
+  res.setHeader('Cache-Control', 'public, max-age=31536000');
+  next();
+}, express.static(path.join(__dirname, 'uploads')));
 
-// Enhanced Security middleware
-app.use(securityHeaders);
-app.use(requestLogger);
-app.use(requestSizeLimit('10mb'));
-app.use(sanitizeRequest);
-
-// Rate limiting with specific limits for different endpoints
-app.use('/api/auth', authRateLimit);
-app.use('/api/upload', uploadRateLimit);
-app.use('/api', apiRateLimit);
-
-// CORS configuration - Always allow localhost in development
+// CORS configuration - Must come BEFORE rate limiting to handle preflight requests
 app.use(cors({
   origin: [
     'http://localhost:3000',
@@ -93,6 +88,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'X-Requested-With'],
   optionsSuccessStatus: 200
 }));
+
+// Enhanced Security middleware
+app.use(securityHeaders);
+app.use(requestLogger);
+app.use(requestSizeLimit('10mb'));
+app.use(sanitizeRequest);
+
+// Rate limiting with specific limits for different endpoints (AFTER CORS)
+app.use('/api/auth', authRateLimit);
+app.use('/api/upload', uploadRateLimit);
+app.use('/api', apiRateLimit);
 
 // Compression middleware
 app.use(compression());

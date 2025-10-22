@@ -14,50 +14,43 @@ const getApiBaseUrl = () => {
 
 /**
  * Get the full URL for an image
+ * Handles both Cloudinary URLs and local file paths
  * @param {string} imagePath - The image path from the API
  * @returns {string} - The full URL for the image
  */
 export const getImageUrl = (imagePath) => {
+  // Return default fallback if no path provided
   if (!imagePath || imagePath === 'null' || imagePath === 'undefined') {
-    console.log('No image path provided, using default');
-    return '/images/polo.png'; // default fallback
+    return '/images/polo.png';
   }
   
-  // Check for known missing files and provide fallback
-  const missingImages = [
-    'product-1759125441920-962749394.png',
-    'product-1759125302247-365339742.webp'
-  ];
-  
-  const fileName = imagePath.split('/').pop(); // Extract filename
-  if (missingImages.includes(fileName)) {
-    console.log('Using fallback for missing image:', fileName);
-    return '/images/polo.png'; // fallback for missing images
-  }
-  
-  // If it's already a full URL, return as is
-  if (imagePath.startsWith('http')) {
+  // If it's already a full URL (Cloudinary, external, etc.), return as is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
     return imagePath;
   }
   
-  // If it already starts with '/uploads/', return as is with API base URL
+  // If it's a Next.js public file (images, icons, etc.), return as-is (served by Next.js)
+  if (imagePath.startsWith('/images/') || imagePath.startsWith('/icons/')) {
+    return imagePath;
+  }
+  
+  // If it starts with '/uploads/', prepend API base URL for local files
   if (imagePath.startsWith('/uploads/')) {
-    const fullUrl = `${getApiBaseUrl()}${imagePath}`;
-    console.log('Generated uploads URL:', fullUrl);
-    return fullUrl;
+    return `${getApiBaseUrl()}${imagePath}`;
+  }
+  
+  // If it starts with 'uploads/' (no leading slash), prepend API base URL
+  if (imagePath.startsWith('uploads/')) {
+    return `${getApiBaseUrl()}/${imagePath}`;
   }
   
   // If it starts with '/', prepend the API base URL
   if (imagePath.startsWith('/')) {
-    const fullUrl = `${getApiBaseUrl()}${imagePath}`;
-    console.log('Generated absolute URL:', fullUrl);
-    return fullUrl;
+    return `${getApiBaseUrl()}${imagePath}`;
   }
   
   // Otherwise, assume it's a raw filename and prepend /uploads/
-  const fullUrl = `${getApiBaseUrl()}/uploads/${imagePath}`;
-  console.log('Generated filename URL:', fullUrl);
-  return fullUrl;
+  return `${getApiBaseUrl()}/uploads/${imagePath}`;
 };
 
 /**

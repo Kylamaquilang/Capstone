@@ -2,7 +2,6 @@
 import Footer from '@/components/common/footer';
 import Navbar from '@/components/common/nav-bar';
 import { XMarkIcon, ShoppingCartIcon, TrashIcon } from '@heroicons/react/24/outline';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useNotifications } from '@/context/NotificationContext';
 import API from '@/lib/axios';
@@ -294,13 +293,15 @@ export default function CartPage() {
 
                     {/* Product Image */}
                     <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
-                      <Image
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
                         src={getImageUrl(item.product_image) || '/images/polo.png'}
                         alt={item.product_name}
-                        width={96}
-                        height={96}
                         className="w-full h-full object-cover"
+                        crossOrigin="anonymous"
+                        loading="lazy"
                         onError={(e) => {
+                          e.target.onerror = null;
                           e.target.src = '/images/polo.png';
                         }}
                       />

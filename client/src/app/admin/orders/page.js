@@ -910,7 +910,7 @@ export default function AdminOrdersPage() {
                   </thead>
                   <tbody>
                     {paginatedOrders.map((order, index) => (
-                      <tr key={order.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
+                      <tr key={`order-${order.id}-${index}`} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
                         <td className="px-4 py-3">
                           <div className="text-xs">
                             {order.items && order.items.length > 0 ? (
@@ -1003,7 +1003,7 @@ export default function AdminOrdersPage() {
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)} uppercase`}>
                               {order.status === 'ready_for_pickup' ? 'For Pickup' : 
                                order.status === 'claimed' ? 'Claimed' : 
-                               order.status.replace('_', ' ')}
+                               order.status ? order.status.replace('_', ' ') : 'Unknown'}
                             </span>
                           </div>
                         </td>
@@ -1213,8 +1213,8 @@ export default function AdminOrdersPage() {
 
       {/* Payment Method Update Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-2xl border-2 border-gray-300">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Update Payment Method - Order #{selectedOrder?.id}
             </h3>
@@ -1229,42 +1229,10 @@ export default function AdminOrdersPage() {
                   onChange={(e) => setPaymentUpdate({ ...paymentUpdate, payment_method: e.target.value })}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Select Payment Method</option>
+                  <option value="" disabled>Select Payment Method</option>
                   <option value="cash">Cash</option>
                   <option value="gcash">GCash</option>
-                  <option value="card">Card</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Payment Status (Optional)
-                </label>
-                <select
-                  value={paymentUpdate.payment_status}
-                  onChange={(e) => setPaymentUpdate({ ...paymentUpdate, payment_status: e.target.value })}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Keep Current Status</option>
-                  <option value="unpaid">Unpaid</option>
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="refunded">Refunded</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  value={paymentUpdate.notes}
-                  onChange={(e) => setPaymentUpdate({ ...paymentUpdate, notes: e.target.value })}
-                  placeholder="Add notes about the payment method change..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                />
               </div>
             </div>
 

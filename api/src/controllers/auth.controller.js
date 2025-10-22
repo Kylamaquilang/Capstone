@@ -43,26 +43,36 @@ export const signup = async (req, res) => {
     }
 
     // Validate email format if provided
-    if (email && !validateEmail(email)) {
-      return res.status(400).json({ 
-        error: 'Invalid email format' 
-      });
+    if (email) {
+      try {
+        validateEmail(email);
+      } catch (validationError) {
+        return res.status(400).json({ 
+          error: validationError.message 
+        });
+      }
     }
 
     // Validate student ID format if provided
-    if (student_id && !validateStudentId(student_id)) {
-      return res.status(400).json({ 
-        error: 'Invalid student ID format' 
-      });
+    if (student_id) {
+      try {
+        validateStudentId(student_id);
+      } catch (validationError) {
+        return res.status(400).json({ 
+          error: validationError.message 
+        });
+      }
     }
 
     // Generate password if not provided
     const finalPassword = password || (role === 'admin' ? 'admin123' : DEFAULT_STUDENT_PASSWORD);
     
     // Validate password strength
-    if (!validatePassword(finalPassword)) {
+    try {
+      validatePassword(finalPassword);
+    } catch (validationError) {
       return res.status(400).json({ 
-        error: 'Password must be at least 6 characters long' 
+        error: validationError.message 
       });
     }
 
@@ -549,11 +559,16 @@ export const verifyPasswordResetCode = async (req, res) => {
     );
 
     res.status(200).json({ 
-      message: 'Verification code verified successfully'
+      message: 'Verification code verified successfully',
+      resetToken: resetToken
     });
   } catch (error) {
-    console.error('Verify password reset code error:', error.message);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Verify password reset code error:', error);
+    console.error('❌ Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -561,16 +576,24 @@ export const verifyPasswordResetCode = async (req, res) => {
 export const resetPasswordWithToken = async (req, res) => {
   try {
     const { resetToken, newPassword } = req.body;
+    console.log('🔄 Password reset request received');
+    console.log('🔑 Reset token present:', !!resetToken);
+    console.log('🔒 New password present:', !!newPassword);
 
     if (!resetToken || !newPassword) {
+      console.log('❌ Missing required fields');
       return res.status(400).json({ 
         error: 'Reset token and new password are required' 
       });
     }
 
-    if (!validatePassword(newPassword)) {
+    // Validate password
+    try {
+      validatePassword(newPassword);
+    } catch (validationError) {
+      console.log('❌ Password validation failed:', validationError.message);
       return res.status(400).json({ 
-        error: 'New password must be at least 6 characters long' 
+        error: validationError.message 
       });
     }
 
@@ -596,8 +619,12 @@ export const resetPasswordWithToken = async (req, res) => {
 
     res.status(200).json({ message: 'Password reset successfully' });
   } catch (error) {
-    console.error('Reset password with token error:', error.message);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('❌ Reset password with token error:', error);
+    console.error('❌ Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -614,8 +641,12 @@ export const updateProfile = async (req, res) => {
     }
 
     // Validate email if provided
-    if (email && !validateEmail(email)) {
-      return res.status(400).json({ error: 'Invalid email format' });
+    if (email) {
+      try {
+        validateEmail(email);
+      } catch (validationError) {
+        return res.status(400).json({ error: validationError.message });
+      }
     }
 
     // Check if email is already taken by another user

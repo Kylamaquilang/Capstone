@@ -35,10 +35,10 @@ export const selectGCashPayment = async (req, res) => {
     // Generate a tracking ID for GCash selection
     const gcashTrackingId = `gcash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-    // Update order with GCash selection and set as unpaid
+    // Update order with GCash selection and set as pending
       await pool.query(
       'UPDATE orders SET payment_intent_id = ?, payment_status = ?, payment_method = ? WHERE id = ?',
-      [gcashTrackingId, 'unpaid', 'gcash', orderId]
+      [gcashTrackingId, 'pending', 'gcash', orderId]
       );
 
     // Store payment transaction for tracking
@@ -56,10 +56,10 @@ export const selectGCashPayment = async (req, res) => {
       gcashTrackingId,
         amount,
         'gcash',
-      'unpaid',
+      'pending',
       JSON.stringify({ 
         method: 'gcash_selection', 
-        message: 'GCash payment method selected - payment status set to unpaid',
+        message: 'GCash payment method selected - payment status set to pending',
         selected_at: new Date().toISOString()
       })
     ]);
@@ -69,9 +69,9 @@ export const selectGCashPayment = async (req, res) => {
     res.json({
       success: true,
       payment_intent_id: gcashTrackingId,
-      payment_status: 'unpaid',
+      payment_status: 'pending',
       payment_method: 'gcash',
-      message: 'GCash payment method selected. Order status set to unpaid.',
+      message: 'GCash payment method selected. Order status set to pending.',
       orderId: orderId
     });
 

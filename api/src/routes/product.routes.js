@@ -21,6 +21,7 @@ import {
 } from '../controllers/product.controller.js'
 
 import { verifyToken, isAdmin } from '../middleware/auth.middleware.js'
+import { uploadToCloudinary, isCloudinaryConfigured } from '../utils/cloudinaryService.js'
 
 const router = express.Router()
 
@@ -143,7 +144,7 @@ router.get('/:id', getProductById) // Get product by ID (must be last to avoid c
 
 // ✅ Admin-only below
 router.post('/', verifyToken, isAdmin, createProduct)
-router.post('/upload-image', verifyToken, isAdmin, upload.single('image'), (req, res) => {
+router.post('/upload-image', verifyToken, isAdmin, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ 
@@ -162,16 +163,35 @@ router.post('/upload-image', verifyToken, isAdmin, upload.single('image'), (req,
       })
     }
 
-    // Return a public URL to the uploaded file
-    const publicUrl = `/uploads/${req.file.filename}`
-    
-    console.log(`✅ Image uploaded successfully: ${req.file.filename}`)
+    let publicUrl = `/uploads/${req.file.filename}`
+    let cloudinaryPublicId = null;
+
+    // Try to upload to Cloudinary if configured
+    if (isCloudinaryConfigured()) {
+      try {
+        console.log('☁️ Uploading image to Cloudinary...');
+        const cloudinaryResult = await uploadToCloudinary(req.file.path, 'products');
+        publicUrl = cloudinaryResult.url;
+        cloudinaryPublicId = cloudinaryResult.public_id;
+        
+        // Delete the local file after successful Cloudinary upload
+        fs.unlinkSync(req.file.path);
+        console.log(`✅ Image uploaded to Cloudinary: ${cloudinaryPublicId}`);
+      } catch (cloudinaryError) {
+        console.error('⚠️ Cloudinary upload failed, falling back to local storage:', cloudinaryError.message);
+        // Keep using local file path as fallback
+      }
+    } else {
+      console.log('ℹ️ Cloudinary not configured, using local storage');
+    }
     
     res.status(201).json({ 
       success: true,
       url: publicUrl,
       filename: req.file.filename,
       size: req.file.size,
+      cloudinary_public_id: cloudinaryPublicId,
+      storage: cloudinaryPublicId ? 'cloudinary' : 'local',
       message: 'Image uploaded successfully'
     })
   } catch (error) {
