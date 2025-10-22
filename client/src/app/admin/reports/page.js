@@ -23,6 +23,7 @@ export default function AdminReportsPage() {
   const [activeTab, setActiveTab] = useState('inventory');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Date filters
   const [dateFilter, setDateFilter] = useState({
@@ -1024,9 +1025,9 @@ export default function AdminReportsPage() {
 
   return (
     <div className="flex flex-col min-h-screen text-black admin-page">
-      <Navbar />
+      <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
       <div className="flex flex-1 pt-16 lg:pt-20">
-        <Sidebar />
+        <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
         <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-64 ml-0">
           {/* Header */}
           <div className="mb-4 sm:mb-6">

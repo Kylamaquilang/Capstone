@@ -51,6 +51,7 @@ export default function AdminOrdersPage() {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Get unique values for filter options from orders data
   const getUniqueSections = () => {
@@ -729,37 +730,39 @@ export default function AdminOrdersPage() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen text-black admin-page">
-        <Navbar />
-        <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
-          <Sidebar />
-        <div className="flex-1 bg-white p-2 sm:p-3 overflow-auto lg:ml-64">
+        <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <div className="flex pt-[68px] lg:pt-20"> {/* Add padding-top for fixed navbar */}
+          <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <div className="flex-1 bg-gray-50 p-3 sm:p-4 overflow-auto lg:ml-64">
           {/* Main Container with Controls and Table */}
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Header Section */}
             <div className="p-3 sm:p-4 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                <div>
-                  <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Orders</h1>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-sm text-gray-600">
-                    Total Orders: {orders.length} | Showing: {filteredOrders.length}
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Orders</h1>
+                    <div className="text-xs sm:text-sm text-gray-600 mt-1">
+                      Total: {orders.length} | Showing: {filteredOrders.length}
+                    </div>
                   </div>
                   {/* Download and Print Buttons */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handleDownloadPDF}
-                      className="flex items-center gap-2 px-3 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 transition-colors text-xs sm:text-sm font-medium active:scale-95"
+                      title="Download PDF"
                     >
                       <ArrowDownTrayIcon className="h-4 w-4" />
-                    
+                      <span className="hidden sm:inline">PDF</span>
                     </button>
                     <button
                       onClick={handlePrint}
-                      className="flex items-center gap-2 px-3 py-2 bg-[#000C50] text-white rounded-md hover:bg-gray-700 transition-colors text-sm font-medium"
+                      className="flex items-center justify-center gap-2 px-3 py-2 bg-[#000C50] text-white rounded-md hover:bg-gray-700 transition-colors text-xs sm:text-sm font-medium active:scale-95"
+                      title="Print"
                     >
                       <PrinterIcon className="h-4 w-4" />
-                      
+                      <span className="hidden sm:inline">Print</span>
                     </button>
                   </div>
                 </div>
@@ -767,21 +770,24 @@ export default function AdminOrdersPage() {
             </div>
 
             {/* Search and Filter Controls */}
-            <div className="p-3 sm:p-4 border-b border-gray-200">
+            <div className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50">
               <div className="flex flex-col gap-3">
                 {/* Search Bar */}
-                <div className="w-80">
-                  <input
-                    type="text"
-                    placeholder="Search by name, student ID, email, or order ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                <div className="w-full">
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search orders..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
                 </div>
                 
-                {/* All Filter Controls in One Line */}
-                <div className="flex flex-nowrap gap-1 overflow-x-auto">
+                {/* All Filter Controls - Scrollable on Mobile */}
+                <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
                   <div className="w-32 flex-shrink-0">
                     <select
                       value={statusFilter}
@@ -869,7 +875,7 @@ export default function AdminOrdersPage() {
                         setYearFilter('');
                         setSectionFilter('');
                       }}
-                      className="w-full bg-gray-100 text-gray-700 px-1 py-1.5 rounded-md text-xs hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      className="w-full bg-gray-200 text-gray-700 px-2 py-1.5 rounded-md text-xs hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 active:scale-95"
                     >
                       Clear
                     </button>
@@ -894,24 +900,23 @@ export default function AdminOrdersPage() {
             ) : (
               <div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-100">
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                  <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Products</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Customer</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Department</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Quantity</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Amount</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Payment Method</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Payment Status</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Order Status</th>
-                      <th className="px-4 py-3 text-xs font-medium text-black-700">Actions</th>
+                      <th className="px-3 sm:px-4 py-3 text-xs font-medium text-gray-700">Products</th>
+                      <th className="px-3 sm:px-4 py-3 text-xs font-medium text-gray-700">Customer</th>
+                      <th className="px-3 sm:px-4 py-3 text-xs font-medium text-gray-700">Department</th>
+                      <th className="px-3 sm:px-4 py-3 text-xs font-medium text-gray-700">Quantity</th>
+                      <th className="px-3 sm:px-4 py-3 text-xs font-medium text-gray-700">Amount</th>
+                      <th className="px-3 sm:px-4 py-3 text-xs font-medium text-gray-700">Payment</th>
+                      <th className="px-3 sm:px-4 py-3 text-xs font-medium text-gray-700">Status</th>
+                      <th className="px-3 sm:px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedOrders.map((order, index) => (
-                      <tr key={`order-${order.id}-${index}`} className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white">
-                        <td className="px-4 py-3">
+                      <tr key={`order-${order.id}-${index}`} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                        <td className="px-3 sm:px-4 py-3">
                           <div className="text-xs">
                             {order.items && order.items.length > 0 ? (
                               <div className="flex items-center gap-1">
@@ -938,77 +943,63 @@ export default function AdminOrdersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div>
-                            <div className="text-xs font-medium text-gray-900 uppercase">{order.user_name}</div>
+                        <td className="px-3 sm:px-4 py-3">
+                          <div className="text-xs font-medium text-gray-900 uppercase truncate max-w-[120px]" title={order.user_name}>
+                            {order.user_name}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="text-center">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 uppercase">
-                              {order.degree || 'N/A'}
-                            </span>
-                          </div>
+                        <td className="px-3 sm:px-4 py-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 uppercase">
+                            {order.degree || 'N/A'}
+                          </span>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="text-center">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
-                              {order.total_quantity || 0}
-                            </span>
-                          </div>
+                        <td className="px-3 sm:px-4 py-3 text-center">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
+                            {order.total_quantity || 0}
+                          </span>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs font-medium text-gray-900">
+                        <td className="px-3 sm:px-4 py-3">
+                          <div className="text-xs font-semibold text-gray-900 whitespace-nowrap">
                             ₱{Number(order.total_amount || 0).toFixed(2)}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col space-y-1">
-                            <div className="flex items-center space-x-2">
-                              {order.payment_method === 'gcash' ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-xl text-xs font-medium bg-blue-100 text-gray-600 uppercase">
-                                  GCash
+                        <td className="px-3 sm:px-4 py-3">
+                          <div className="space-y-1">
+                            {order.payment_method === 'gcash' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 uppercase whitespace-nowrap">
+                                GCash
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 uppercase whitespace-nowrap">
+                                Cash
+                              </span>
+                            )}
+                            <div>
+                              {order.payment_status === 'paid' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 uppercase whitespace-nowrap">
+                                  Paid
+                                </span>
+                              ) : order.payment_status === 'pending' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 uppercase whitespace-nowrap">
+                                  Pending
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-xl text-xs font-medium bg-yellow-100 text-gray-600 uppercase">
-                                  Cash
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 uppercase whitespace-nowrap">
+                                  Unpaid
                                 </span>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center space-x-2">
-                            {order.payment_status === 'paid' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-green-100 text-green-700 uppercase">
-                                Paid
-                              </span>
-                            ) : order.payment_status === 'pending' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-yellow-100 text-yellow-700 uppercase">
-                                Pending
-                              </span>
-                            ) : order.payment_status === 'failed' ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-red-100 text-red-700 uppercase">
-                                Failed
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 uppercase">
-                                Unpaid
-                              </span>
-                            )}
-                          </div>
+                        <td className="px-3 sm:px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)} uppercase whitespace-nowrap`}>
+                            {order.status === 'ready_for_pickup' ? 'For Pickup' : 
+                             order.status === 'claimed' ? 'Claimed' : 
+                             order.status ? order.status.replace('_', ' ') : 'Unknown'}
+                          </span>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center space-x-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(order.status)} uppercase`}>
-                              {order.status === 'ready_for_pickup' ? 'For Pickup' : 
-                               order.status === 'claimed' ? 'Claimed' : 
-                               order.status ? order.status.replace('_', ' ') : 'Unknown'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
+                        <td className="px-3 sm:px-4 py-3">
+                          <div className="flex items-center gap-1">
                             <button
                               onClick={() => {
                                 setSelectedOrder(order);
@@ -1055,11 +1046,11 @@ export default function AdminOrdersPage() {
 
           {/* Pagination */}
           {filteredOrders.length > 0 && (
-            <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="px-3 sm:px-4 py-3 border-t border-gray-200 bg-gray-50">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 {/* Records Info */}
-                <div className="text-xs text-gray-600">
-                  Showing {startIndex + 1} to {Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length} orders
+                <div className="text-xs text-gray-600 text-center sm:text-left">
+                  Showing {startIndex + 1}-{Math.min(endIndex, filteredOrders.length)} of {filteredOrders.length}
                 </div>
                 
                 {/* Pagination Controls */}
@@ -1067,19 +1058,21 @@ export default function AdminOrdersPage() {
                   <button
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1 || totalPages <= 1}
-                    className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                    className="px-3 py-1.5 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors active:scale-95"
+                    aria-label="Previous page"
                   >
                     &lt;
                   </button>
                   
-                  <span className="px-3 py-1 text-xs border border-gray-300 rounded-md bg-[#000C50] text-white">
-                    {currentPage}
+                  <span className="px-3 py-1.5 text-xs border border-gray-300 rounded-md bg-[#000C50] text-white font-medium">
+                    {currentPage} / {totalPages}
                   </span>
                   
                   <button
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages || totalPages <= 1}
-                    className="px-3 py-1 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                    className="px-3 py-1.5 text-xs border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors active:scale-95"
+                    aria-label="Next page"
                   >
                     &gt;
                   </button>

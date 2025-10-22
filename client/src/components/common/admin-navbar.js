@@ -1,12 +1,12 @@
 'use client';
-import { BellIcon, ArrowRightOnRectangleIcon, XMarkIcon, CheckIcon, TrashIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { BellIcon, ArrowRightOnRectangleIcon, XMarkIcon, CheckIcon, TrashIcon, ChevronRightIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import API from '@/lib/axios';
 
-export default function AdminNavbar() {
+export default function AdminNavbar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [apiAvailable, setApiAvailable] = useState(true);
   const [recentNotifications, setRecentNotifications] = useState([]);
@@ -16,6 +16,10 @@ export default function AdminNavbar() {
   const dropdownRef = useRef(null);
   const router = useRouter();
   const { user, logout } = useAuth();
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
 
   const fetchUnreadCount = async () => {
     try {
@@ -231,21 +235,22 @@ export default function AdminNavbar() {
   return (
     <>
       {/* Desktop Header */}
-      <nav className="hidden lg:flex bg-[#000C50] text-white p-4 items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}>
-        <div className="flex items-center gap-2">
-          <Image src="/images/cpc.png" alt="Logo" width={30} height={30} />
+      <nav className="hidden lg:flex bg-[#000C50] text-white px-4 py-3 items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg">
+        <div className="flex items-center gap-3">
+          <Image src="/images/cpc.png" alt="Logo" width={32} height={32} priority />
           <span className="text-lg font-semibold">Admin Panel</span>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-3 items-center">
           <div className="relative" ref={dropdownRef}>
           <button 
             onClick={handleNotificationClick}
-              className="relative p-2 rounded-lg hover:bg-blue-800 transition-colors"
+              className="relative p-2 rounded-lg hover:bg-blue-800 transition-colors active:scale-95"
             title={apiAvailable ? "Notifications" : "Notifications (API unavailable)"}
+            aria-label="Notifications"
           >
             <BellIcon className={`h-5 w-5 ${apiAvailable ? 'text-white' : 'text-gray-400'}`} />
             {unreadCount > 0 && apiAvailable && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
@@ -388,8 +393,9 @@ export default function AdminNavbar() {
           <div className="flex items-center">
             <button
               onClick={handleLogout}
-              className="text-white p-2 rounded-lg hover:bg-blue-800 transition-colors"
+              className="text-white p-2 rounded-lg hover:bg-blue-800 transition-colors active:scale-95"
               title="Logout"
+              aria-label="Logout"
             >
               <ArrowRightOnRectangleIcon className="h-5 w-5" />
             </button>
@@ -398,21 +404,39 @@ export default function AdminNavbar() {
       </nav>
 
       {/* Mobile Header */}
-      <div className="lg:hidden bg-[#000C50] text-white p-3 flex items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}>
-        <div className="flex items-center gap-2">
-          <Image src="/images/cpc.png" alt="Logo" width={24} height={24} />
-          <span className="text-base font-semibold">Admin</span>
+      <nav className="lg:hidden bg-[#000C50] text-white px-3 py-2.5 flex items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg">
+        <div className="flex items-center gap-3">
+          {/* Hamburger Menu Button */}
+          <button
+            onClick={toggleMobileMenu}
+            className={`p-2 rounded-lg transition-all duration-300 active:scale-95 ${
+              isMobileMenuOpen 
+                ? 'bg-transparent hover:bg-white/10' 
+                : 'bg-[#000C50] hover:bg-blue-800'
+            }`}
+            aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+          >
+            {isMobileMenuOpen ? (
+              <XMarkIcon className="h-5 w-5 text-white" />
+            ) : (
+              <Bars3Icon className="h-5 w-5 text-white" />
+            )}
+          </button>
+          
+          <Image src="/images/cpc.png" alt="Logo" width={28} height={28} priority />
+          <span className="text-base font-semibold">Admin Panel</span>
         </div>
-        <div className="flex gap-1 items-center">
+        <div className="flex gap-2 items-center">
           <div className="relative" ref={dropdownRef}>
           <button 
             onClick={handleNotificationClick}
-            className="relative p-2 rounded-lg hover:bg-blue-800 transition-colors"
+            className="relative p-2 rounded-lg hover:bg-blue-800 transition-colors active:scale-95"
             title={apiAvailable ? "Notifications" : "Notifications (API unavailable)"}
+            aria-label="Notifications"
           >
-            <BellIcon className={`h-4 w-4 ${apiAvailable ? 'text-white' : 'text-gray-400'}`} />
+            <BellIcon className={`h-5 w-5 ${apiAvailable ? 'text-white' : 'text-gray-400'}`} />
             {unreadCount > 0 && apiAvailable && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-3 w-3 flex items-center justify-center text-[10px]">
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center font-semibold">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -555,14 +579,15 @@ export default function AdminNavbar() {
           <div className="flex items-center">
             <button
               onClick={handleLogout}
-              className="text-white p-2 rounded-lg hover:bg-blue-800 transition-colors"
+              className="text-white p-2 rounded-lg hover:bg-blue-800 transition-colors active:scale-95"
               title="Logout"
+              aria-label="Logout"
             >
-              <ArrowRightOnRectangleIcon className="h-4 w-4" />
+              <ArrowRightOnRectangleIcon className="h-5 w-5" />
             </button>
           </div>
         </div>
-      </div>
+      </nav>
     </>
   );
 }

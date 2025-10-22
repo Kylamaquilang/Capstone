@@ -24,6 +24,7 @@ export default function AdminUsersPage() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -432,65 +433,67 @@ export default function AdminUsersPage() {
 
   return (
     <div className="min-h-screen text-black admin-page">
-      <Navbar />
-      <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
-        <Sidebar />
-        <div className="flex-1 bg-white p-2 sm:p-3 overflow-auto lg:ml-64">
+      <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+      <div className="flex pt-[68px] lg:pt-20"> {/* Add padding-top for fixed navbar */}
+        <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <div className="flex-1 bg-gray-50 p-3 sm:p-4 overflow-auto lg:ml-64">
           {/* Main Container with Buttons and Table */}
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
             {/* Header Section */}
             <div className="p-3 sm:p-4 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                <div>
-                  <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Users</h1>
-                  {selectedUsers.size > 0 && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      {selectedUsers.size} user(s) selected
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  {/* Bulk Actions */}
-                  {selectedUsers.size > 0 && (
-                    <div className="flex items-center gap-2 mr-2">
-                      <button 
-                        onClick={handleBulkActivate}
-                        disabled={bulkActionLoading}
-                        className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-sm font-medium flex items-center gap-2"
-                      >
-                        {bulkActionLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
-                        Activate Selected
-                      </button>
-                      <button 
-                        onClick={handleBulkDeactivate}
-                        disabled={bulkActionLoading}
-                        className="bg-yellow-600 text-white px-3 py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50 transition-colors text-sm font-medium flex items-center gap-2"
-                      >
-                        {bulkActionLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
-                        Deactivate Selected
-                      </button>
-                      <button 
-                        onClick={handleBulkDelete}
-                        disabled={bulkActionLoading}
-                        className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors text-sm font-medium flex items-center gap-2"
-                      >
-                        {bulkActionLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
-                        Delete Selected
-                      </button>
-                    </div>
-                  )}
-                  <button 
-                    onClick={() => setShowAddStudentModal(true)}
-                    className="bg-[#000C50] text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
-                  >
-                    Add Student
-                  </button>
-                  <button 
-                    onClick={() => setShowBulkUploadModal(true)}
-                    className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-                  >
-                    Bulk Upload
-                  </button>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Users</h1>
+                    {selectedUsers.size > 0 && (
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                        {selectedUsers.size} user(s) selected
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    {/* Bulk Actions - Stack on Mobile */}
+                    {selectedUsers.size > 0 && (
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <button 
+                          onClick={handleBulkActivate}
+                          disabled={bulkActionLoading}
+                          className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 active:scale-95"
+                        >
+                          {bulkActionLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                          <span>Activate ({selectedUsers.size})</span>
+                        </button>
+                        <button 
+                          onClick={handleBulkDeactivate}
+                          disabled={bulkActionLoading}
+                          className="bg-yellow-600 text-white px-3 py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 active:scale-95"
+                        >
+                          {bulkActionLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                          <span>Deactivate ({selectedUsers.size})</span>
+                        </button>
+                        <button 
+                          onClick={handleBulkDelete}
+                          disabled={bulkActionLoading}
+                          className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2 active:scale-95"
+                        >
+                          {bulkActionLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                          <span>Delete ({selectedUsers.size})</span>
+                        </button>
+                      </div>
+                    )}
+                    <button 
+                      onClick={() => setShowAddStudentModal(true)}
+                      className="bg-[#000C50] text-white px-3 py-2 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium active:scale-95"
+                    >
+                      Add Student
+                    </button>
+                    <button 
+                      onClick={() => setShowBulkUploadModal(true)}
+                      className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium active:scale-95"
+                    >
+                      Bulk Upload
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

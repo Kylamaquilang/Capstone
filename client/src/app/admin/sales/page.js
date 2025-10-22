@@ -59,6 +59,7 @@ export default function AdminSalesPage() {
     end_date: ''
   });
   const [groupBy, setGroupBy] = useState('day');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const fetchSalesData = async () => {
     try {
@@ -583,30 +584,30 @@ export default function AdminSalesPage() {
 
   return (
     <div className="min-h-screen text-black admin-page">
-      <Navbar />
-      <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
-        <Sidebar />
-        <div className="flex-1 bg-white p-2 sm:p-3 overflow-auto lg:ml-64">
+      <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+      <div className="flex pt-[68px] lg:pt-20"> {/* Add padding-top for fixed navbar */}
+        <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <div className="flex-1 bg-gray-50 p-3 sm:p-4 overflow-auto lg:ml-64">
           {/* Header */}
-          <div className="mb-2">
-            <div className="flex items-center justify-between">
+          <div className="mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h1 className="text-lg sm:text-2xl font-semibold text-gray-900 mb-5">Sales Analytics</h1>
+                <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Sales Analytics</h1>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   onClick={fetchSalesData}
-                  className="px-3 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center gap-2 mb-5"
+                  className="w-full sm:w-auto px-3 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center justify-center gap-2 active:scale-95"
                 >
                   <ArrowPathIcon className="w-4 h-4" />
-                  Refresh Data
+                  <span>Refresh Data</span>
                 </button>
                 <a
                   href="/admin/orders"
-                  className="px-3 py-2 bg-white-600 text-[#000C50] rounded-md text-sm font-medium flex items-center gap-2 mb-5 border"
+                  className="w-full sm:w-auto px-3 py-2 bg-white text-[#000C50] rounded-md text-sm font-medium flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50"
                 >
                   <ClipboardDocumentListIcon className="w-4 h-4" />
-                  View Orders
+                  <span>View Orders</span>
                 </a>
               </div>
             </div>
@@ -619,8 +620,8 @@ export default function AdminSalesPage() {
           )}
 
           {/* Filters */}
-          <div className="bg-white p-2 sm:p-3 rounded-lg shadow-sm border border-gray-200 mb-5">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
                 <input
@@ -656,7 +657,7 @@ export default function AdminSalesPage() {
               
               <button
                 onClick={fetchSalesData}
-                className="px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-800 text-sm font-medium"
+                className="w-full sm:w-auto px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-800 text-sm font-medium active:scale-95"
               >
                 Apply Filters
               </button>
@@ -671,7 +672,7 @@ export default function AdminSalesPage() {
           ) : (
             <>
               {/* Sales Summary */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                 <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                   <div className="flex items-center">
                     <div className="p-2 bg-blue-50 rounded-md mt-2 ml-4">
@@ -734,9 +735,9 @@ export default function AdminSalesPage() {
 
               {/* Profit Analytics Section */}
               {salesData.profitAnalytics && (
-                <div className="mb-5">
-                  <h2 className="text-sm font-semibold text-gray-900 mb-2">Profit Analytics</h2>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                <div className="mb-4">
+                  <h2 className="text-sm sm:text-base font-semibold text-gray-900 mb-3">Profit Analytics</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
                       <div className="flex items-center">
                         <div className="p-2 bg-blue-50 rounded-md mt-2 ml-4">
@@ -801,7 +802,7 @@ export default function AdminSalesPage() {
 
 
               {/* Charts Section */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                 {/* Sales Trend Line Chart */}
                 <div className="bg-white border border-gray-200 rounded-lg shadow-md">
                   <div className="p-4">

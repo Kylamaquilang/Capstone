@@ -82,6 +82,18 @@ export default function UserProfilePage() {
     });
   }, [authUser]);
 
+  // Close menu on escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && menuOpen) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [menuOpen]);
+
   // Fetch user's profile and orders
   const fetchData = useCallback(async () => {
     try {
@@ -686,10 +698,75 @@ export default function UserProfilePage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
 
-      <main className="flex-grow">
+      <main className="flex-grow pt-20 sm:pt-24">
         {/* User Info Card */}
-        <div className="bg-[#000C50] to-blue-800 mx-4 sm:mx-6 lg:mx-8 xl:mx-24 my-4 sm:my-6 p-4 sm:p-6 lg:p-8 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center relative text-white shadow-xl">
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center w-full sm:w-auto">
+        <div className="bg-[#000C50] to-blue-800 mx-4 sm:mx-6 lg:mx-8 xl:mx-24 my-4 sm:my-6 p-4 sm:p-6 lg:p-8 rounded-lg relative text-white shadow-xl">
+          {/* Hamburger Button - Top Right Corner */}
+          <div className="absolute top-4 right-4 z-10">
+            <button 
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 sm:p-3 rounded-full transition-all backdrop-blur-sm"
+              aria-label="Profile menu"
+            >
+              <Bars3Icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            </button>
+            {menuOpen && (
+              <>
+                {/* Close menu when clicking outside */}
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setMenuOpen(false)}
+                  aria-hidden="true"
+                />
+                <div className="absolute right-0 mt-2 w-56 sm:w-64 bg-white rounded-lg shadow-xl z-20 border border-gray-200 overflow-hidden">
+                  <div className="p-2">
+                    <button
+                      onClick={() => {
+                        setEditing(!editing);
+                        setMenuOpen(false);
+                      }}
+                      className="flex items-center gap-3 w-full text-gray-700 px-4 py-3 hover:bg-gray-100 rounded-md transition-colors text-sm sm:text-base"
+                    >
+                      <PencilIcon className="h-5 w-5 text-[#000C50] flex-shrink-0" />
+                      <span>{editing ? 'Cancel Edit' : 'Edit Profile'}</span>
+                    </button>
+                    <label className="flex items-center gap-3 w-full text-gray-700 px-4 py-3 hover:bg-gray-100 rounded-md transition-colors cursor-pointer text-sm sm:text-base">
+                      <CameraIcon className="h-5 w-5 text-[#000C50] flex-shrink-0" />
+                      <span>Change Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                    </label>
+                    <button
+                      onClick={() => {
+                        handleSendVerificationCode();
+                        setMenuOpen(false);
+                      }}
+                      className="flex items-center gap-3 w-full text-gray-700 px-4 py-3 hover:bg-gray-100 rounded-md transition-colors text-sm sm:text-base"
+                    >
+                      <KeyIcon className="h-5 w-5 text-[#000C50] flex-shrink-0" />
+                      <span>Change Password</span>
+                    </button>
+                    <hr className="my-2" />
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-3 w-full px-4 py-3 hover:bg-red-50 rounded-md transition-colors text-red-600 text-sm sm:text-base"
+                    >
+                      <ArrowRightIcon className="h-5 w-5 flex-shrink-0" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Profile Content */}
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center pr-12 sm:pr-16">
             <div className="relative flex-shrink-0">
               {profile.profile_image ? (
                 <Image
@@ -718,22 +795,22 @@ export default function UserProfilePage() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 truncate">{profile.name}</h1>
-              <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 break-words">{profile.name}</h1>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <AcademicCapIcon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                <p className="text-sm sm:text-base lg:text-lg opacity-90 truncate">{profile.student_id}</p>
+                <p className="text-sm sm:text-base lg:text-lg opacity-90 break-words">{profile.student_id}</p>
               </div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <EnvelopeIcon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                <p className="text-xs sm:text-sm opacity-80 truncate">{profile.email}</p>
+                <p className="text-xs sm:text-sm opacity-80 break-words">{profile.email}</p>
               </div>
               {profile.contact_number && (
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <PhoneIcon className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                  <p className="text-xs sm:text-sm opacity-80 truncate">{profile.contact_number}</p>
+                  <p className="text-xs sm:text-sm opacity-80 break-words">{profile.contact_number}</p>
                 </div>
               )}
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <ShieldCheckIcon className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span className={`px-2 sm:px-3 py-1 text-xs font-medium rounded-full ${
                   profile.is_active 
@@ -744,55 +821,6 @@ export default function UserProfilePage() {
                 </span>
               </div>
             </div>
-          </div>
-
-          {/* Hamburger Button */}
-          <div className="relative mt-4 sm:mt-0 flex-shrink-0">
-            <button 
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 sm:p-3 rounded-full transition-all"
-            >
-              <Bars3Icon className="h-5 w-5 sm:h-6 sm:w-6 text-[#000C50]" />
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 mt-2 w-48 sm:w-56 bg-white rounded-lg shadow-lg z-10 border">
-                <div className="p-2">
-                  <button
-                    onClick={() => setEditing(!editing)}
-                    className="flex items-center gap-3 w-full text-[#000C50] px-4 py-3 hover:bg-gray-100 rounded-md transition-colors"
-                  >
-                    <PencilIcon className="h-5 w-5 text-[#000C50]" />
-                    {editing ? 'Cancel Edit' : 'Edit Profile'}
-                  </button>
-                  <label className="flex items-center gap-3 w-full text-[#000C50] px-4 py-3 hover:bg-gray-100 rounded-md transition-colors cursor-pointer">
-                    <CameraIcon className="h-5 w-5 text-[#000C50]" />
-                    Change Photo
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={uploadingImage}
-                    />
-                  </label>
-                  <button
-                    onClick={handleSendVerificationCode}
-                    className="flex items-center gap-2 w-full text-[#000C50] px-4 py-3 hover:bg-gray-100 rounded-md transition-colors"
-                  >
-                    <KeyIcon className="h-5 w-5 text-[#000C50]" />
-                    Change Password
-                  </button>
-                  <hr className="my-2" />
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-3 w-full text-[#000C50] px-4 py-3 hover:bg-red-50 rounded-md transition-colors text-red-600"
-                  >
-                    <ArrowRightIcon className="h-5 w-5" />
-                    Logout
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 

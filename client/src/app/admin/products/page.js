@@ -15,6 +15,7 @@ export default function AdminProductPage() {
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Build tabs dynamically from categories
   const tabs = [
@@ -113,44 +114,46 @@ export default function AdminProductPage() {
 
   return (
     <div className="min-h-screen text-black admin-page">
-      <Navbar />
-      <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
-        <Sidebar />
-        <div className="flex-1 bg-white-50 p-2 sm:p-3 overflow-auto lg:ml-64">
+      <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+      <div className="flex pt-[68px] lg:pt-20"> {/* Add padding-top for fixed navbar */}
+        <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <div className="flex-1 bg-gray-50 p-3 sm:p-4 overflow-auto lg:ml-64">
           {/* Header Section */}
-          <div className="mb-2 ml-1 sm:ml-2">
-            <h1 className="text-lg sm:text-2xl font-semibold text-gray-900 mb-1">Products</h1>
+          <div className="mb-3 sm:mb-4">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Products</h1>
           </div>
 
           {/* Main Container with Search, Tabs and Table */}
-          <div className="bg-white rounded-xl shadow-lg">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             {/* Modern Tab Navigation */}
-            <div className="border-b border-gray-100">
-              <div className="flex items-center justify-between px-4 py-3">
-                {/* Tab Navigation */}
-                <div className="flex space-x-1 bg-white-100 p-1 rounded-lg">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => {
-                        setActiveTab(tab.id);
-                        setSelectedSubcategory('');
-                      }}
-                      className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                        activeTab === tab.id
-                          ? 'bg-[#000C50] text-white shadow-sm font-semibold'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-white'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
+            <div className="border-b border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 sm:px-4 py-3">
+                {/* Tab Navigation - Horizontal Scroll on Mobile */}
+                <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                  <div className="flex space-x-1 bg-gray-50 p-1 rounded-lg min-w-max">
+                    {tabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          setActiveTab(tab.id);
+                          setSelectedSubcategory('');
+                        }}
+                        className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 whitespace-nowrap ${
+                          activeTab === tab.id
+                            ? 'bg-[#000C50] text-white shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-white'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Add Product Button */}
                 <button 
                   onClick={() => setShowAddProductModal(true)}
-                  className="bg-[#000C50] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium shadow-sm"
+                  className="w-full sm:w-auto bg-[#000C50] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium shadow-sm active:scale-95"
                 >
                   Add Product
                 </button>

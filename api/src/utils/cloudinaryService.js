@@ -119,3 +119,4 @@ export const uploadBufferToCloudinary = async (buffer, folder = 'products') => {
 export default cloudinary;
 
 
+

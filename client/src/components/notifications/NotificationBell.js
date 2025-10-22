@@ -11,6 +11,7 @@ const NotificationBell = ({ userType = 'user', userId }) => {
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const { socket, isConnected, connectionFailed, joinUserRoom } = useSocket();
+  const bellButtonRef = useRef(null);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
@@ -101,12 +102,9 @@ const NotificationBell = ({ userType = 'user', userId }) => {
     }
   }, [notifications]);
 
-  const toggleDropdown = () => {
-    if (isOpen) {
-      setIsOpen(false);
-    } else {
-      setIsOpen(true);
-    }
+  const toggleDropdown = (e) => {
+    e.stopPropagation();
+    setIsOpen(!isOpen);
   };
 
   const handleClose = useCallback(() => {
@@ -119,16 +117,17 @@ const NotificationBell = ({ userType = 'user', userId }) => {
   }, []);
 
   return (
-    <div className="relative">
+    <div className="relative inline-block">
       {/* Notification Bell Button */}
       <button
+        ref={bellButtonRef}
         onClick={toggleDropdown}
-        className="relative p-2 text-white hover:text-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 rounded-full"
+        className="relative p-2 text-white hover:text-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 rounded-full"
         aria-label="Notifications"
       >
         {/* Bell Icon */}
         <svg
-          className="w-6 h-6"
+          className="w-5 h-5 sm:w-6 sm:h-6"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -144,7 +143,7 @@ const NotificationBell = ({ userType = 'user', userId }) => {
 
         {/* Unread Count Badge */}
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-medium text-[10px] sm:text-xs">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -152,7 +151,7 @@ const NotificationBell = ({ userType = 'user', userId }) => {
         {/* Loading Indicator */}
         {loading && (
           <div className="absolute -top-1 -right-1">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white"></div>
           </div>
         )}
       </button>
@@ -164,6 +163,7 @@ const NotificationBell = ({ userType = 'user', userId }) => {
         userId={userId}
         notifications={notifications}
         onUpdateNotifications={updateNotifications}
+        triggerRef={bellButtonRef}
       />
     </div>
   );

@@ -10,11 +10,10 @@ import {
   BellIcon, ChartBarIcon
 } from '@heroicons/react/24/outline';
 
-export default function Sidebar() {
+export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   const { logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -44,49 +43,29 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile Hamburger Button */}
-      <button
-        onClick={toggleMobileMenu}
-        className="lg:hidden fixed top-20 left-3 z-50 bg-white text-gray-700 p-2 rounded-lg shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
-      >
-        {isMobileMenuOpen ? (
-          <XMarkIcon className="h-4 w-4" />
-        ) : (
-          <Bars3Icon className="h-4 w-4" />
-        )}
-      </button>
-
-      {/* Mobile Overlay */}
+      {/* Mobile Overlay - Transparent clickable area */}
       {isMobileMenuOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-gray bg-opacity-50 z-40"
+          className="lg:hidden fixed inset-0 z-40 transition-opacity duration-300"
           onClick={toggleMobileMenu}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
-      <div className={`
-        w-60 bg-white flex flex-col min-h-screen  
-        fixed top-20 left-0 transform transition-transform duration-300 ease-in-out z-30  
-        shadow-md
-        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}  
-      `}>
-        {/* Mobile Header */}
-        <div className="lg:hidden px-3 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Admin Panel</h2>
-            <button
-              onClick={toggleMobileMenu}
-              className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-            >
-              <XMarkIcon className="h-5 w-5 text-gray-500" />
-            </button>
-          </div>
-        </div>
+      <aside 
+        className={`
+          w-64 bg-white flex flex-col h-screen
+          fixed top-[68px] left-0 bottom-0 transform transition-transform duration-300 ease-in-out z-50
+          shadow-xl border-r border-gray-200
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}
+        aria-label="Sidebar navigation"
+      >
 
         {/* Navigation Items */}
-        <div className="flex-1 px-3 py-6">
-          <nav className="space-y-1">
+        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+          <div className="space-y-1">
             <SidebarItem href="/admin/products" icon={CubeIcon} label="Products" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/categories" icon={TagIcon} label="Categories" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" onClick={toggleMobileMenu} pathname={pathname} />
@@ -94,20 +73,20 @@ export default function Sidebar() {
             <SidebarItem href="/admin/sales" icon={BanknotesIcon} label="Sales" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/reports" icon={ChartBarIcon} label="Reports" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/users" icon={UserCircleIcon} label="Users" onClick={toggleMobileMenu} pathname={pathname} />
-          </nav>
-        </div>
+          </div>
+        </nav>
 
         {/* Logout Section */}
-        <div className="px-3 py-4 border-t border-gray-100">
+        <div className="px-3 py-4 border-t border-gray-200 bg-gray-50">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center space-x-3 px-3 py-3 text-sm font-medium text-gray-600 hover:text-white hover:bg-[#000C50] rounded-md transition-colors"
+            className="w-full flex items-center space-x-3 px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-white hover:bg-[#000C50] rounded-md transition-all active:scale-95"
           >
             <ArrowLeftOnRectangleIcon className="h-5 w-5" />
             <span>Sign Out</span>
           </button>
         </div>
-      </div>
+      </aside>
     </>
   );
 }

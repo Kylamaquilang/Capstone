@@ -17,6 +17,7 @@ export default function AdminNotificationPage() {
   const [processingOrder, setProcessingOrder] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const fetchNotifications = async () => {
     try {
@@ -209,9 +210,9 @@ export default function AdminNotificationPage() {
 
   return (
     <div className="min-h-screen text-black admin-page">
-      <Navbar />
+      <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
       <div className="flex pt-16 lg:pt-20"> {/* Add padding-top for fixed navbar */}
-        <Sidebar />
+        <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
         <div className="flex-1 bg-white p-2 sm:p-3 overflow-auto lg:ml-64">
           <div className="max-w-4xl mx-auto">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

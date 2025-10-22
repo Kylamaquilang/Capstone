@@ -37,6 +37,7 @@ export default function AdminInventoryPage() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [currentActionType, setCurrentActionType] = useState('stockIn');
   const [activeTab, setActiveTab] = useState('overview');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Form states
   const [stockInForm, setStockInForm] = useState({
@@ -446,9 +447,9 @@ export default function AdminInventoryPage() {
   if (loading) {
     return (
       <div className="min-h-screen text-black admin-page">
-        <Navbar />
-        <div className="flex pt-16 lg:pt-20">
-          <Sidebar />
+        <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <div className="flex pt-[68px] lg:pt-20">
+          <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
           <div className="flex-1 flex items-center justify-center bg-gray-50 lg:ml-64">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#000C50] mx-auto mb-4"></div>
@@ -462,20 +463,20 @@ export default function AdminInventoryPage() {
 
   return (
     <div className="min-h-screen text-black admin-page">
-      <Navbar />
-      <div className="flex pt-16 lg:pt-20">
-        <Sidebar />
-        <div className="flex-1 bg-white p-2 sm:p-3 overflow-auto lg:ml-64">
+      <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+      <div className="flex pt-[68px] lg:pt-20">
+        <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
+        <div className="flex-1 bg-gray-50 p-3 sm:p-4 overflow-auto lg:ml-64">
            {/* Header */}
-           <div className="mb-4 sm:mb-6">
-             <div className="flex justify-between items-center">
+           <div className="mb-4">
+             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                <div>
-                <h1 className="text-lg sm:text-2xl font-semibold text-gray-900">Inventory Management</h1>
-                <p className="text-sm text-gray-600 mt-1">Transaction-based stock tracking system</p>
+                <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Inventory Management</h1>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">Transaction-based stock tracking system</p>
                </div>
                <button
                 onClick={fetchAllData}
-                 className="px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium mr-5"
+                 className="w-full sm:w-auto px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium active:scale-95"
                >
                  Refresh Data
                </button>
@@ -488,27 +489,27 @@ export default function AdminInventoryPage() {
             </div>
           )}
 
-          {/* Tabs */}
+          {/* Tabs - Horizontal Scroll on Mobile */}
           <div className="mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8">
+            <div className="border-b border-gray-200 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+              <nav className="-mb-px flex space-x-4 sm:space-x-8 min-w-max">
                 {[
                   { id: 'overview', name: 'Overview', count: getSummaryStats().total_products },
                   { id: 'current', name: 'Current Stock', count: currentStock.length },
-                  { id: 'history', name: 'Transaction History', count: stockHistory.length },
-                  { id: 'alerts', name: 'Low Stock Alerts', count: lowStockAlerts.length }
+                  { id: 'history', name: 'History', count: stockHistory.length },
+                  { id: 'alerts', name: 'Alerts', count: lowStockAlerts.length }
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    className={`py-2 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap ${
                       activeTab === tab.id
                         ? 'border-[#000C50] text-[#000C50]'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                   >
                     {tab.name}
-                    <span className="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2 rounded-full text-xs">
+                    <span className="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2 rounded-full text-[10px] sm:text-xs">
                       {tab.count}
                     </span>
                   </button>
@@ -519,59 +520,59 @@ export default function AdminInventoryPage() {
 
           {/* Overview Tab */}
           {activeTab === 'overview' && (
-            <div className="space-y-6">
+            <div className="space-y-4">
           {/* Inventory Overview Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
-              <div className="flex items-center">
-                <div className="p-2 bg-blue-100 rounded-md mt-2 ml-4">
-                  <CubeIcon className="w-8 h-8 text-blue-700" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 rounded-md">
+                  <CubeIcon className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="ml-2 sm:ml-3">
-                  <p className="text-xs sm:text-sm font-medium text-blue-600">Total Products</p>
-                  <p className="text-base sm:text-lg font-bold text-blue-700">
+                <div>
+                  <p className="text-xs font-medium text-blue-600">Total Products</p>
+                  <p className="text-lg font-bold text-blue-700">
                         {getSummaryStats().total_products}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
-              <div className="flex items-center">
-                <div className="p-2 bg-green-50 rounded-md mt-2 ml-4">
-                  <ArchiveBoxIcon className="w-8 h-8 text-green-700" />
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-50 rounded-md">
+                  <ArchiveBoxIcon className="w-6 h-6 text-green-600" />
                 </div>
-                <div className="ml-2 sm:ml-3">
-                  <p className="text-xs sm:text-sm font-medium text-green-600">Total Stock</p>
-                  <p className="text-base sm:text-lg font-bold text-green-700">
+                <div>
+                  <p className="text-xs font-medium text-green-600">Total Stock</p>
+                  <p className="text-lg font-bold text-green-700">
                         {getSummaryStats().total_stock}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
-              <div className="flex items-center">
-                <div className="p-2 bg-yellow-50 rounded-md mt-2 ml-4">
-                  <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-50 rounded-md">
+                  <ExclamationTriangleIcon className="w-6 h-6 text-red-600" />
                 </div>
-                <div className="ml-2 sm:ml-3">
-                  <p className="text-xs sm:text-sm font-medium text-yellow-600">Low Stock</p>
-                  <p className="text-base sm:text-lg font-bold text-yellow-700">
+                <div>
+                  <p className="text-xs font-medium text-yellow-600">Low Stock</p>
+                  <p className="text-lg font-bold text-yellow-700">
                         {getSummaryStats().low_stock_count}
                   </p>
                 </div>
               </div>
             </div>
 
-                <div className="bg-white p-3 sm:p-4 rounded-lg shadow-md border-gray-200">
-              <div className="flex items-center">
-                <div className="p-2 bg-purple-50 rounded-md mt-2 ml-4">
-                  <ChartBarIcon className="w-8 h-8 text-purple-600" />
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-50 rounded-md">
+                  <ChartBarIcon className="w-6 h-6 text-purple-600" />
                 </div>
-                <div className="ml-2 sm:ml-3">
-                  <p className="text-xs sm:text-sm font-medium text-purple-600">Inventory Value</p>
-                  <p className="text-base sm:text-lg font-bold text-purple-700">
+                <div>
+                  <p className="text-xs font-medium text-purple-600">Inventory Value</p>
+                  <p className="text-lg font-bold text-purple-700">
                         {formatCurrency(getSummaryStats().total_inventory_value)}
                   </p>
                 </div>
@@ -581,17 +582,17 @@ export default function AdminInventoryPage() {
 
               {/* Quick Actions */}
              <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-               <div className="p-4 border-b border-gray-200">
+               <div className="p-3 sm:p-4 border-b border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900">Quick Actions</h3>
                </div>
-               <div className="p-4">
-                  <div className="flex flex-wrap gap-3">
+               <div className="p-3 sm:p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
                     <button
                       onClick={() => {
                         setSelectedProduct(null);
                         setShowStockInModal(true);
                       }}
-                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium flex items-center space-x-2"
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium flex items-center justify-center space-x-2 active:scale-95"
                     >
                       <PlusIcon className="h-4 w-4" />
                       <span>Add Stock</span>
@@ -601,7 +602,7 @@ export default function AdminInventoryPage() {
                         setSelectedProduct(null);
                         setShowStockOutModal(true);
                       }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium flex items-center space-x-2"
+                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium flex items-center justify-center space-x-2 active:scale-95"
                     >
                       <MinusIcon className="h-4 w-4" />
                       <span>Stock Out</span>
@@ -611,17 +612,18 @@ export default function AdminInventoryPage() {
                         setSelectedProduct(null);
                         setShowAdjustModal(true);
                       }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center space-x-2"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center space-x-2 active:scale-95"
                     >
                       <ClockIcon className="h-4 w-4" />
                       <span>Adjust Stock</span>
                     </button>
                     <button
                       onClick={() => router.push('/admin/stock-management')}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-sm font-medium flex items-center space-x-2"
+                      className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center space-x-2 active:scale-95"
                     >
                       <DocumentTextIcon className="h-4 w-4" />
-                      <span>Advanced Stock Management</span>
+                      <span className="hidden sm:inline">Advanced Management</span>
+                      <span className="sm:hidden">Advanced</span>
                     </button>
                    </div>
                    </div>
