@@ -110,8 +110,22 @@ export const createStockMovementsTable = async (req, res) => {
 // ✅ Create Stock Movement
 export const createStockMovement = async (req, res) => {
   try {
-    const { product_id, movement_type, quantity, reason, supplier, notes } = req.body;
+    const { product_id, movement_type, quantity, reason, supplier, notes, size } = req.body;
     const user_id = req.user.id;
+
+    // Debug logging
+    console.log('📦 Stock Movement Request:', {
+      product_id,
+      movement_type,
+      quantity,
+      reason,
+      size,
+      size_type: typeof size,
+      size_is_null: size === null,
+      size_is_undefined: size === undefined,
+      size_is_empty: size === '',
+      body: req.body
+    });
 
     // Validation
     if (!product_id || !movement_type || !quantity || !reason) {
@@ -142,6 +156,7 @@ export const createStockMovement = async (req, res) => {
         CREATE TABLE IF NOT EXISTS stock_movements (
           id INT PRIMARY KEY AUTO_INCREMENT,
           product_id INT NOT NULL,
+          size_id INT NULL,
           user_id INT NOT NULL,
           movement_type ENUM('stock_in', 'stock_out', 'stock_adjustment') NOT NULL,
           quantity INT NOT NULL,
@@ -153,10 +168,12 @@ export const createStockMovement = async (req, res) => {
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           
           FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+          FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL,
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
           
           CONSTRAINT chk_movement_quantity CHECK (quantity > 0),
           INDEX idx_stock_movements_product (product_id),
+          INDEX idx_stock_movements_size (size_id),
           INDEX idx_stock_movements_user (user_id),
           INDEX idx_stock_movements_type (movement_type),
           INDEX idx_stock_movements_date (created_at)
@@ -175,7 +192,50 @@ export const createStockMovement = async (req, res) => {
     }
 
     const product = products[0];
-    const currentStock = parseInt(product.stock) || 0;
+    
+    // Get size_id if size is provided
+    let size_id = null;
+    let currentStock = parseInt(product.stock) || 0;
+    let stockTarget = 'products'; // Track whether we're updating product or product_sizes
+    
+    // Clean and validate the size parameter
+    const cleanSize = size && size.toString().trim();
+    console.log('🔍 Size parameter received:', {
+      original: size,
+      cleaned: cleanSize,
+      type: typeof size,
+      isEmpty: !cleanSize || cleanSize === '' || cleanSize === 'null' || cleanSize === 'undefined'
+    });
+    
+    if (cleanSize && cleanSize !== '' && cleanSize !== 'null' && cleanSize !== 'undefined') {
+      console.log('🔍 Looking for size:', cleanSize, 'for product_id:', product_id);
+      
+      // First, let's see what sizes exist for this product
+      const [availableSizes] = await pool.query(
+        'SELECT id, size, stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
+        [product_id]
+      );
+      console.log('📋 Available sizes for product:', availableSizes);
+      
+      const [sizeResults] = await pool.query(
+        'SELECT id, stock FROM product_sizes WHERE product_id = ? AND TRIM(size) = ? AND is_active = 1',
+        [product_id, cleanSize]
+      );
+      
+      console.log('🔍 Size query results:', sizeResults);
+      
+      if (sizeResults.length > 0) {
+        size_id = sizeResults[0].id;
+        currentStock = parseInt(sizeResults[0].stock) || 0;
+        stockTarget = 'product_sizes';
+        console.log('✅ Found size_id:', size_id, 'with current stock:', currentStock);
+      } else {
+        console.log('⚠️ No size found with name:', cleanSize, 'for product:', product_id);
+        console.log('⚠️ Query was: SELECT id, stock FROM product_sizes WHERE product_id =', product_id, 'AND TRIM(size) =', cleanSize, 'AND is_active = 1');
+      }
+    } else {
+      console.log('ℹ️ No size specified - updating base stock');
+    }
 
     // Check if stock out would result in negative stock (not for adjustments)
     if (movement_type === 'stock_out' && currentStock < quantity) {
@@ -200,18 +260,25 @@ export const createStockMovement = async (req, res) => {
         newStock = quantity;
       }
 
-      // Update product stock
-      await connection.query(
-        'UPDATE products SET stock = ?, updated_at = NOW() WHERE id = ?',
-        [newStock, product_id]
-      );
+      // Update stock in the appropriate table
+      if (stockTarget === 'product_sizes' && size_id) {
+        await connection.query(
+          'UPDATE product_sizes SET stock = ?, updated_at = NOW() WHERE id = ?',
+          [newStock, size_id]
+        );
+      } else {
+        await connection.query(
+          'UPDATE products SET stock = ?, updated_at = NOW() WHERE id = ?',
+          [newStock, product_id]
+        );
+      }
 
-      // Record stock movement with previous stock for adjustments
+      // Record stock movement with size_id
       const [result] = await connection.query(
         `INSERT INTO stock_movements 
-         (product_id, user_id, movement_type, quantity, reason, supplier, notes, previous_stock, new_stock, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [product_id, user_id, movement_type, quantity, reason, supplier, notes, currentStock, newStock]
+         (product_id, size_id, user_id, movement_type, quantity, reason, supplier, notes, previous_stock, new_stock, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [product_id, size_id, user_id, movement_type, quantity, reason, supplier, notes, currentStock, newStock]
       );
 
       await connection.commit();
@@ -219,6 +286,8 @@ export const createStockMovement = async (req, res) => {
       // Emit real-time updates
       emitAdminDataRefresh('stock_movement_created', {
         product_id,
+        size_id,
+        size,
         movement_type,
         quantity,
         new_stock: newStock
@@ -231,6 +300,8 @@ export const createStockMovement = async (req, res) => {
         movement: {
           id: result.insertId,
           product_id,
+          size_id,
+          size,
           movement_type,
           quantity,
           reason,
@@ -502,7 +573,7 @@ export const getCurrentInventoryReport = async (req, res) => {
             product_name: product.product_name,
             size: size.size,
             current_stock: size.stock,
-            base_stock: size.base_stock,
+            base_stock: product.base_stock,  // Use product's base stock, not size's base stock
             selling_price: size.price || product.selling_price,
             cost_price: product.cost_price,
             category_name: product.category_name,
@@ -565,10 +636,35 @@ export const getRestockReport = async (req, res) => {
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
 
+    // Check if size_id column exists in stock_movements table
+    let hasSizeColumn = false;
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'stock_movements' 
+        AND COLUMN_NAME = 'size_id'
+      `);
+      hasSizeColumn = columns.length > 0;
+    } catch (err) {
+      console.log('Could not check for size_id column:', err.message);
+    }
+
+    // Build query based on whether size_id column exists
+    const sizeFields = hasSizeColumn 
+      ? 'sm.size_id, ps.size as size,'
+      : 'NULL as size_id, NULL as size,';
+    
+    const sizeJoin = hasSizeColumn
+      ? 'LEFT JOIN product_sizes ps ON sm.size_id = ps.id'
+      : '';
+
     const [restocks] = await pool.query(
       `SELECT 
         sm.id,
         sm.product_id,
+        ${sizeFields}
         p.name as product_name,
         sm.quantity,
         sm.reason,
@@ -587,6 +683,7 @@ export const getRestockReport = async (req, res) => {
         END as admin_name
        FROM stock_movements sm
        LEFT JOIN products p ON sm.product_id = p.id
+       ${sizeJoin}
        LEFT JOIN users u ON sm.user_id = u.id
        ${whereClause}
        ORDER BY sm.created_at DESC`,
@@ -604,12 +701,13 @@ export const getRestockReport = async (req, res) => {
       total_restocks: restocks.length,
       total_quantity_restocked: totalRestocked,
       unique_products_restocked: uniqueProducts,
-      restocks
+      restocks,
+      has_size_tracking: hasSizeColumn
     });
 
   } catch (error) {
     console.error('Get Restock Report Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
 
@@ -631,19 +729,53 @@ export const getSalesUsageReport = async (req, res) => {
 
     const whereClause = `WHERE ${whereConditions.join(' AND ')}`;
 
+    // Check if size_id column exists in stock_movements table
+    let hasSizeColumn = false;
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'stock_movements' 
+        AND COLUMN_NAME = 'size_id'
+      `);
+      hasSizeColumn = columns.length > 0;
+    } catch (err) {
+      console.log('Could not check for size_id column:', err.message);
+    }
+
+    // Build query based on whether size_id column exists
+    const sizeFields = hasSizeColumn 
+      ? 'sm.size_id, ps.size as size,'
+      : 'NULL as size_id, NULL as size,';
+    
+    const sizeJoin = hasSizeColumn
+      ? 'LEFT JOIN product_sizes ps ON sm.size_id = ps.id'
+      : '';
+
     const [sales] = await pool.query(
       `SELECT 
         sm.id,
         sm.product_id,
+        ${sizeFields}
         p.name as product_name,
         sm.quantity,
         sm.reason,
         sm.previous_stock,
         sm.new_stock,
         sm.created_at,
-        u.name as user_name
+        CASE 
+          WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
+            THEN CONCAT(u.first_name, ' ', u.last_name)
+          WHEN u.name IS NOT NULL 
+            THEN u.name
+          WHEN u.email IS NOT NULL 
+            THEN u.email
+          ELSE 'System'
+        END as user_name
        FROM stock_movements sm
        LEFT JOIN products p ON sm.product_id = p.id
+       ${sizeJoin}
        LEFT JOIN users u ON sm.user_id = u.id
        ${whereClause}
        ORDER BY sm.created_at DESC`,
@@ -668,12 +800,13 @@ export const getSalesUsageReport = async (req, res) => {
       total_quantity_sold: totalSold,
       unique_products_sold: uniqueProducts,
       reason_breakdown: reasonBreakdown,
-      sales
+      sales,
+      has_size_tracking: hasSizeColumn
     });
 
   } catch (error) {
     console.error('Get Sales/Usage Report Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
 

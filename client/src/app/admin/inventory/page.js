@@ -151,14 +151,32 @@ export default function AdminInventoryPage() {
   const handleStockIn = async (e) => {
     e.preventDefault();
     try {
-      await API.post('/stock/in', {
-        productId: parseInt(stockInForm.productId),
-        quantity: parseInt(stockInForm.quantity),
-        size: stockInForm.size || null,
-        batchNo: stockInForm.batchNo || null,
-        source: 'restock', // Default source
-        note: stockInForm.note
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch('http://localhost:5000/api/stock-movements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          product_id: parseInt(stockInForm.productId),
+          movement_type: 'stock_in',
+          quantity: parseInt(stockInForm.quantity),
+          reason: 'restock',
+          supplier: stockInForm.batchNo || null,
+          notes: stockInForm.note || null,
+          size: stockInForm.size || null
+        })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add stock');
+      }
+
+      const data = await response.json();
+      console.log('✅ Stock added successfully:', data);
 
       handleStockActionSuccess();
       // Reset form
@@ -173,7 +191,7 @@ export default function AdminInventoryPage() {
       alert('Stock added successfully!');
     } catch (error) {
       console.error('Error adding stock:', error);
-      alert(error.response?.data?.error || 'Error adding stock. Please try again.');
+      alert(error.message || 'Error adding stock. Please try again.');
     }
   };
 
@@ -218,13 +236,31 @@ export default function AdminInventoryPage() {
   const handleStockOut = async (e) => {
     e.preventDefault();
     try {
-      await API.post('/stock/out', {
-        productId: parseInt(stockOutForm.productId),
-        quantity: parseInt(stockOutForm.quantity),
-        size: stockOutForm.size || null,
-        source: stockOutForm.reason, // reason becomes source
-        note: stockOutForm.note
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch('http://localhost:5000/api/stock-movements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          product_id: parseInt(stockOutForm.productId),
+          movement_type: 'stock_out',
+          quantity: parseInt(stockOutForm.quantity),
+          reason: stockOutForm.reason || 'deduction',
+          notes: stockOutForm.note || null,
+          size: stockOutForm.size || null
+        })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove stock');
+      }
+
+      const data = await response.json();
+      console.log('✅ Stock removed successfully:', data);
 
       handleStockActionSuccess();
       // Reset form
@@ -239,7 +275,7 @@ export default function AdminInventoryPage() {
       alert('Stock removed successfully!');
     } catch (error) {
       console.error('Error removing stock:', error);
-      alert(error.response?.data?.error || 'Error removing stock. Please try again.');
+      alert(error.message || 'Error removing stock. Please try again.');
     }
   };
 
@@ -247,13 +283,31 @@ export default function AdminInventoryPage() {
   const handleAdjustStock = async (e) => {
     e.preventDefault();
     try {
-      await API.post('/stock/adjust', {
-        productId: parseInt(adjustForm.productId),
-        size: adjustForm.size || null,
-        physicalCount: parseInt(adjustForm.physicalCount),
-        reason: adjustForm.reason,
-        note: adjustForm.note
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch('http://localhost:5000/api/stock-movements', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          product_id: parseInt(adjustForm.productId),
+          movement_type: 'stock_adjustment',
+          quantity: parseInt(adjustForm.physicalCount),
+          reason: adjustForm.reason || 'adjustment',
+          notes: adjustForm.note || null,
+          size: adjustForm.size || null
+        })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to adjust stock');
+      }
+
+      const data = await response.json();
+      console.log('✅ Stock adjusted successfully:', data);
 
       handleStockActionSuccess();
       // Reset form
@@ -268,7 +322,7 @@ export default function AdminInventoryPage() {
       alert('Stock adjustment completed successfully!');
     } catch (error) {
       console.error('Error adjusting stock:', error);
-      alert(error.response?.data?.error || 'Error adjusting stock. Please try again.');
+      alert(error.message || 'Error adjusting stock. Please try again.');
     }
   };
 

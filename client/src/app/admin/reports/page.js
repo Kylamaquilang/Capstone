@@ -45,72 +45,25 @@ export default function AdminReportsPage() {
       
       console.log('Fetching inventory data for reports...');
       
-      // Get all products with detailed information
-      let allProducts = [];
-      let productsWithSizes = [];
-      
-      // Step 1: Get all products
+      // Get inventory report with individual size rows
       try {
-        console.log('Fetching all products...');
-        const productsRes = await API.get('/products');
-        allProducts = productsRes.data || [];
+        const response = await API.get('/stock-movements/reports/current-inventory');
+        const inventoryRows = response.data.inventory || [];
         
-        if (allProducts.length === 0) {
-          console.log('No products found in database');
+        if (inventoryRows.length === 0) {
+          console.log('No inventory data found');
           setInventoryData([]);
-          setError('No products found. Add some products to see inventory data.');
+          setError('No inventory data found. Add some products to see inventory data.');
           return;
         }
         
-        console.log(`Found ${allProducts.length} products`);
-      } catch (productsErr) {
-        console.error('Failed to fetch products:', productsErr.message);
-        throw productsErr;
-      }
-      
-      // Step 2: Try to get detailed product data with sizes
-      try {
-        console.log('Fetching detailed product data with sizes...');
-        const detailedRes = await API.get('/products/detailed');
-        const detailedProducts = detailedRes.data || [];
+        console.log(`Found ${inventoryRows.length} inventory rows (including individual sizes)`);
+        setInventoryData(inventoryRows);
         
-        if (Array.isArray(detailedProducts) && detailedProducts.length > 0) {
-          // Fetch individual product details to get accurate sizes
-          productsWithSizes = await Promise.all(
-            detailedProducts.map(async (product) => {
-              try {
-                const { data: productDetail } = await API.get(`/products/${product.id}`);
-                return {
-                  ...product,
-                  sizes: productDetail.sizes || []
-                };
-              } catch (err) {
-                return {
-                  ...product,
-                  sizes: []
-                };
-              }
-            })
-          );
-          console.log(`Enhanced ${productsWithSizes.length} products with size data`);
-        } else {
-          // Use basic products data
-          productsWithSizes = allProducts.map(product => ({
-            ...product,
-            sizes: []
-          }));
-          console.log('Using basic product data (no size details available)');
-        }
-      } catch (detailedErr) {
-        console.log('Detailed products API failed, using basic product data:', detailedErr.message);
-        productsWithSizes = allProducts.map(product => ({
-          ...product,
-          sizes: []
-        }));
+      } catch (inventoryErr) {
+        console.error('Failed to fetch inventory data:', inventoryErr.message);
+        throw inventoryErr;
       }
-      
-      console.log('Setting inventory data for reports:', productsWithSizes.length);
-      setInventoryData(productsWithSizes);
       
     } catch (err) {
       console.error('Inventory error:', err);
@@ -428,14 +381,14 @@ export default function AdminReportsPage() {
     let yPosition = 135;
     
     switch (activeTab) {
-      case 'low-stock':
-        yPosition = generateLowStockPDF(pdf, reportData, yPosition);
+      case 'inventory':
+        yPosition = generateInventoryPDF(pdf, reportData, yPosition);
+        break;
+      case 'restock':
+        yPosition = generateRestockPDF(pdf, reportData, yPosition);
         break;
       case 'sales':
         yPosition = generateSalesPDF(pdf, reportData, yPosition);
-        break;
-      case 'revenue':
-        yPosition = generateRevenuePDF(pdf, reportData, yPosition);
         break;
       default:
         pdf.setFontSize(12);
@@ -466,14 +419,14 @@ export default function AdminReportsPage() {
     
     // Report Content
     switch (activeTab) {
-      case 'low-stock':
-        content += generateLowStockDoc(reportData);
+      case 'inventory':
+        content += generateInventoryDoc(reportData);
+        break;
+      case 'restock':
+        content += generateRestockDoc(reportData);
         break;
       case 'sales':
         content += generateSalesDoc(reportData);
-        break;
-      case 'revenue':
-        content += generateRevenueDoc(reportData);
         break;
       default:
         content += 'No data available for this report.\n';
@@ -687,20 +640,22 @@ export default function AdminReportsPage() {
             <th>Product Name</th>
             <th>Category</th>
             <th>Size/Variant</th>
-            <th>Qty in Stock</th>
+            <th>Base Stock</th>
+            <th>Current Stock</th>
             <th>Status</th>
           </tr>
         </thead>
         <tbody>
-          ${data.map(product => `
+          ${data.map(item => `
             <tr>
-              <td style="font-weight: 500;">${product.name}</td>
-              <td>${product.category_name || product.category || 'N/A'}</td>
-              <td>${product.sizes && product.sizes.length > 0 ? product.sizes.map(size => size.size).join(', ') : 'N/A'}</td>
-              <td style="text-align: center; font-weight: 500;">${product.stock || 0}</td>
+              <td style="font-weight: 500;">${item.product_name}</td>
+              <td>${item.category_name || 'N/A'}</td>
+              <td>${item.size && item.size !== 'No sizes' ? item.size : 'N/A'}</td>
+              <td style="text-align: center; color: #666;">${item.base_stock || 0}</td>
+              <td style="text-align: center; font-weight: 500;">${item.current_stock || 0}</td>
               <td>
-                <span class="status-badge ${product.stock === 0 ? 'status-out-of-stock' : product.stock <= (product.reorder_level || 5) ? 'status-low-stock' : 'status-good'}">
-                  ${product.stock === 0 ? 'Out of Stock' : product.stock <= (product.reorder_level || 5) ? 'Low Stock' : 'In Stock'}
+                <span class="status-badge ${item.stock_status === 'Out of Stock' ? 'status-out-of-stock' : item.stock_status === 'Low Stock' ? 'status-low-stock' : 'status-good'}">
+                  ${item.stock_status}
                 </span>
               </td>
             </tr>
@@ -719,9 +674,10 @@ export default function AdminReportsPage() {
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Product</th>
-            <th>Quantity</th>
+            <th>Date & Time</th>
+            <th>Product Name</th>
+            <th>Size/Variant</th>
+            <th>Quantity Added</th>
             <th>Stock Before</th>
             <th>Stock After</th>
           </tr>
@@ -729,11 +685,22 @@ export default function AdminReportsPage() {
         <tbody>
           ${data.map(item => `
             <tr>
-              <td>${formatDate(item.date)}</td>
-              <td>${item.product_name}</td>
-              <td style="text-align: center;">${item.quantity}</td>
-              <td style="text-align: center;">${item.stock_before}</td>
-              <td style="text-align: center;">${item.stock_after}</td>
+              <td>
+                <div style="font-weight: 500;">${new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                <div style="font-size: 11px; color: #666;">${new Date(item.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+              </td>
+              <td style="font-weight: 600;">${item.product_name}</td>
+              <td>
+                ${item.size 
+                  ? `<span style="display: inline-block; padding: 4px 10px; background: #DBEAFE; color: #1E40AF; border-radius: 4px; font-size: 11px; font-weight: 600;">${item.size}</span>`
+                  : '<span style="font-style: italic; color: #9CA3AF; font-size: 11px;">No size specified</span>'
+                }
+              </td>
+              <td style="text-align: center;">
+                <span style="display: inline-block; padding: 4px 10px; background: #D1FAE5; color: #065F46; border-radius: 12px; font-weight: bold; font-size: 12px;">+${item.quantity}</span>
+              </td>
+              <td style="text-align: center; color: #666;">${item.stock_before}</td>
+              <td style="text-align: center; font-weight: 600;">${item.stock_after}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -742,31 +709,40 @@ export default function AdminReportsPage() {
   };
 
   const generateSalesHTML = (data) => {
-    if (!data.salesData || !Array.isArray(data.salesData) || data.salesData.length === 0) {
+    if (!data.orderItems || !Array.isArray(data.orderItems) || data.orderItems.length === 0) {
       return '<div class="no-data">No sales data available for the selected period</div>';
     }
 
     return `
+      ${data.summary ? `
+        <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+          <h3 style="margin: 0 0 10px 0; color: #000C50;">Summary</h3>
+          <p style="margin: 5px 0;"><strong>Total Orders:</strong> ${data.summary.total_orders || 0}</p>
+          <p style="margin: 5px 0;"><strong>Total Revenue:</strong> ${formatCurrency(data.summary.total_revenue || 0)}</p>
+        </div>
+      ` : ''}
       <table>
         <thead>
           <tr>
-            <th>Period</th>
-            <th>Orders</th>
-            <th>Revenue</th>
-            <th>Avg Order Value</th>
-            <th>GCash Orders</th>
-            <th>Cash Orders</th>
+            <th>Date</th>
+            <th>Product Name</th>
+            <th>Size</th>
+            <th>Quantity</th>
+            <th>Unit Price</th>
+            <th>Total</th>
+            <th>Payment</th>
           </tr>
         </thead>
         <tbody>
-          ${data.salesData.map(item => `
+          ${data.orderItems.map(item => `
             <tr>
-              <td style="font-weight: 500;">${item.period}</td>
-              <td style="text-align: center;">${item.orders}</td>
-              <td style="text-align: right; font-weight: 500;">${formatCurrency(item.revenue)}</td>
-              <td style="text-align: right;">${formatCurrency(item.avg_order_value)}</td>
-              <td style="text-align: center;">${item.gcash_orders}</td>
-              <td style="text-align: center;">${item.cash_orders}</td>
+              <td>${formatDate(item.order_date)}</td>
+              <td style="font-weight: 500;">${item.product_name}</td>
+              <td>${item.size || 'N/A'}</td>
+              <td style="text-align: center;">${item.quantity}</td>
+              <td style="text-align: right;">${formatCurrency(item.unit_price)}</td>
+              <td style="text-align: right; font-weight: 500;">${formatCurrency(item.item_total)}</td>
+              <td style="text-align: center;">${item.payment_method?.toUpperCase() || 'N/A'}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -809,6 +785,94 @@ export default function AdminReportsPage() {
   };
 
   // Generate PDF content for each report type
+  const generateInventoryPDF = (pdf, data, yPosition) => {
+    if (!Array.isArray(data) || data.length === 0) {
+      pdf.setFontSize(12);
+      pdf.text('No inventory data found.', 20, yPosition);
+      return yPosition + 20;
+    }
+
+    // Add section title
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Inventory Report', 20, yPosition);
+    yPosition += 20;
+
+    // Prepare table data
+    const tableData = data.map(item => [
+      item.product_name || 'N/A',
+      item.category_name || 'N/A',
+      item.size && item.size !== 'No sizes' ? item.size : 'N/A',
+      item.base_stock?.toString() || '0',
+      item.current_stock?.toString() || '0',
+      item.stock_status || 'N/A'
+    ]);
+
+    // Create table
+    autoTable(pdf, {
+      startY: yPosition,
+      head: [['Product Name', 'Category', 'Size', 'Base Stock', 'Current Stock', 'Status']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [0, 12, 80] },
+      styles: { fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 22 },
+        5: { cellWidth: 26 }
+      }
+    });
+
+    return pdf.lastAutoTable.finalY + 20;
+  };
+
+  const generateRestockPDF = (pdf, data, yPosition) => {
+    if (!Array.isArray(data) || data.length === 0) {
+      pdf.setFontSize(12);
+      pdf.text('No restock data found.', 20, yPosition);
+      return yPosition + 20;
+    }
+
+    // Add section title
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Restock Report', 20, yPosition);
+    yPosition += 20;
+
+    // Prepare table data
+    const tableData = data.map(item => [
+      new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      item.product_name || 'N/A',
+      item.size || 'N/A',
+      `+${item.quantity}` || '0',
+      item.stock_before?.toString() || '0',
+      item.stock_after?.toString() || '0'
+    ]);
+
+    // Create table
+    autoTable(pdf, {
+      startY: yPosition,
+      head: [['Date', 'Product Name', 'Size', 'Qty Added', 'Before', 'After']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [0, 12, 80], fontSize: 7 },
+      styles: { fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 28 },
+        1: { cellWidth: 55 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 22 },
+        5: { cellWidth: 22 }
+      }
+    });
+
+    return pdf.lastAutoTable.finalY + 20;
+  };
+
   const generateLowStockPDF = (pdf, data, yPosition) => {
     if (!data.products || !Array.isArray(data.products) || data.products.length === 0) {
       pdf.setFontSize(12);
@@ -959,12 +1023,13 @@ export default function AdminReportsPage() {
     let content = 'INVENTORY REPORT\n';
     content += '================\n\n';
     
-    data.forEach((product, index) => {
-      content += `${index + 1}. ${product.name}\n`;
-      content += `   Category: ${product.category_name || product.category || 'N/A'}\n`;
-      content += `   Size/Variant: ${product.sizes && product.sizes.length > 0 ? product.sizes.map(size => size.size).join(', ') : 'N/A'}\n`;
-      content += `   Qty in Stock: ${product.stock || 0}\n`;
-      content += `   Status: ${product.stock === 0 ? 'Out of Stock' : product.stock <= (product.reorder_level || 5) ? 'Low Stock' : 'In Stock'}\n\n`;
+    data.forEach((item, index) => {
+      content += `${index + 1}. ${item.product_name}\n`;
+      content += `   Category: ${item.category_name || 'N/A'}\n`;
+      content += `   Size/Variant: ${item.size && item.size !== 'No sizes' ? item.size : 'N/A'}\n`;
+      content += `   Base Stock: ${item.base_stock || 0}\n`;
+      content += `   Current Stock: ${item.current_stock || 0}\n`;
+      content += `   Status: ${item.stock_status}\n\n`;
     });
     
     return content;
@@ -980,10 +1045,10 @@ export default function AdminReportsPage() {
     
     data.forEach((item, index) => {
       content += `${index + 1}. ${item.product_name}\n`;
-      content += `   Date: ${formatDate(item.date)}\n`;
-      content += `   Quantity: ${item.quantity}\n`;
-      content += `   Supplier: ${item.supplier || 'N/A'}\n`;
-      content += `   Admin: ${item.admin_name || 'N/A'}\n`;
+      content += `   Date: ${new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}\n`;
+      content += `   Time: ${new Date(item.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}\n`;
+      content += `   Size/Variant: ${item.size || 'No size specified'}\n`;
+      content += `   Quantity Added: +${item.quantity}\n`;
       content += `   Stock Before: ${item.stock_before}\n`;
       content += `   Stock After: ${item.stock_after}\n\n`;
     });
@@ -992,22 +1057,28 @@ export default function AdminReportsPage() {
   };
 
   const generateSalesDoc = (data) => {
-    if (!data.salesData || !Array.isArray(data.salesData) || data.salesData.length === 0) {
+    if (!data.orderItems || !Array.isArray(data.orderItems) || data.orderItems.length === 0) {
       return 'No sales data available for the selected period.\n';
     }
 
     let content = 'SALES REPORT\n';
     content += '============\n\n';
     
-    data.salesData.forEach((item, index) => {
-      content += `${index + 1}. ${item.period}\n`;
-      content += `   Orders: ${item.orders}\n`;
-      content += `   Revenue: ${formatCurrency(item.revenue)}\n`;
-      content += `   Average Order Value: ${formatCurrency(item.avg_order_value)}\n`;
-      content += `   GCash Orders: ${item.gcash_orders}\n`;
-      content += `   GCash Revenue: ${formatCurrency(item.gcash_revenue || 0)}\n`;
-      content += `   Cash Orders: ${item.cash_orders}\n`;
-      content += `   Cash Revenue: ${formatCurrency(item.cash_revenue || 0)}\n\n`;
+    if (data.summary) {
+      content += `Total Orders: ${data.summary.total_orders || 0}\n`;
+      content += `Total Revenue: ${formatCurrency(data.summary.total_revenue || 0)}\n\n`;
+    }
+    
+    content += 'Product Sales Details:\n\n';
+    
+    data.orderItems.forEach((item, index) => {
+      content += `${index + 1}. ${item.product_name}\n`;
+      content += `   Date: ${formatDate(item.order_date)}\n`;
+      content += `   Size: ${item.size || 'N/A'}\n`;
+      content += `   Quantity: ${item.quantity}\n`;
+      content += `   Unit Price: ${formatCurrency(item.unit_price)}\n`;
+      content += `   Total: ${formatCurrency(item.item_total)}\n`;
+      content += `   Payment Method: ${item.payment_method?.toUpperCase() || 'N/A'}\n\n`;
     });
     
     return content;
@@ -1207,55 +1278,57 @@ export default function AdminReportsPage() {
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size/Variant</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Qty in Stock</th>
+                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Base Stock</th>
+                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Current Stock</th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {Array.isArray(inventoryData) && inventoryData.length > 0 ? (
-                            inventoryData.map((product, index) => (
-                              <tr key={product.id} className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                            inventoryData.map((item, index) => (
+                              <tr key={item.id || index} className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
                                 <td className="px-6 py-4">
                                   <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                 </td>
                                 <td className="px-6 py-4">
-                                  <div className="text-sm font-medium text-gray-900 uppercase">{product.name}</div>
+                                  <div className="text-sm font-medium text-gray-900 uppercase">{item.product_name}</div>
                                 </td>
                                 <td className="px-6 py-4">
                                   <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full uppercase">
-                                    {product.category_name || product.category || 'N/A'}
+                                    {item.category_name || 'N/A'}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {product.sizes && product.sizes.length > 0 
-                                    ? product.sizes.map(size => size.size).join(', ') 
-                                    : 'N/A'
-                                  }
+                                <td className="px-6 py-4">
+                                  {item.size && item.size !== 'No sizes' ? (
+                                    <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded uppercase">
+                                      {item.size}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-gray-400">N/A</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-600 text-center">
+                                  {item.base_stock || 0}
                                 </td>
                                 <td className="px-6 py-4 text-sm text-gray-900 text-center font-medium">
-                                  {product.stock || 0}
+                                  {item.current_stock || 0}
                                 </td>
                                 <td className="px-6 py-4">
                                   <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${
-                                    product.stock === 0 
+                                    item.stock_status === 'Out of Stock'
                                       ? 'bg-red-100 text-red-800' 
-                                      : product.stock <= (product.reorder_level || 5)
+                                      : item.stock_status === 'Low Stock'
                                       ? 'bg-yellow-100 text-yellow-800'
                                       : 'bg-green-100 text-green-800'
                                   }`}>
-                                    {product.stock === 0 
-                                      ? 'Out of Stock' 
-                                      : product.stock <= (product.reorder_level || 5)
-                                      ? 'Low Stock'
-                                      : 'In Stock'
-                                    }
+                                    {item.stock_status}
                                   </span>
                                 </td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan="6" className="px-6 py-12 text-center">
+                              <td colSpan="7" className="px-6 py-12 text-center">
                                 <div className="flex flex-col items-center gap-3">
                                   <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1317,7 +1390,7 @@ export default function AdminReportsPage() {
                         <div>
                           <h3 className="text-xl font-semibold text-gray-900">Restock Report</h3>
                           <p className="text-sm text-gray-600 mt-1">
-                            History of restocked items
+                            History of restocked items with size information
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -1338,27 +1411,57 @@ export default function AdminReportsPage() {
                       <table className="w-full">
                         <thead className="bg-gray-50/50">
                           <tr>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock Before</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock After</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date & Time</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size/Variant</th>
+                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity Added</th>
+                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock Before</th>
+                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock After</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {Array.isArray(restockData) && restockData.length > 0 ? (
                             restockData.map((item, index) => (
                               <tr key={index} className={`hover:bg-orange-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
-                                <td className="px-6 py-4 text-sm text-gray-900">{formatDate(item.date)}</td>
-                                <td className="px-6 py-4 text-sm font-medium text-gray-900 uppercase">{item.product_name}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900 text-center">{item.quantity}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900 text-center">{item.stock_before}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900 text-center">{item.stock_after}</td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {new Date(item.date).toLocaleDateString('en-US', { 
+                                      month: 'short', 
+                                      day: 'numeric', 
+                                      year: 'numeric' 
+                                    })}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {new Date(item.date).toLocaleTimeString('en-US', { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    })}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm font-semibold text-gray-900 uppercase">{item.product_name}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  {item.size ? (
+                                    <span className="inline-flex px-3 py-1.5 text-xs font-semibold bg-blue-100 text-blue-800 rounded uppercase">
+                                      {item.size}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-gray-400 italic">No size specified</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  <span className="inline-flex px-3 py-1 text-sm font-bold text-green-700 bg-green-100 rounded-full">
+                                    +{item.quantity}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-600 text-center">{item.stock_before}</td>
+                                <td className="px-6 py-4 text-sm font-semibold text-gray-900 text-center">{item.stock_after}</td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan="5" className="px-6 py-12 text-center">
+                              <td colSpan="6" className="px-6 py-12 text-center">
                                 <div className="flex flex-col items-center gap-3">
                                   <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                                     <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1367,7 +1470,7 @@ export default function AdminReportsPage() {
                                   </div>
                                   <div>
                                     <p className="text-sm font-medium text-gray-900">No restock data found</p>
-                                    <p className="text-xs text-gray-500">No restock history available</p>
+                                    <p className="text-xs text-gray-500">No restock history available for the selected period</p>
                                   </div>
                                 </div>
                               </td>
@@ -1686,3 +1789,4 @@ export default function AdminReportsPage() {
     </div>
   );
 }
+

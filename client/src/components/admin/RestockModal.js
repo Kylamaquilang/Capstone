@@ -9,7 +9,6 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
     size: ''
   });
   const [loading, setLoading] = useState(false);
-  const [selectedSize, setSelectedSize] = useState('');
 
   useEffect(() => {
     if (isOpen && product) {
@@ -18,12 +17,12 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
         remarks: '',
         size: ''
       });
-      setSelectedSize('');
     }
   }, [isOpen, product]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    console.log('🔄 Form input changed:', { name, value });
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -42,8 +41,31 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
       return;
     }
 
+    // Validate size selection for products with sizes
+    if (product.sizes && product.sizes.length > 0) {
+      if (!formData.size || formData.size.trim() === '') {
+        Swal.fire({
+          icon: 'error',
+          title: 'Size Required',
+          text: 'Please select a size for this product'
+        });
+        return;
+      }
+    }
+
     try {
       setLoading(true);
+      
+      const requestBody = {
+        product_id: product.id,
+        movement_type: 'stock_in',
+        quantity: parseInt(formData.quantity),
+        reason: 'restock',
+        notes: formData.remarks.trim() || null,
+        size: formData.size && formData.size.trim() !== '' ? formData.size.trim() : null
+      };
+      
+      console.log('📦 Sending restock request:', requestBody);
       
       const response = await fetch('http://localhost:5000/api/stock-movements', {
         method: 'POST',
@@ -51,14 +73,7 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          product_id: product.id,
-          movement_type: 'stock_in',
-          quantity: parseInt(formData.quantity),
-          reason: 'restock',
-          notes: formData.remarks.trim() || null,
-          size: selectedSize || null
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -126,22 +141,26 @@ const RestockModal = ({ isOpen, onClose, product, onRestockSuccess }) => {
           {product.sizes && product.sizes.length > 0 && (
             <div>
               <label htmlFor="size" className="block text-sm font-medium text-gray-700 mb-2">
-                Size
+                Size <span className="text-red-500">*</span>
               </label>
               <select
                 id="size"
                 name="size"
-                value={selectedSize}
-                onChange={(e) => setSelectedSize(e.target.value)}
+                value={formData.size}
+                onChange={handleInputChange}
+                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">All sizes (base stock)</option>
+                <option value="">-- Select a size --</option>
                 {product.sizes.map((size, index) => (
                   <option key={index} value={size.size}>
                     {size.size} (Current: {size.stock || 0})
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Please select a specific size to restock
+              </p>
             </div>
           )}
 

@@ -392,7 +392,7 @@ export default function InventoryReportsPage() {
                           <>
                             <th className="px-4 py-3 text-xs font-medium text-gray-700">Date</th>
                             <th className="px-4 py-3 text-xs font-medium text-gray-700">Product</th>
-                            <th className="px-4 py-3 text-xs font-medium text-gray-700">Size</th>
+                            <th className="px-4 py-3 text-xs font-medium text-gray-700">Size/Variant</th>
                             <th className="px-4 py-3 text-xs font-medium text-gray-700">Quantity</th>
                             <th className="px-4 py-3 text-xs font-medium text-gray-700">Performed By</th>
                           </>
@@ -444,12 +444,20 @@ export default function InventoryReportsPage() {
                           {reportType === 'restock' && (
                             <>
                               <td className="px-4 py-3 text-sm text-gray-900">
-                                {new Date(item.created_at).toLocaleDateString()}
+                                {new Date(item.created_at || item.date).toLocaleDateString()}
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.product_name}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.size || 'Base'}</td>
+                              <td className="px-4 py-3">
+                                {item.size ? (
+                                  <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded uppercase">
+                                    {item.size}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-gray-400">N/A</span>
+                                )}
+                              </td>
                               <td className="px-4 py-3 text-sm text-green-600 font-medium">+{item.quantity}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900">{item.user_name || 'System'}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{item.admin_name || item.user_name || 'System'}</td>
                             </>
                           )}
                           {reportType === 'sales-usage' && (
@@ -458,7 +466,15 @@ export default function InventoryReportsPage() {
                                 {new Date(item.created_at).toLocaleDateString()}
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.product_name}</td>
-                              <td className="px-4 py-3 text-sm text-gray-900 uppercase">{item.size || 'Base'}</td>
+                              <td className="px-4 py-3">
+                                {item.size ? (
+                                  <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded uppercase">
+                                    {item.size}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-gray-400">N/A</span>
+                                )}
+                              </td>
                               <td className="px-4 py-3 text-sm text-red-600 font-medium">-{Math.abs(item.quantity)}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">{item.reason || 'N/A'}</td>
                               <td className="px-4 py-3 text-sm text-gray-900">{item.user_name || 'System'}</td>
