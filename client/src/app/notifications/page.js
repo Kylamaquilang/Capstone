@@ -10,6 +10,7 @@ import { useAuth } from '@/context/auth-context';
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -50,6 +51,7 @@ export default function NotificationsPage() {
   const loadNotifications = async () => {
     setLoading(true);
     try {
+      setError(''); // Clear any previous errors
       const response = await API.get('/notifications');
       const notificationsData = response.data.notifications || response.data || [];
       
@@ -64,6 +66,17 @@ export default function NotificationsPage() {
       console.log('📱 Loaded notifications:', normalizedNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
+      
+      // Handle network errors gracefully
+      if (error.isNetworkError || error.code === 'ECONNABORTED' || error.message === 'Network Error') {
+        console.log('Network error - server may not be running');
+        setError('Unable to connect to server. Please check if the API server is running on port 5000.');
+        // Don't clear notifications on network error, keep existing ones
+        setLoading(false);
+        return;
+      }
+      
+      setError('Failed to load notifications. Please try again.');
       setNotifications([]);
     } finally {
       setLoading(false);
@@ -177,6 +190,11 @@ export default function NotificationsPage() {
                   <p className="text-sm text-gray-500 mt-1">
                     Manage your notifications and stay updated
                   </p>
+                  {error && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+                      {error}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center space-x-4">
                   {unreadCount > 0 && (

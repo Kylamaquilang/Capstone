@@ -39,6 +39,14 @@ const NotificationBell = ({ userType = 'user', userId }) => {
       console.log('🔔 Loaded notifications for bell:', normalizedNotifications.length);
     } catch (error) {
       console.error('🔔 Error loading notifications:', error);
+      
+      // Handle network errors gracefully
+      if (error.isNetworkError || error.code === 'ECONNABORTED' || error.message === 'Network Error') {
+        console.log('🔔 Network error - server may not be running');
+        // Don't clear notifications on network error, keep existing ones
+        return;
+      }
+      
       if (error.response?.status === 401) {
         console.log('🔔 401 error - token may be invalid or expired');
       }

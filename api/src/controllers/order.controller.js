@@ -710,12 +710,12 @@ export const getDetailedSalesReport = async (req, res) => {
     }
     
     // Get detailed order items for claimed/completed orders
-    // Note: size is saved to order_items during checkout
+    // Note: size is saved to order_items during checkout, but we also join with product_sizes to ensure all sizes are displayed
     const [orderItems] = await pool.query(`
       SELECT 
         o.created_at as order_date,
         p.name as product_name,
-        oi.size as size,
+        COALESCE(oi.size, ps.size, 'N/A') as size,
         oi.quantity,
         oi.unit_price,
         oi.total_price as item_total,
@@ -724,6 +724,7 @@ export const getDetailedSalesReport = async (req, res) => {
       FROM orders o
       JOIN order_items oi ON o.id = oi.order_id
       JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
       WHERE o.status IN ('claimed', 'completed')
       ${dateFilter}
       ORDER BY o.created_at DESC, p.name

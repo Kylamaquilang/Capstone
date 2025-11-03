@@ -125,18 +125,7 @@ export default function AdminNotificationPage() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      const unreadNotifications = notifications.filter(n => !n.is_read);
-      
-      // Mark each notification as read individually
-      const results = await Promise.allSettled(
-        unreadNotifications.map(notification => 
-          API.put(`/notifications/${notification.id}/read`)
-        )
-      );
-      
-      // Count successful operations
-      const successful = results.filter(result => result.status === 'fulfilled').length;
-      const failed = results.filter(result => result.status === 'rejected').length;
+      await API.put('/notifications/mark-all-read');
       
       // Update all notifications in local state
       setNotifications(prev => 
@@ -145,12 +134,9 @@ export default function AdminNotificationPage() {
       
       // Dispatch custom event to notify navbar to refresh unread count
       window.dispatchEvent(new CustomEvent('notificationsMarkedAsRead'));
-      
-      if (failed > 0) {
-        console.log(`Marked ${successful} notifications as read, ${failed} failed`);
-      }
     } catch (err) {
       console.error('Failed to mark all notifications as read:', err);
+      alert('Failed to mark all notifications as read. Please try again.');
     }
   };
 
@@ -223,10 +209,18 @@ export default function AdminNotificationPage() {
                     <h1 className="text-xl font-bold text-gray-900">Notifications</h1>
                     <p className="text-gray-600 text-xs mt-1">Manage your notifications and stay updated.</p>
                   </div>
-                  <div className="text-right">
+                  <div className="flex flex-col items-end gap-2">
                     <span className="text-xs text-gray-500">
                       {notifications.filter(n => !n.is_read).length} unread
                     </span>
+                    {notifications.filter(n => !n.is_read).length > 0 && (
+                      <button
+                        onClick={handleMarkAllAsRead}
+                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors border border-blue-200"
+                      >
+                        Mark all as read
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

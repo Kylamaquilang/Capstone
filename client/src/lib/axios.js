@@ -4,6 +4,7 @@ import axios from 'axios';
 const API = axios.create({
   baseURL: 'http://localhost:5000/api',
   withCredentials: true,
+  timeout: 30000, // 30 seconds timeout
   headers: {
     'Content-Type': 'application/json',
   },
@@ -45,6 +46,17 @@ API.interceptors.response.use(
     return response;
   },
   (error) => {
+    // Handle network errors
+    if (error.code === 'ECONNABORTED' || error.message === 'Network Error' || !error.response) {
+      console.error('🌐 Network Error:', error.message || 'Unable to connect to server');
+      // Don't throw for network errors - let components handle them gracefully
+      return Promise.reject({
+        ...error,
+        isNetworkError: true,
+        message: 'Unable to connect to server. Please check if the server is running.',
+      });
+    }
+    
     console.log('🔍 Axios response interceptor - Error:', error.response?.status, error.response?.data);
     
     if (error.response?.status === 401 || error.response?.status === 403) {

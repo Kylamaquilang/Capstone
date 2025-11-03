@@ -135,13 +135,30 @@ export const errorHandler = (error, req, res, next) => {
     message = error.message;
   } else if (error.name === 'ValidationError') {
     statusCode = 400;
-    message = 'Validation Error';
+    message = error.message || 'Validation Error';
   } else if (error.name === 'CastError') {
     statusCode = 400;
     message = 'Invalid ID format';
   } else if (error.code === 11000) {
     statusCode = 409;
     message = 'Duplicate field value';
+  } else if (error.code === 'ER_DUP_ENTRY') {
+    statusCode = 409;
+    message = 'Duplicate entry';
+  } else if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+    statusCode = 400;
+    message = 'Referenced record does not exist';
+  } else if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+    statusCode = 400;
+    message = 'Cannot delete record that is referenced by other records';
+  } else if (error.code === 'ER_NO_SUCH_TABLE') {
+    statusCode = 500;
+    message = 'Database table not found';
+  } else if (error.code === 'ER_BAD_DB_ERROR') {
+    statusCode = 500;
+    message = 'Database connection error';
+  } else if (error.message) {
+    message = error.message;
   }
   
   const errorResponse = formatErrorResponse({

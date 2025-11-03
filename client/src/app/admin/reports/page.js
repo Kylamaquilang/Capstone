@@ -1601,8 +1601,8 @@ export default function AdminReportsPage() {
                                     <div className="text-sm font-medium text-gray-900">{item.product_name}</div>
                                   </td>
                                   <td className="px-6 py-4">
-                                    {item.size ? (
-                                      <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded">
+                                    {item.size && item.size !== 'N/A' ? (
+                                      <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded uppercase">
                                         {item.size}
                                       </span>
                                     ) : (

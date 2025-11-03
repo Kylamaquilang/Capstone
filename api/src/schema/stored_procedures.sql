@@ -43,6 +43,7 @@ DROP PROCEDURE IF EXISTS sp_get_sales_performance;
 DROP PROCEDURE IF EXISTS sp_get_all_users;
 DROP PROCEDURE IF EXISTS sp_create_notification;
 DROP PROCEDURE IF EXISTS sp_get_user_notifications;
+DROP PROCEDURE IF EXISTS sp_mark_notifications_read;
 
 DELIMITER $$
 
@@ -466,21 +467,22 @@ CREATE PROCEDURE sp_get_cart_items(
 )
 BEGIN
     SELECT 
-        c.id, c.user_id, c.product_id, c.size, c.quantity,
+        c.id, c.user_id, c.product_id, c.size_id, c.size, c.quantity,
         c.created_at, c.updated_at,
         p.name as product_name, p.description, p.price, p.image,
         p.stock, p.is_active,
         CASE 
-            WHEN c.size IS NOT NULL THEN ps.stock
+            WHEN c.size_id IS NOT NULL THEN ps.stock
             ELSE p.stock
         END as available_stock,
         CASE
-            WHEN c.size IS NOT NULL THEN ps.price
+            WHEN c.size_id IS NOT NULL THEN ps.price
             ELSE p.price
-        END as item_price
-    FROM cart c
+        END as item_price,
+        ps.size as size_name
+    FROM cart_items c
     JOIN products p ON c.product_id = p.id
-    LEFT JOIN product_sizes ps ON c.product_id = ps.product_id AND c.size = ps.size
+    LEFT JOIN product_sizes ps ON c.size_id = ps.id
     WHERE c.user_id = p_user_id AND p.is_active = TRUE;
 END$$
 
@@ -488,31 +490,37 @@ END$$
 CREATE PROCEDURE sp_add_to_cart(
     IN p_user_id INT,
     IN p_product_id INT,
-    IN p_size VARCHAR(20),
+    IN p_size_id INT,
     IN p_quantity INT
 )
 BEGIN
     DECLARE v_cart_id INT;
+    DECLARE v_size_name VARCHAR(20);
+    
+    -- Get size name if size_id is provided
+    IF p_size_id IS NOT NULL THEN
+        SELECT size INTO v_size_name FROM product_sizes WHERE id = p_size_id LIMIT 1;
+    END IF;
     
     -- Check if item already exists in cart
     SELECT id INTO v_cart_id
-    FROM cart
+    FROM cart_items
     WHERE user_id = p_user_id 
       AND product_id = p_product_id 
-      AND (size = p_size OR (size IS NULL AND p_size IS NULL))
+      AND (size_id = p_size_id OR (size_id IS NULL AND p_size_id IS NULL))
     LIMIT 1;
     
     IF v_cart_id IS NOT NULL THEN
         -- Update existing cart item
-        UPDATE cart
+        UPDATE cart_items
         SET quantity = quantity + p_quantity, updated_at = CURRENT_TIMESTAMP
         WHERE id = v_cart_id;
         
         SELECT v_cart_id as cart_id, 'updated' as action;
     ELSE
         -- Insert new cart item
-        INSERT INTO cart (user_id, product_id, size, quantity, created_at)
-        VALUES (p_user_id, p_product_id, p_size, p_quantity, CURRENT_TIMESTAMP);
+        INSERT INTO cart_items (user_id, product_id, size_id, size, quantity, created_at)
+        VALUES (p_user_id, p_product_id, p_size_id, v_size_name, p_quantity, CURRENT_TIMESTAMP);
         
         SELECT LAST_INSERT_ID() as cart_id, 'created' as action;
     END IF;
@@ -525,7 +533,7 @@ CREATE PROCEDURE sp_update_cart_item(
     IN p_quantity INT
 )
 BEGIN
-    UPDATE cart
+    UPDATE cart_items
     SET quantity = p_quantity, updated_at = CURRENT_TIMESTAMP
     WHERE id = p_cart_id AND user_id = p_user_id;
     
@@ -538,7 +546,7 @@ CREATE PROCEDURE sp_remove_from_cart(
     IN p_user_id INT
 )
 BEGIN
-    DELETE FROM cart
+    DELETE FROM cart_items
     WHERE id = p_cart_id AND user_id = p_user_id;
     
     SELECT ROW_COUNT() as affected_rows;
@@ -549,7 +557,7 @@ CREATE PROCEDURE sp_clear_cart(
     IN p_user_id INT
 )
 BEGIN
-    DELETE FROM cart
+    DELETE FROM cart_items
     WHERE user_id = p_user_id;
     
     SELECT ROW_COUNT() as affected_rows;

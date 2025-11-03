@@ -378,7 +378,7 @@ export default function AdminNavbar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                     onClick={handleViewAllNotifications}
                       className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center space-x-2"
                   >
-                      <span>View All Notifications</span>
+                      <span>View All</span>
                       <ChevronRightIcon className="w-4 h-4" />
                   </button>
                     <div className="text-xs text-gray-500 font-medium">
@@ -564,7 +564,7 @@ export default function AdminNavbar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                     onClick={handleViewAllNotifications}
                       className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center space-x-1"
                   >
-                      <span>View All Notifications</span>
+                      <span>View All</span>
                       <ChevronRightIcon className="w-3 h-3" />
                   </button>
                     <div className="text-xs text-gray-500 font-medium">
