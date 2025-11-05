@@ -66,6 +66,11 @@ export const getAllProductsSimple = async (req, res) => {
       ORDER BY p.name, p.created_at DESC
     `, queryParams);
 
+    // Handle empty products array
+    if (!products || products.length === 0) {
+      return res.json([]);
+    }
+
     // Get sizes for each product
     const productsWithSizes = await Promise.all(
       products.map(async (product) => {
@@ -106,7 +111,7 @@ export const getAllProductsSimple = async (req, res) => {
             created_at: product.created_at,
             last_restock_date: product.last_restock_date,
             category_name: product.category_name,
-            category: product.category || 'Other',
+            category: product.category || product.category_name || 'Other',
             sizes: sizes.map(size => ({
               id: size.id,
               size: size.size,
@@ -134,7 +139,7 @@ export const getAllProductsSimple = async (req, res) => {
             created_at: product.created_at,
             last_restock_date: product.last_restock_date,
             category_name: product.category_name,
-            category: product.category || 'Other',
+            category: product.category || product.category_name || 'Other',
             sizes: []
           };
         }
@@ -171,7 +176,11 @@ export const getAllProductsSimple = async (req, res) => {
     res.json(finalProducts);
   } catch (err) {
     console.error('Get Products Simple Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error stack:', err.stack);
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: err.message || 'Failed to fetch products'
+    });
   }
 };
 

@@ -14,7 +14,6 @@ import {
   userConfirmOrderReceipt,
   confirmOrderReceiptNotification,
   testNotification,
-  getSalesAnalytics,
   confirmOrderReceiptPublic,
   userCancelOrder
 } from '../controllers/order.controller.js'
@@ -44,7 +43,6 @@ router.get('/test-db', async (req, res) => {
 // Analytics and reporting routes (MUST come before parameterized routes)
 router.get('/stats', verifyToken, isAdmin, getOrderStats)
 router.get('/sales-performance', verifyToken, isAdmin, getSalesPerformance)
-router.get('/sales-analytics', verifyToken, isAdmin, getSalesAnalytics)
 router.get('/detailed-sales-report', verifyToken, isAdmin, getDetailedSalesReport)
 
 // Public sales data endpoint for testing (remove in production)

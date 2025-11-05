@@ -1173,17 +1173,23 @@ export default function AdminReportsPage() {
               <div className="flex items-end">
                 <button
                   onClick={() => {
-                    const today = new Date();
-                    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-                    setDateFilter({
-                      startDate: firstDay.toISOString().split('T')[0],
-                      endDate: today.toISOString().split('T')[0],
-                      period: 'month'
-                    });
+                    switch (activeTab) {
+                      case 'inventory':
+                        fetchInventoryData();
+                        break;
+                      case 'restock':
+                        fetchRestockData();
+                        break;
+                      case 'sales':
+                        fetchSalesData();
+                        break;
+                      default:
+                        break;
+                    }
                   }}
                   className="w-full px-3 py-2 bg-[#000C50] text-white rounded-md text-sm font-medium hover:bg-[#000C50]/90 transition-colors"
                 >
-                  This Month
+                  Apply Filter
                 </button>
               </div>
             </div>
@@ -1270,57 +1276,57 @@ export default function AdminReportsPage() {
                     {/* Table */}
                     <div className="overflow-x-auto">
                       <table className="w-full">
-                        <thead className="bg-gray-50/50">
+                        <thead style={{ backgroundColor: '#F6F6F6' }}>
                           <tr>
                             <th className="px-6 py-4 text-left">
                               <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                             </th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Category</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size/Variant</th>
-                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Base Stock</th>
-                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Current Stock</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Product Name</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Category</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Size/Variant</th>
+                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Base Stock</th>
+                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Current Stock</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {Array.isArray(inventoryData) && inventoryData.length > 0 ? (
                             inventoryData.map((item, index) => (
-                              <tr key={item.id || index} className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                              <tr key={item.id || index} className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : ''}`} style={index % 2 !== 0 ? { backgroundColor: '#F6F6F6' } : {}}>
                                 <td className="px-6 py-4">
                                   <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                                 </td>
                                 <td className="px-6 py-4">
-                                  <div className="text-sm font-medium text-gray-900 uppercase">{item.product_name}</div>
+                                  <div className="text-xs text-gray-900 uppercase">{item.product_name}</div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full uppercase">
+                                  <span className="inline-flex px-2.5 py-1 text-xs rounded-full uppercase" style={{ backgroundColor: '#A5D8FF', color: '#0464C5' }}>
                                     {item.category_name || 'N/A'}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4">
                                   {item.size && item.size !== 'No sizes' ? (
-                                    <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded uppercase">
+                                    <span className="inline-flex px-2.5 py-1 text-xs text-black uppercase">
                                       {item.size}
                                     </span>
                                   ) : (
-                                    <span className="text-xs text-gray-400">N/A</span>
+                                    <span className="text-xs text-black">N/A</span>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-600 text-center">
+                                <td className="px-6 py-4 text-xs text-gray-600 text-center">
                                   {item.base_stock || 0}
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-900 text-center font-medium">
+                                <td className="px-6 py-4 text-xs text-gray-900 text-center">
                                   {item.current_stock || 0}
                                 </td>
                                 <td className="px-6 py-4">
-                                  <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${
+                                  <span className="inline-flex px-2.5 py-1 text-xs rounded-full" style={
                                     item.stock_status === 'Out of Stock'
-                                      ? 'bg-red-100 text-red-800' 
+                                      ? { backgroundColor: '#FEF2F2', color: '#991B1B' }
                                       : item.stock_status === 'Low Stock'
-                                      ? 'bg-yellow-100 text-yellow-800'
-                                      : 'bg-green-100 text-green-800'
-                                  }`}>
+                                      ? { backgroundColor: '#F8E194', color: '#E2821D' }
+                                      : { backgroundColor: '#ABE8BA', color: '#059C2B' }
+                                  }>
                                     {item.stock_status}
                                   </span>
                                 </td>
@@ -1385,22 +1391,18 @@ export default function AdminReportsPage() {
                 {activeTab === 'restock' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     {/* Header Section */}
-                    <div className="px-6 py-5 bg-gradient-to-r from-orange-50 to-red-50 border-b border-gray-100">
+                    <div className="px-6 py-5  border-gray-100">
                       <div className="flex justify-between items-center">
                         <div>
                           <h3 className="text-xl font-semibold text-gray-900">Restock Report</h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            History of restocked items with size information
-                          </p>
                         </div>
                         <div className="flex items-center gap-3">
                           {/* Download Button */}
                           <button
                             onClick={handleDownload}
-                            className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 shadow-sm"
+                            className="px-4 py-2 text-sm bg-[#000C50] text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                           >
                             <ArrowDownTrayIcon className="h-4 w-4" />
-                            Download
                           </button>
                         </div>
                       </div>
@@ -1409,22 +1411,22 @@ export default function AdminReportsPage() {
                     {/* Table */}
                     <div className="overflow-x-auto">
                       <table className="w-full">
-                        <thead className="bg-gray-50/50">
+                        <thead style={{ backgroundColor: '#F6F6F6' }}>
                           <tr>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date & Time</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size/Variant</th>
-                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity Added</th>
-                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock Before</th>
-                            <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Stock After</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date & Time</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Product Name</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Size/Variant</th>
+                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Quantity Added</th>
+                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Stock Before</th>
+                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Stock After</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {Array.isArray(restockData) && restockData.length > 0 ? (
                             restockData.map((item, index) => (
-                              <tr key={index} className={`hover:bg-orange-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                              <tr key={index} className={`hover:bg-orange-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : ''}`} style={index % 2 !== 0 ? { backgroundColor: '#F6F6F6' } : {}}>
                                 <td className="px-6 py-4">
-                                  <div className="text-sm font-medium text-gray-900">
+                                  <div className="text-xs text-gray-900">
                                     {new Date(item.date).toLocaleDateString('en-US', { 
                                       month: 'short', 
                                       day: 'numeric', 
@@ -1439,24 +1441,24 @@ export default function AdminReportsPage() {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <div className="text-sm font-semibold text-gray-900 uppercase">{item.product_name}</div>
+                                  <div className="text-xs text-gray-900 uppercase">{item.product_name}</div>
                                 </td>
                                 <td className="px-6 py-4">
                                   {item.size ? (
-                                    <span className="inline-flex px-3 py-1.5 text-xs font-semibold bg-blue-100 text-blue-800 rounded uppercase">
+                                    <span className="inline-flex px-3 py-1.5 text-xs text-black uppercase">
                                       {item.size}
                                     </span>
                                   ) : (
-                                    <span className="text-xs text-gray-400 italic">No size specified</span>
+                                    <span className="text-xs text-black italic">No size specified</span>
                                   )}
                                 </td>
                                 <td className="px-6 py-4 text-center">
-                                  <span className="inline-flex px-3 py-1 text-sm font-bold text-green-700 bg-green-100 rounded-full">
+                                  <span className="text-xs text-black">
                                     +{item.quantity}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-sm text-gray-600 text-center">{item.stock_before}</td>
-                                <td className="px-6 py-4 text-sm font-semibold text-gray-900 text-center">{item.stock_after}</td>
+                                <td className="px-6 py-4 text-xs text-gray-600 text-center">{item.stock_before}</td>
+                                <td className="px-6 py-4 text-xs text-gray-900 text-center">{item.stock_after}</td>
                               </tr>
                             ))
                           ) : (
@@ -1518,48 +1520,20 @@ export default function AdminReportsPage() {
                 {activeTab === 'sales' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     {/* Header Section */}
-                    <div className="px-6 py-5 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-100">
-                      <div className="flex flex-col gap-3">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <h3 className="text-xl font-semibold text-gray-900">Sales Report</h3>
-                            <p className="text-sm text-gray-600 mt-1">
-                              Product sales details from claimed and completed orders
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {/* Download Button */}
-                            <button
-                              onClick={handleDownload}
-                              className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-sm"
-                            >
-                              <ArrowDownTrayIcon className="h-4 w-4" />
-                              Download
-                            </button>
-                          </div>
+                    <div className="px-6 py-5 border-b border-gray-100">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h3 className="text-xl font-semibold text-gray-900">Sales Report</h3>
                         </div>
-                        
-                        {/* Summary Info */}
-                        {salesData.summary && (
-                          <div className="flex flex-wrap gap-4 text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="text-gray-600">Total Orders:</span>
-                              <span className="font-semibold text-gray-900">{salesData.summary.total_orders || 0}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-gray-600">Total Revenue:</span>
-                              <span className="font-semibold text-green-600">{formatCurrency(salesData.summary.total_revenue || 0)}</span>
-                            </div>
-                            {(dateFilter.startDate || dateFilter.endDate) && (
-                              <button
-                                onClick={() => setDateFilter({ startDate: '', endDate: '', period: 'month' })}
-                                className="text-xs px-2 py-1 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                              >
-                                Clear Filters
-                              </button>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {/* Download Button */}
+                          <button
+                            onClick={handleDownload}
+                            className="px-4 py-2 text-sm bg-[#000C50] text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                          >
+                            <ArrowDownTrayIcon className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -1568,22 +1542,22 @@ export default function AdminReportsPage() {
                       <>
                         <div className="overflow-x-auto">
                           <table className="w-full">
-                            <thead className="bg-gray-50/50">
+                            <thead style={{ backgroundColor: '#F6F6F6' }}>
                               <tr>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date & Time</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Product Name</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Size</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Price</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Payment Method</th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date & Time</th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Product Name</th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Size</th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Quantity</th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Unit Price</th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Total</th>
+                                <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Payment Method</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                               {salesData.orderItems.map((item, index) => (
-                                <tr key={index} className={`hover:bg-green-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                <tr key={index} className={`hover:bg-green-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : ''}`} style={index % 2 !== 0 ? { backgroundColor: '#F6F6F6' } : {}}>
                                   <td className="px-6 py-4">
-                                    <div className="text-sm font-medium text-gray-900">
+                                    <div className="text-xs text-gray-900">
                                       {new Date(item.order_date).toLocaleDateString('en-US', { 
                                         month: 'short', 
                                         day: 'numeric', 
@@ -1598,35 +1572,35 @@ export default function AdminReportsPage() {
                                     </div>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <div className="text-sm font-medium text-gray-900">{item.product_name}</div>
+                                    <div className="text-xs text-gray-900">{item.product_name}</div>
                                   </td>
                                   <td className="px-6 py-4">
                                     {item.size && item.size !== 'N/A' ? (
-                                      <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded uppercase">
+                                      <span className="inline-flex px-2.5 py-1 text-xs text-black uppercase">
                                         {item.size}
                                       </span>
                                     ) : (
-                                      <span className="text-xs text-gray-400">—</span>
+                                      <span className="text-xs text-black">—</span>
                                     )}
                                   </td>
                                   <td className="px-6 py-4">
-                                    <span className="inline-flex px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                    <span className="text-xs text-black">
                                       {item.quantity}
                                     </span>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <span className="text-sm font-medium text-gray-900">{formatCurrency(item.unit_price)}</span>
+                                    <span className="text-xs text-gray-900">{formatCurrency(item.unit_price)}</span>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <span className="text-sm font-bold text-gray-900">{formatCurrency(item.item_total)}</span>
+                                    <span className="text-xs text-gray-900">{formatCurrency(item.item_total)}</span>
                                   </td>
                                   <td className="px-6 py-4">
                                     {item.payment_method?.toLowerCase() === 'gcash' ? (
-                                      <span className="inline-flex px-3 py-1.5 text-xs font-medium bg-purple-100 text-purple-800 rounded-full uppercase">
+                                      <span className="inline-flex px-3 py-1.5 text-xs rounded-full uppercase" style={{ backgroundColor: '#F8E194', color: '#E2821D' }}>
                                         GCash
                                       </span>
                                     ) : (
-                                      <span className="inline-flex px-3 py-1.5 text-xs font-medium bg-orange-100 text-orange-800 rounded-full uppercase">
+                                      <span className="inline-flex px-3 py-1.5 text-xs rounded-full uppercase" style={{ backgroundColor: '#A5D8FF', color: '#2B8BE0' }}>
                                         Cash
                                       </span>
                                     )}

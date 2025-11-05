@@ -337,88 +337,160 @@ const getStockHistory = async (req, res) => {
     const { productId, page = 1, limit = 50, transactionType, startDate, endDate } = req.query;
     const offset = (page - 1) * limit;
     
-    let query = `
-      SELECT 
-        st.id,
-        st.product_id,
-        p.name as product_name,
-        st.transaction_type,
-        st.quantity,
-        st.reference_no,
-        st.batch_no,
-        st.expiry_date,
-        st.source,
-        st.note,
-        CASE 
-          WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
-            THEN CONCAT(u.first_name, ' ', u.last_name)
-          WHEN u.email IS NOT NULL 
-            THEN u.email
-          ELSE 'System'
-        END as created_by_name,
-        u.role as created_by_role,
-        st.created_at
-      FROM stock_transactions st
-      JOIN products p ON st.product_id = p.id
-      LEFT JOIN users u ON st.created_by = u.id
-      WHERE 1=1
-    `;
-    
+    // Build WHERE clauses and parameters for stock_transactions
+    let stWhereClause = 'WHERE 1=1';
+    let smWhereClause = 'WHERE 1=1';
     const params = [];
-    
-    if (productId) {
-      query += ' AND st.product_id = ?';
-      params.push(productId);
-    }
-    
-    if (transactionType) {
-      query += ' AND st.transaction_type = ?';
-      params.push(transactionType);
-    }
-    
-    if (startDate) {
-      query += ' AND st.created_at >= ?';
-      params.push(startDate);
-    }
-    
-    if (endDate) {
-      query += ' AND st.created_at <= ?';
-      params.push(endDate);
-    }
-    
-    query += ' ORDER BY st.created_at DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit), offset);
-    
-    const [rows] = await pool.query(query, params);
-    
-    // Get total count
-    let countQuery = `
-      SELECT COUNT(*) as total
-      FROM stock_transactions st
-      WHERE 1=1
-    `;
-    
     const countParams = [];
     
     if (productId) {
-      countQuery += ' AND st.product_id = ?';
+      stWhereClause += ' AND st.product_id = ?';
+      smWhereClause += ' AND sm.product_id = ?';
+      params.push(productId);
       countParams.push(productId);
     }
     
-    if (transactionType) {
-      countQuery += ' AND st.transaction_type = ?';
-      countParams.push(transactionType);
-    }
-    
     if (startDate) {
-      countQuery += ' AND st.created_at >= ?';
+      stWhereClause += ' AND st.created_at >= ?';
+      smWhereClause += ' AND sm.created_at >= ?';
+      params.push(startDate);
       countParams.push(startDate);
     }
     
     if (endDate) {
-      countQuery += ' AND st.created_at <= ?';
+      stWhereClause += ' AND st.created_at <= ?';
+      smWhereClause += ' AND sm.created_at <= ?';
+      params.push(endDate);
       countParams.push(endDate);
     }
+    
+    // Build transaction type filter for stock_transactions
+    let stTypeFilter = '';
+    if (transactionType) {
+      if (transactionType === 'IN') {
+        stTypeFilter = " AND st.transaction_type = 'IN'";
+      } else if (transactionType === 'OUT') {
+        stTypeFilter = " AND st.transaction_type = 'OUT'";
+      } else {
+        stTypeFilter = ' AND st.transaction_type = ?';
+        params.push(transactionType);
+        countParams.push(transactionType);
+      }
+    }
+    
+    // Build movement type filter for stock_movements
+    let smTypeFilter = '';
+    if (transactionType) {
+      if (transactionType === 'IN') {
+        smTypeFilter = " AND sm.movement_type = 'stock_in'";
+      } else if (transactionType === 'OUT') {
+        smTypeFilter = " AND sm.movement_type = 'stock_out'";
+      } else {
+        // For other types, skip stock_movements or handle accordingly
+        smTypeFilter = " AND 1=0"; // Exclude stock_movements for non-IN/OUT types
+      }
+    }
+    
+    // Combined query from both stock_transactions and stock_movements
+    let query = `
+      SELECT 
+        id,
+        product_id,
+        product_name,
+        transaction_type,
+        quantity,
+        reference_no,
+        batch_no,
+        expiry_date,
+        source,
+        note,
+        created_by_name,
+        created_by_role,
+        created_at
+      FROM (
+        SELECT 
+          st.id,
+          st.product_id,
+          p.name as product_name,
+          st.transaction_type,
+          st.quantity,
+          st.reference_no,
+          st.batch_no,
+          st.expiry_date,
+          st.source,
+          st.note,
+          CASE 
+            WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
+              THEN CONCAT(u.first_name, ' ', u.last_name)
+            WHEN u.email IS NOT NULL 
+              THEN u.email
+            ELSE 'System'
+          END as created_by_name,
+          u.role as created_by_role,
+          st.created_at
+        FROM stock_transactions st
+        JOIN products p ON st.product_id = p.id
+        LEFT JOIN users u ON st.created_by = u.id
+        ${stWhereClause}
+        ${stTypeFilter}
+        
+        UNION ALL
+        
+        SELECT 
+          sm.id + 1000000 as id,
+          sm.product_id,
+          p.name as product_name,
+          CASE 
+            WHEN sm.movement_type = 'stock_in' THEN 'IN'
+            WHEN sm.movement_type = 'stock_out' THEN 'OUT'
+            WHEN sm.movement_type = 'stock_adjustment' THEN 'ADJUSTMENT'
+            ELSE sm.movement_type
+          END as transaction_type,
+          sm.quantity,
+          NULL as reference_no,
+          NULL as batch_no,
+          NULL as expiry_date,
+          COALESCE(sm.reason, 'Manual') as source,
+          sm.notes as note,
+          CASE 
+            WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
+              THEN CONCAT(u.first_name, ' ', u.last_name)
+            WHEN u.email IS NOT NULL 
+              THEN u.email
+            ELSE 'System'
+          END as created_by_name,
+          u.role as created_by_role,
+          sm.created_at
+        FROM stock_movements sm
+        JOIN products p ON sm.product_id = p.id
+        LEFT JOIN users u ON sm.user_id = u.id
+        ${smWhereClause}
+        ${smTypeFilter}
+      ) combined_history
+      ORDER BY created_at DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    params.push(parseInt(limit), offset);
+    
+    const [rows] = await pool.query(query, params);
+    
+    // Get total count from both tables
+    let countQuery = `
+      SELECT COUNT(*) as total FROM (
+        SELECT st.id
+        FROM stock_transactions st
+        ${stWhereClause}
+        ${stTypeFilter}
+        
+        UNION ALL
+        
+        SELECT sm.id
+        FROM stock_movements sm
+        ${smWhereClause}
+        ${smTypeFilter}
+      ) combined_count
+    `;
     
     const [countResult] = await pool.query(countQuery, countParams);
     const total = countResult[0].total;

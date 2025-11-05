@@ -472,10 +472,10 @@ export default function ProductTable({ category = '', subcategory = '', category
                 </div>
               </th>
               <th className="px-4 py-3 text-xs font-medium text-gray-700">
-                Base Stock (Display Only)
+                Base Stock
               </th>
               <th className="px-4 py-3 text-xs font-medium text-gray-700">Size</th>
-              <th className="px-4 py-3 text-xs font-medium text-gray-700">Stock (Display Only)</th>
+              <th className="px-4 py-3 text-xs font-medium text-gray-700">Stock</th>
               <th className="px-4 py-3 text-xs font-medium text-gray-700">Actions</th>
             </tr>
           </thead>

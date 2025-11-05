@@ -5,6 +5,7 @@ import Sidebar from '@/components/common/side-bar';
 import API from '@/lib/axios';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 import { useSocket } from '@/context/SocketContext';
+import Swal from '@/lib/sweetalert-config';
 import { 
   CubeIcon, 
   PlusIcon, 
@@ -15,14 +16,11 @@ import {
   XCircleIcon,
   ArchiveBoxIcon,
   ChartBarIcon,
-  DocumentTextIcon,
   TruckIcon
 } from '@heroicons/react/24/outline';
 import { getImageUrl } from '@/utils/imageUtils';
-import { useRouter } from 'next/navigation';
 
 export default function AdminInventoryPage() {
-  const router = useRouter();
   const { socket, isConnected, joinAdminRoom } = useSocket();
   const [currentStock, setCurrentStock] = useState([]);
   const [stockHistory, setStockHistory] = useState([]);
@@ -44,7 +42,6 @@ export default function AdminInventoryPage() {
     productId: '',
     quantity: '',
     size: '',
-    batchNo: '',
     note: ''
   });
   const [adjustForm, setAdjustForm] = useState({
@@ -164,7 +161,7 @@ export default function AdminInventoryPage() {
           movement_type: 'stock_in',
           quantity: parseInt(stockInForm.quantity),
           reason: 'restock',
-          supplier: stockInForm.batchNo || null,
+          supplier: null,
           notes: stockInForm.note || null,
           size: stockInForm.size || null
         })
@@ -184,17 +181,42 @@ export default function AdminInventoryPage() {
         productId: '',
         quantity: '',
         size: '',
-        batchNo: '',
         note: ''
       });
       setProductSizes([]);
-      alert('Stock added successfully!');
+      
+      // Show SweetAlert success message
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: 'Stock added successfully!',
+        confirmButtonColor: '#000C50',
+        timer: 2000,
+        showConfirmButton: true
+      });
     } catch (error) {
       console.error('Error adding stock:', error);
-      alert(error.message || 'Error adding stock. Please try again.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'Error adding stock. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 
+
+  // Helper function to get current stock for a product
+  const getCurrentStockForProduct = (productId) => {
+    const product = currentStock.find(p => p.id === parseInt(productId));
+    if (!product) return null;
+    
+    if (product.sizes && product.sizes.length > 0) {
+      return product.sizes;
+    } else {
+      return { current_stock: product.current_stock || 0 };
+    }
+  };
 
   // Handle product selection in adjust modal
   const handleAdjustProductSelect = async (productId) => {
@@ -203,8 +225,28 @@ export default function AdminInventoryPage() {
     // Fetch sizes for selected product
     if (productId) {
       try {
+        // Ensure current stock is up to date
+        await fetchCurrentStock();
+        
         const response = await API.get(`/products/${productId}/sizes`);
-        setAdjustProductSizes(response.data || []);
+        const sizesData = response.data || [];
+        
+        // Get current stock data and merge with sizes
+        const stockData = getCurrentStockForProduct(productId);
+        if (stockData && Array.isArray(stockData)) {
+          // Product has sizes - merge stock data
+          const mergedSizes = sizesData.map(size => {
+            const stockInfo = stockData.find(s => s.size === size.size);
+            return {
+              ...size,
+              stock: stockInfo?.stock || 0
+            };
+          });
+          setAdjustProductSizes(mergedSizes);
+        } else {
+          // Product without sizes - use stock from currentStock
+          setAdjustProductSizes(sizesData);
+        }
       } catch (error) {
         console.error('Error fetching product sizes:', error);
         setAdjustProductSizes([]);
@@ -221,8 +263,28 @@ export default function AdminInventoryPage() {
     // Fetch sizes for selected product
     if (productId) {
       try {
+        // Ensure current stock is up to date
+        await fetchCurrentStock();
+        
         const response = await API.get(`/products/${productId}/sizes`);
-        setStockOutProductSizes(response.data || []);
+        const sizesData = response.data || [];
+        
+        // Get current stock data and merge with sizes
+        const stockData = getCurrentStockForProduct(productId);
+        if (stockData && Array.isArray(stockData)) {
+          // Product has sizes - merge stock data
+          const mergedSizes = sizesData.map(size => {
+            const stockInfo = stockData.find(s => s.size === size.size);
+            return {
+              ...size,
+              stock: stockInfo?.stock || 0
+            };
+          });
+          setStockOutProductSizes(mergedSizes);
+        } else {
+          // Product without sizes - use stock from currentStock
+          setStockOutProductSizes(sizesData);
+        }
       } catch (error) {
         console.error('Error fetching product sizes:', error);
         setStockOutProductSizes([]);
@@ -520,7 +582,7 @@ export default function AdminInventoryPage() {
       <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
       <div className="flex pt-[68px] lg:pt-20">
         <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <div className="flex-1 bg-gray-50 p-3 sm:p-4 overflow-auto lg:ml-64">
+        <div className="flex-1 bg-gray-50 p-3 sm:p-4 overflow-y-auto overflow-x-hidden lg:ml-64">
            {/* Header */}
            <div className="mb-4">
              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
@@ -545,7 +607,7 @@ export default function AdminInventoryPage() {
 
           {/* Tabs - Horizontal Scroll on Mobile */}
           <div className="mb-6">
-            <div className="border-b border-gray-200 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <div className="border-b border-gray-200 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <nav className="-mb-px flex space-x-4 sm:space-x-8 min-w-max">
                 {[
                   { id: 'overview', name: 'Overview', count: getSummaryStats().total_products },
@@ -640,7 +702,7 @@ export default function AdminInventoryPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Quick Actions</h3>
                </div>
                <div className="p-3 sm:p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                     <button
                       onClick={() => {
                         setSelectedProduct(null);
@@ -670,14 +732,6 @@ export default function AdminInventoryPage() {
                     >
                       <ClockIcon className="h-4 w-4" />
                       <span>Adjust Stock</span>
-                    </button>
-                    <button
-                      onClick={() => router.push('/admin/stock-management')}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors text-xs sm:text-sm font-medium flex items-center justify-center space-x-2 active:scale-95"
-                    >
-                      <DocumentTextIcon className="h-4 w-4" />
-                      <span className="hidden sm:inline">Advanced Management</span>
-                      <span className="sm:hidden">Advanced</span>
                     </button>
                    </div>
                    </div>
@@ -735,22 +789,22 @@ export default function AdminInventoryPage() {
                             
                             return (
                               <tr key={`${product.id}-${size.id}`}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 uppercase">
+                                <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-900 uppercase">
                                   {product.name}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700">
                                     {size.size}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
+                                <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                                   {size.base_stock || 0}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
+                                <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-900">
                                   {sizeStock}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockStatusColor(sizeStatus)}`}>
+                                  <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getStockStatusColor(sizeStatus)}`}>
                                     {sizeStatus}
                                   </span>
                                 </td>
@@ -761,22 +815,22 @@ export default function AdminInventoryPage() {
                           // Product has no sizes, display as single row
                           return (
                         <tr key={product.id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 uppercase">
+                              <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-900 uppercase">
                             {product.name}
                              </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-500">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-50 text-gray-500">
                                   No sizes
                                 </span>
                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">
+                              <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                                 {product.base_stock || 0}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
+                              <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-900">
                             {product.current_stock}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStockStatusColor(product.stock_status)}`}>
+                            <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getStockStatusColor(product.stock_status)}`}>
                               {product.stock_status}
                                    </span>
                              </td>
@@ -816,34 +870,28 @@ export default function AdminInventoryPage() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Source
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          User
-                        </th>
                        </tr>
                      </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {stockHistory.map((transaction) => (
                         <tr key={transaction.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                             {new Date(transaction.created_at).toLocaleDateString()}
                            </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-900">
                             {transaction.product_name}
                            </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTransactionTypeColor(transaction.transaction_type)}`}>
+                            <span className={`inline-flex px-2 py-1 text-xs rounded-full ${getTransactionTypeColor(transaction.transaction_type)}`}>
                               {transaction.transaction_type}
                                        </span>
                            </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-900">
                             {transaction.quantity}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                             {transaction.source}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {transaction.created_by_name}
-                           </td>
                          </tr>
                        ))}
                      </tbody>
@@ -917,7 +965,6 @@ export default function AdminInventoryPage() {
                                     productId: product.id.toString(), 
                                     quantity: '', 
                                     size: '', 
-                                    batchNo: '', 
                                     note: '' 
                                   });
                                   // Fetch sizes for this product
@@ -994,7 +1041,6 @@ export default function AdminInventoryPage() {
                         {productSizes.map((sizeObj) => (
                           <option key={sizeObj.id} value={sizeObj.size}>
                             {sizeObj.size.toUpperCase()}
-                            {sizeObj.size.toLowerCase() !== 'none' && ` - Stock: ${sizeObj.stock || 0}`}
                           </option>
                         ))}
                       </select>
@@ -1033,18 +1079,6 @@ export default function AdminInventoryPage() {
                     />
       </div>
 
-                  {/* Batch No */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Batch No (Optional)</label>
-                    <input
-                      type="text"
-                      value={stockInForm.batchNo}
-                      onChange={(e) => setStockInForm({ ...stockInForm, batchNo: e.target.value })}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                      placeholder="e.g., BATCH-001"
-                    />
-                  </div>
-
                   {/* Note */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Note</label>
@@ -1066,7 +1100,6 @@ export default function AdminInventoryPage() {
                         productId: '',
                         quantity: '',
                         size: '',
-                        batchNo: '',
                         note: ''
                       });
                       setProductSizes([]);
@@ -1136,7 +1169,6 @@ export default function AdminInventoryPage() {
                         {adjustProductSizes.map((sizeObj) => (
                           <option key={sizeObj.id} value={sizeObj.size}>
                             {sizeObj.size.toUpperCase()}
-                            {sizeObj.size.toLowerCase() !== 'none' && ` - Stock: ${sizeObj.stock || 0}`}
                           </option>
                         ))}
                       </select>
@@ -1170,7 +1202,10 @@ export default function AdminInventoryPage() {
                             ? (adjustForm.size 
                                 ? adjustProductSizes.find(s => s.size === adjustForm.size)?.stock || 0
                                 : 0)
-                            : allProducts.find(p => p.id === parseInt(adjustForm.productId))?.stock || 0
+                            : (() => {
+                                const stockData = getCurrentStockForProduct(adjustForm.productId);
+                                return stockData && !Array.isArray(stockData) ? stockData.current_stock : 0;
+                              })()
                         }
                       disabled
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 text-gray-700 font-semibold"
@@ -1306,7 +1341,6 @@ export default function AdminInventoryPage() {
                           {stockOutProductSizes.map((sizeObj) => (
                             <option key={sizeObj.id} value={sizeObj.size}>
                               {sizeObj.size.toUpperCase()}
-                              {sizeObj.size.toLowerCase() !== 'none' && ` - Stock: ${sizeObj.stock || 0}`}
                             </option>
                           ))}
                         </select>
@@ -1340,7 +1374,10 @@ export default function AdminInventoryPage() {
                               ? (stockOutForm.size 
                                   ? stockOutProductSizes.find(s => s.size === stockOutForm.size)?.stock || 0
                                   : 0)
-                              : allProducts.find(p => p.id === parseInt(stockOutForm.productId))?.stock || 0
+                              : (() => {
+                                  const stockData = getCurrentStockForProduct(stockOutForm.productId);
+                                  return stockData && !Array.isArray(stockData) ? stockData.current_stock : 0;
+                                })()
                           }
                           disabled
                           className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 text-gray-700 font-semibold"

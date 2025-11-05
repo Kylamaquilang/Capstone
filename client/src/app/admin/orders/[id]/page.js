@@ -78,6 +78,8 @@ export default function OrderDetailPage() {
       processing: 'bg-blue-100 text-blue-800',
       ready_for_pickup: 'bg-purple-100 text-purple-800',
       delivered: 'bg-green-100 text-green-800',
+      claimed: 'bg-green-100 text-green-800',
+      completed: 'bg-emerald-100 text-emerald-800',
       cancelled: 'bg-red-100 text-red-800',
       refunded: 'bg-gray-100 text-gray-800'
     };
@@ -86,14 +88,24 @@ export default function OrderDetailPage() {
 
   const getStatusIcon = (status) => {
     const icons = {
-      pending: '⏳',
-      processing: '⚙️',
-      ready_for_pickup: <CubeIcon className="w-4 h-4" />,
-      delivered: '✅',
-      cancelled: '❌',
-      refunded: '↩️'
+      pending: '',
+      processing: '',
+      ready_for_pickup: '',
+      delivered: '',
+      claimed: '',
+      completed: '',
+      cancelled: '',
+      refunded: ''
     };
-    return icons[status] || '❓';
+    return icons[status] || '';
+  };
+
+  const formatStatus = (status) => {
+    if (!status) return 'Unknown';
+    if (status === 'ready_for_pickup') return 'Ready for Pickup';
+    if (status === 'claimed') return 'Claimed';
+    if (status === 'completed') return 'Completed';
+    return status.replace('_', ' ');
   };
 
   const formatDate = (dateString) => {
@@ -210,7 +222,7 @@ export default function OrderDetailPage() {
                   <div>
                     <span className="font-medium">Status:</span>
                     <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                      {getStatusIcon(order.status)} {order.status.replace('_', ' ')}
+                      {formatStatus(order.status)}
                     </span>
                   </div>
                   <div>
@@ -286,10 +298,10 @@ export default function OrderDetailPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status.new_status)}`}>
-                              {status.new_status.replace('_', ' ')}
+                              {formatStatus(status.new_status)}
                             </span>
                             {status.old_status && (
-                              <span className="text-gray-500">← {status.old_status.replace('_', ' ')}</span>
+                              <span className="text-gray-500">← {formatStatus(status.old_status)}</span>
                             )}
                           </div>
                           <div className="text-sm text-gray-600">
@@ -331,6 +343,8 @@ export default function OrderDetailPage() {
                 <option value="pending">Pending</option>
                 <option value="processing">Processing</option>
                 <option value="ready_for_pickup">Ready for Pickup</option>
+                <option value="claimed">Claimed</option>
+                <option value="completed">Completed</option>
                 <option value="delivered">Delivered</option>
                 <option value="cancelled">Cancelled</option>
                 <option value="refunded">Refunded</option>

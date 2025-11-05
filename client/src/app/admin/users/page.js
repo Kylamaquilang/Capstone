@@ -399,37 +399,13 @@ export default function AdminUsersPage() {
   };
 
   const getActiveStatusBadge = (isActive) => {
-    const statusClasses = isActive 
-      ? 'bg-green-100 text-green-800' 
-      : 'bg-red-100 text-red-800';
-    
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusClasses}`}>
+      <span className="px-2 py-1 text-xs rounded-full" style={{ backgroundColor: '#ABE8BA', color: '#059C2B' }}>
         {isActive ? 'Active' : 'Inactive'}
       </span>
     );
   };
 
-  const getRoleBadge = (role) => {
-    // Handle null, undefined, or empty role
-    if (!role) {
-      return (
-        <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-          N/A
-        </span>
-      );
-    }
-
-    const roleClasses = role === 'admin' 
-      ? 'bg-purple-100 text-purple-800' 
-      : 'bg-blue-100 text-blue-800';
-    
-    return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleClasses}`}>
-        {role.charAt(0).toUpperCase() + role.slice(1)}
-      </span>
-    );
-  };
 
   return (
     <div className="min-h-screen text-black admin-page">
@@ -605,9 +581,8 @@ export default function AdminUsersPage() {
                         </div>
                       </th>
                       <th className="w-24 px-3 py-3 text-xs font-medium text-gray-700">Stud ID</th>
-                      <th className="w-48 px-3 py-3 text-xs font-medium text-gray-700">Name</th>
+                      <th className="w-24 px-3 py-3 text-xs font-medium text-gray-700">Name</th>
                       <th className="w-64 px-3 py-3 text-xs font-medium text-gray-700">Email</th>
-                      <th className="w-20 px-3 py-3 text-xs font-medium text-gray-700">Role</th>
                       <th className="w-24 px-3 py-3 text-xs font-medium text-gray-700">Degree</th>
                       <th className="w-20 px-3 py-3 text-xs font-medium text-gray-700">Year</th>
                       <th className="w-16 px-3 py-3 text-xs font-medium text-gray-700">Section</th>
@@ -629,13 +604,13 @@ export default function AdminUsersPage() {
                           />
                         </td>
                         <td className="w-24 px-3 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 font-mono">
+                          <span className="text-xs text-gray-900 font-mono">
                             {user.student_id || 'N/A'}
                           </span>
                         </td>
-                        <td className="w-48 px-3 py-3">
+                        <td className="w-24 px-3 py-3">
                           <div className="truncate" title={user.name || 'N/A'}>
-                            <div className="text-xs font-medium text-gray-900 uppercase">{user.name || 'N/A'}</div>
+                            <div className="text-xs text-gray-900 uppercase">{user.name || 'N/A'}</div>
                           </div>
                         </td>
                         <td className="w-64 px-3 py-3">
@@ -643,25 +618,18 @@ export default function AdminUsersPage() {
                             {user.email || 'N/A'}
                           </div>
                         </td>
-                        <td className="w-20 px-3 py-3">{getRoleBadge(user.role)}</td>
                         <td className="w-24 px-3 py-3">
-                          <div className="text-xs">
-                            <div className="font-medium text-gray-900 uppercase">{user.degree || 'N/A'}</div>
-                          </div>
+                          <div className="text-xs text-gray-900 uppercase">{user.degree || 'N/A'}</div>
                         </td>
                         <td className="w-20 px-3 py-3">
-                          <div className="text-xs">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 uppercase">
-                              {user.year_level || 'N/A'}
-                            </span>
+                          <div className="text-xs text-gray-900 whitespace-nowrap">
+                            {user.year_level || 'N/A'}
                           </div>
                         </td>
                         <td className="w-16 px-3 py-3">
-                          <div className="text-xs">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-600 uppercase">
-                              {user.section || 'N/A'}
-                            </span>
-                          </div>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs uppercase" style={{ backgroundColor: '#ABE8BA', color: '#059C2B' }}>
+                            {user.section || 'N/A'}
+                          </span>
                         </td>
                         <td className="w-20 px-3 py-3">{getActiveStatusBadge(user.is_active)}</td>
                         <td className="w-24 px-3 py-3">

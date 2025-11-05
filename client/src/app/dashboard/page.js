@@ -76,7 +76,23 @@ export default function UserDashboard() {
   const fetchProducts = async () => {
     try {
       setProductsLoading(true);
-      const { data } = await API.get('/products');
+      setError(''); // Clear any previous errors
+      const response = await API.get('/products');
+      const data = response.data;
+      
+      // Check if data is an array
+      if (!Array.isArray(data)) {
+        console.error('Invalid response format:', data);
+        setError('Invalid response from server. Please try again.');
+        setProducts({});
+        return;
+      }
+      
+      // Check if data is empty
+      if (data.length === 0) {
+        setProducts({});
+        return;
+      }
       
       // Define the specific order for categories
       const categoryOrder = ['POLO', 'LANYARD', 'TELA', 'PE', 'NSTP'];
@@ -124,8 +140,21 @@ export default function UserDashboard() {
       
       setProducts(sortedCategories);
     } catch (err) {
-      console.log('Error fetching products (server might be starting):', err.message);
-      setError('Failed to load products. Please try again in a moment.');
+      console.error('Error fetching products:', err);
+      
+      // More detailed error handling
+      if (err.isNetworkError) {
+        setError('Unable to connect to server. Please check if the server is running.');
+      } else if (err.response) {
+        // Server responded with error status
+        const errorMessage = err.response.data?.error || err.response.data?.message || 'Failed to load products. Please try again.';
+        setError(errorMessage);
+        console.error('Server error response:', err.response.status, err.response.data);
+      } else {
+        // Other errors
+        setError('Failed to load products. Please try again in a moment.');
+      }
+      setProducts({});
     } finally {
       setProductsLoading(false);
     }

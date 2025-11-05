@@ -185,9 +185,6 @@ export default function InventoryReportsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Inventory Reports</h1>
-                <p className="text-sm text-gray-600 mt-1">
-                  Generate and export inventory reports
-                </p>
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { XMarkIcon, CubeIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 
 export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
@@ -60,22 +60,20 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
       processing: 'bg-blue-100 text-blue-800',
       ready_for_pickup: 'bg-purple-100 text-purple-800',
       delivered: 'bg-green-100 text-green-800',
+      claimed: 'bg-green-100 text-green-800',
+      completed: 'bg-emerald-100 text-emerald-800',
       cancelled: 'bg-red-100 text-red-800',
       refunded: 'bg-gray-100 text-gray-800'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
-  const getStatusIcon = (status) => {
-    const icons = {
-      pending: '⏳',
-      processing: '🔄',
-      ready_for_pickup: <CubeIcon className="w-4 h-4" />,
-      delivered: '✅',
-      cancelled: '❌',
-      refunded: '💰'
-    };
-    return icons[status] || '❓';
+  const formatStatus = (status) => {
+    if (!status) return 'Unknown';
+    if (status === 'ready_for_pickup') return 'Ready for Pickup';
+    if (status === 'claimed') return 'Claimed';
+    if (status === 'completed') return 'Completed';
+    return status.replace('_', ' ');
   };
 
   const handleClose = () => {
@@ -140,7 +138,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
                       <span
                         className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusColor(order.status)}`}
                       >
-                        {getStatusIcon(order.status)} {order.status.replace('_', ' ')}
+                        {formatStatus(order.status)}
                       </span>
                     </div>
                     <div className="flex justify-between">

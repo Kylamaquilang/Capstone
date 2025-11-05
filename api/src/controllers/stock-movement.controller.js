@@ -284,14 +284,17 @@ export const createStockMovement = async (req, res) => {
       await connection.commit();
 
       // Emit real-time updates
-      emitAdminDataRefresh('stock_movement_created', {
-        product_id,
-        size_id,
-        size,
-        movement_type,
-        quantity,
-        new_stock: newStock
-      });
+      const io = req.app.get('io');
+      if (io) {
+        emitAdminDataRefresh(io, 'inventory', {
+          product_id,
+          size_id,
+          size,
+          movement_type,
+          quantity,
+          new_stock: newStock
+        });
+      }
 
       res.status(201).json({
         message: 'Stock movement recorded successfully',

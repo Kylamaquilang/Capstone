@@ -922,11 +922,11 @@ export default function AdminOrdersPage() {
                                   
                                   return (
                                     <>
-                                      <span className="font-medium uppercase text-gray-900">
+                                      <span className="uppercase text-gray-900">
                                         {uniqueProducts[0]}
                                       </span>
                                       {uniqueProducts.length > 1 && (
-                                        <span className="text-gray-500 font-bold">
+                                        <span className="text-gray-500">
                                           +{uniqueProducts.length - 1}
                                         </span>
                                       )}
@@ -940,38 +940,38 @@ export default function AdminOrdersPage() {
                           </div>
                         </td>
                         <td className="px-3 sm:px-4 py-3">
-                          <div className="text-xs font-medium text-gray-900 uppercase truncate max-w-[120px]" title={order.user_name}>
+                          <div className="text-xs text-gray-900 uppercase truncate max-w-[120px]" title={order.user_name}>
                             {order.user_name}
                           </div>
                         </td>
                         <td className="px-3 sm:px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 uppercase">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs text-black uppercase">
                             {order.degree || 'N/A'}
                           </span>
                         </td>
                         <td className="px-3 sm:px-4 py-3 text-center">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-50 text-gray-600">
                             {order.total_quantity || 0}
                           </span>
                         </td>
                         <td className="px-3 sm:px-4 py-3">
-                          <div className="text-xs font-semibold text-gray-900 whitespace-nowrap">
+                          <div className="text-xs text-gray-900 whitespace-nowrap">
                             ₱{Number(order.total_amount || 0).toFixed(2)}
                           </div>
                         </td>
                         <td className="px-3 sm:px-4 py-3">
                           {(order.status === 'claimed' || order.status === 'completed') ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 uppercase whitespace-nowrap">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-700 uppercase whitespace-nowrap">
                               Paid
                             </span>
                           ) : (
                             <div className="space-y-1">
                               {order.payment_method === 'gcash' ? (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 uppercase whitespace-nowrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700 uppercase whitespace-nowrap">
                                   GCash
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 uppercase whitespace-nowrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-yellow-100 text-yellow-700 uppercase whitespace-nowrap">
                                   Cash
                                 </span>
                               )}
@@ -1077,7 +1077,21 @@ export default function AdminOrdersPage() {
         <div className="fixed inset-0 bg-black/30 backdrop-blur-xm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 max-w-md">
             <h3 className="text-lg font-semibold mb-4">
-              Update Order #{selectedOrder.id} Status
+              Update {selectedOrder?.items && selectedOrder.items.length > 0 
+                ? (() => {
+                    const uniqueProducts = [...new Set(selectedOrder.items.map(item => item.product_name))];
+                    return (
+                      <>
+                        <span className="uppercase">{uniqueProducts[0]}</span>
+                        {uniqueProducts.length > 1 && (
+                          <span className="text-gray-500 font-bold ml-1">
+                            +{uniqueProducts.length - 1}
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()
+                : `Order #${selectedOrder.id}`} Status
             </h3>
             
             <div className="mb-4">
@@ -1196,7 +1210,21 @@ export default function AdminOrdersPage() {
         <div className="fixed inset-0 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-2xl border-2 border-gray-300">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Update Payment Method - Order #{selectedOrder?.id}
+              Update Payment Method - {selectedOrder?.items && selectedOrder.items.length > 0 
+                ? (() => {
+                    const uniqueProducts = [...new Set(selectedOrder.items.map(item => item.product_name))];
+                    return (
+                      <>
+                        <span className="uppercase">{uniqueProducts[0]}</span>
+                        {uniqueProducts.length > 1 && (
+                          <span className="text-gray-500 font-bold ml-1">
+                            +{uniqueProducts.length - 1}
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()
+                : `Order #${selectedOrder?.id}`}
             </h3>
 
             <div className="space-y-4">
