@@ -26,24 +26,19 @@ export default function AdminNavbar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
       // Check if token exists before making request
       const token = localStorage.getItem('token');
       if (!token) {
-        console.log('🔔 Admin navbar - No token found, skipping unread count');
         setUnreadCount(0);
         setApiAvailable(false);
         return;
       }
       
-      console.log('🔔 Admin navbar - Fetching unread count with token');
       const { data } = await API.get('/notifications/unread-count');
       setUnreadCount(data.count || 0);
       setApiAvailable(true);
     } catch (err) {
-      // Silently handle network errors - don't break the UI
       if (err.code === 'NETWORK_ERROR' || err.message === 'Network Error') {
-        console.log('API server not available - notification count disabled');
         setUnreadCount(0);
         setApiAvailable(false);
       } else if (err.response?.status === 401) {
-        console.log('🔔 Admin navbar - 401 error, token may be invalid');
         setUnreadCount(0);
         setApiAvailable(false);
       } else {

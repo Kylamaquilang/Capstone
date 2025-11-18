@@ -148,32 +148,19 @@ export default function UserProfilePage() {
     setError('');
     setSuccess('');
 
-    console.log('🔍 Submitting profile update:', formData);
-    console.log('🔍 Current user from auth context:', authUser);
-    console.log('🔍 Current user token:', localStorage.getItem('token') ? 'Present' : 'Missing');
-
-    // Check if token exists before making request
     const token = localStorage.getItem('token');
     if (!token) {
-      console.log('❌ Profile update - No token found');
       setError('Please log in to update your profile');
       return;
     }
 
     try {
-      console.log('🔍 Profile update - Making request with token');
-      console.log('🔍 Profile update - Token value:', token.substring(0, 20) + '...');
-      console.log('🔍 Profile update - Form data:', formData);
-      
-      // Make request with explicit headers to ensure token is sent
       const response = await API.put('/users/profile', formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      console.log('✅ Profile update response:', response.data);
-      
       // Show SweetAlert success message
       await Swal.fire({
         title: 'Success!',

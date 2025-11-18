@@ -40,8 +40,6 @@ export default function AdminProductPage() {
 
   const handleAddProductSuccess = useCallback(() => {
     setShowAddProductModal(false);
-    // The ProductTable component will handle refreshing its own data
-    console.log('Product added - table will refresh automatically');
   }, []);
 
   const handleCloseAddProductModal = useCallback(() => {

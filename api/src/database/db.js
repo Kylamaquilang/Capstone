@@ -24,11 +24,10 @@ export const pool = mysql.createPool(dbConfig);
 export const testConnection = async () => {
   try {
     const connection = await pool.getConnection();
-    console.log('✅ Database connected successfully');
     connection.release();
     return true;
   } catch (error) {
-    console.error('❌ Database connection failed:', error.message);
+    console.error('Database connection failed:', error.message);
     return false;
   }
 };
@@ -38,13 +37,10 @@ export const initializeDatabase = async () => {
   try {
     await testConnection();
     
-    // Test basic query
-    const [rows] = await pool.query('SELECT 1 as test');
-    console.log('✅ Database query test successful');
-    
+    await pool.query('SELECT 1 as test');
     return true;
   } catch (error) {
-    console.error('❌ Database initialization failed:', error.message);
+    console.error('Database initialization failed:', error.message);
     return false;
   }
 };
@@ -53,21 +49,20 @@ export const initializeDatabase = async () => {
 export const closeDatabase = async () => {
   try {
     await pool.end();
-    console.log('✅ Database connections closed gracefully');
   } catch (error) {
-    console.error('❌ Error closing database connections:', error.message);
+    console.error('Error closing database connections:', error.message);
   }
 };
 
 // Handle database errors
 pool.on('error', (err) => {
-  console.error('❌ Database pool error:', err);
+  console.error('Database pool error:', err);
   if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    console.log('Database connection was closed. Reconnecting...');
+    // Database connection was closed
   } else if (err.code === 'ER_CON_COUNT_ERROR') {
-    console.log('Database has too many connections.');
+    console.error('Database has too many connections.');
   } else if (err.code === 'ECONNREFUSED') {
-    console.log('Database connection was refused.');
+    console.error('Database connection was refused.');
   }
 });
 

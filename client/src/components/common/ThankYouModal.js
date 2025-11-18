@@ -34,9 +34,8 @@ export default function ThankYouModal({ isOpen, onClose, orderId }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-      {/* Modal */}
-      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full max-h-[70vh] overflow-y-auto shadow-2xl border border-gray-200">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-4 sm:p-6 max-w-lg w-full max-h-[70vh] overflow-y-auto shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 sm:mb-6">
           <div className="flex items-center gap-3">

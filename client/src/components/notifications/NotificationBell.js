@@ -19,16 +19,13 @@ const NotificationBell = ({ userType = 'user', userId }) => {
       // Check if token exists before making request
       const token = localStorage.getItem('token');
       if (!token) {
-        console.log('🔔 No token found, skipping notifications load');
         setNotifications([]);
         return;
       }
       
-      console.log('🔔 Loading notifications with token:', token.substring(0, 20) + '...');
       const response = await API.get('/notifications');
       const notificationsData = response.data.notifications || response.data || [];
       
-      // Normalize notification data to handle both API and frontend field names
       const normalizedNotifications = notificationsData.map(notification => ({
         ...notification,
         read: notification.is_read !== undefined ? !!notification.is_read : notification.read,
@@ -36,19 +33,18 @@ const NotificationBell = ({ userType = 'user', userId }) => {
       }));
       
       setNotifications(Array.isArray(normalizedNotifications) ? normalizedNotifications : []);
-      console.log('🔔 Loaded notifications for bell:', normalizedNotifications.length);
     } catch (error) {
-      console.error('🔔 Error loading notifications:', error);
+      console.error('Error loading notifications:', error);
       
       // Handle network errors gracefully
       if (error.isNetworkError || error.code === 'ECONNABORTED' || error.message === 'Network Error') {
-        console.log('🔔 Network error - server may not be running');
         // Don't clear notifications on network error, keep existing ones
         return;
       }
       
       if (error.response?.status === 401) {
-        console.log('🔔 401 error - token may be invalid or expired');
+        setNotifications([]);
+        return;
       }
       setNotifications([]);
     } finally {

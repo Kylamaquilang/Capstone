@@ -76,7 +76,6 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
       }));
       
       setLocalNotifications(Array.isArray(normalizedNotifications) ? normalizedNotifications : []);
-      console.log('🔔 Loaded notifications for dropdown:', normalizedNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
       setLocalNotifications([]);

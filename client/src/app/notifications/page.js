@@ -63,13 +63,11 @@ export default function NotificationsPage() {
       }));
       
       setNotifications(Array.isArray(normalizedNotifications) ? normalizedNotifications : []);
-      console.log('📱 Loaded notifications:', normalizedNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
       
       // Handle network errors gracefully
       if (error.isNetworkError || error.code === 'ECONNABORTED' || error.message === 'Network Error') {
-        console.log('Network error - server may not be running');
         setError('Unable to connect to server. Please check if the API server is running on port 5000.');
         // Don't clear notifications on network error, keep existing ones
         setLoading(false);

@@ -227,46 +227,39 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log(`🔌 User disconnected: ${socket.id}`);
+    // User disconnected
   });
 });
 
 // Make io available to other modules
 // Socket.io error handling
 io.engine.on('connection_error', (err) => {
-  console.error('🔌 Socket.io connection error:', err);
+  console.error('Socket.io connection error:', err);
 });
 
 app.set('io', io);
 
 server.listen(PORT, () => {
-  console.log(`🚀 Server running in ${NODE_ENV} mode on port ${PORT}`);
-  console.log(`📊 Health check available at http://localhost:${PORT}/health`);
-  console.log(`🔌 Socket.io server ready for real-time connections`);
+  console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
+  console.log(`Health check available at http://localhost:${PORT}/health`);
+  console.log(`Socket.io server ready for real-time connections`);
   
-  // Setup scheduled tasks
   setupScheduledTasks(io);
 });
 
-// Setup scheduled tasks
 const setupScheduledTasks = (ioInstance) => {
-  console.log('⏰ Setting up scheduled tasks...');
-  
-  // Auto-confirm claimed orders every day at 2:00 AM
   cron.schedule('0 2 * * *', async () => {
-    console.log('🔄 Running daily auto-confirmation check...');
     try {
       await autoConfirmClaimedOrders(ioInstance);
     } catch (error) {
-      console.error('❌ Error in scheduled auto-confirmation:', error);
+      console.error('Error in scheduled auto-confirmation:', error);
     }
   }, {
     scheduled: true,
     timezone: "Asia/Manila"
   });
   
-  console.log('✅ Scheduled tasks configured:');
-  console.log('   - Auto-confirm claimed orders: Daily at 2:00 AM (Asia/Manila timezone)');
+  console.log('Scheduled tasks configured: Auto-confirm claimed orders daily at 2:00 AM (Asia/Manila timezone)');
 };
 
 // Graceful shutdown

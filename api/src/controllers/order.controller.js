@@ -43,9 +43,8 @@ const createDeliveredOrderNotification = async (orderId, userId) => {
       ]);
     }
     
-    console.log(`✅ Delivered order confirmation notifications created for order #${orderId}`);
   } catch (error) {
-    console.error('❌ Error creating delivered order notification:', error);
+    console.error('Error creating delivered order notification:', error);
   }
 }
 

@@ -48,7 +48,7 @@ API.interceptors.response.use(
   (error) => {
     // Handle network errors
     if (error.code === 'ECONNABORTED' || error.message === 'Network Error' || !error.response) {
-      console.error('🌐 Network Error:', error.message || 'Unable to connect to server');
+      console.error('Network Error:', error.message || 'Unable to connect to server');
       // Don't throw for network errors - let components handle them gracefully
       return Promise.reject({
         ...error,

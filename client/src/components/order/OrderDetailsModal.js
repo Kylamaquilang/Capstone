@@ -84,15 +84,12 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-       {/* Backdrop */}
-       <div
-         className="fixed inset-0 bg-transparent transition-opacity"
-         onClick={handleClose}
-       />
-
-      {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div 
+        className="fixed inset-0"
+        onClick={handleClose}
+      />
+      <div className="relative bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto z-10">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-xl font-medium text-gray-900">Order Details</h2>

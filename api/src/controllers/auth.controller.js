@@ -3,10 +3,9 @@ import jwt from 'jsonwebtoken';
 import { pool } from '../database/db.js';
 import { validateEmail, validateStudentId, validatePassword } from '../utils/validation.js';
 import { sendPasswordResetEmail, generateVerificationCode, sendWelcomeEmail } from '../utils/emailService.js';
-import { transporter } from '../utils/emailService.js'; // Added for new email functions
+import { transporter } from '../utils/emailService.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_here';
-console.log('🔍 JWT_SECRET in auth controller:', JWT_SECRET ? 'Set' : 'Not set');
 const SALT_ROUNDS = 12;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 const DEFAULT_STUDENT_PASSWORD = process.env.DEFAULT_STUDENT_PASSWORD || 'cpc123';
