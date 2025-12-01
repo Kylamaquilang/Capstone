@@ -185,7 +185,7 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
               </svg>
             </div>
             <h4 className="text-xs sm:text-sm font-medium text-gray-900 mb-1">No notifications</h4>
-            <p className="text-xs sm:text-sm text-gray-500">We'll notify you about your orders and updates</p>
+            <p className="text-xs sm:text-sm text-gray-500">We&apos;ll notify you about your orders and updates</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">

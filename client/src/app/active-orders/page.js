@@ -366,7 +366,7 @@ export default function ActiveOrdersPage() {
                       No Active Orders
                     </h3>
                     <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4">
-                      You don't have any active orders at the moment.
+                      You don&apos;t have any active orders at the moment.
                     </p>
                     <button
                       onClick={() => router.push('/dashboard')}

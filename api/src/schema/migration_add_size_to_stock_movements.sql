@@ -1,5 +1,6 @@
 -- Migration: Add size_id column to stock_movements table if it doesn't exist
 -- This allows tracking which specific size was restocked/deducted
+-- Run this if you have an existing database that needs the size_id column added
 
 -- Check if the column exists, if not add it
 SET @dbname = DATABASE();
@@ -58,5 +59,4 @@ EXECUTE addIndexIfNotExists;
 DEALLOCATE PREPARE addIndexIfNotExists;
 
 SELECT 'Migration completed: size_id column added to stock_movements table (if it was missing)' as message;
-
 

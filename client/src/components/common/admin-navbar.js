@@ -1,7 +1,7 @@
 'use client';
 import { BellIcon, ArrowRightOnRectangleIcon, XMarkIcon, CheckIcon, TrashIcon, ChevronRightIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import API from '@/lib/axios';
@@ -49,7 +49,7 @@ export default function AdminNavbar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
     }
   };
 
-  const fetchRecentNotifications = async () => {
+  const fetchRecentNotifications = useCallback(async () => {
     if (loadingNotifications) return;
     
     try {
@@ -80,7 +80,7 @@ export default function AdminNavbar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
     } finally {
       setLoadingNotifications(false);
     }
-  };
+  }, [loadingNotifications]);
 
   useEffect(() => {
     // Try to fetch unread count, but don't break if API is unavailable
@@ -286,7 +286,7 @@ export default function AdminNavbar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                         <BellIcon className="w-8 h-8 text-gray-400" />
                       </div>
                       <h4 className="text-sm font-medium text-gray-900 mb-1">No notifications</h4>
-                      <p className="text-sm text-gray-500">We'll notify you about orders and updates</p>
+                      <p className="text-sm text-gray-500">We&apos;ll notify you about orders and updates</p>
                     </div>
                   ) : (
                     <div>
@@ -472,7 +472,7 @@ export default function AdminNavbar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                         <BellIcon className="w-6 h-6 text-gray-400" />
                       </div>
                       <h4 className="text-xs font-medium text-gray-900 mb-1">No notifications</h4>
-                      <p className="text-xs text-gray-500">We'll notify you about orders and updates</p>
+                      <p className="text-xs text-gray-500">We&apos;ll notify you about orders and updates</p>
                     </div>
                   ) : (
                     <div>

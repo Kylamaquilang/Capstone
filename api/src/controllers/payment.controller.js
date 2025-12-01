@@ -35,11 +35,15 @@ export const selectGCashPayment = async (req, res) => {
     // Generate a tracking ID for GCash selection
     const gcashTrackingId = `gcash_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-    // Update order with GCash selection and set as pending
-      await pool.query(
-      'UPDATE orders SET payment_intent_id = ?, payment_status = ?, payment_method = ? WHERE id = ?',
-      [gcashTrackingId, 'pending', 'gcash', orderId]
-      );
+    // Update order with GCash selection - keep payment_status as 'pending' (will be updated when paid at counter)
+    // Store transaction_id in notes field since orders table doesn't have payment_intent_id column
+    const existingNotes = order.notes || '';
+    const newNotes = existingNotes ? `${existingNotes} | GCash Tracking ID: ${gcashTrackingId}` : `GCash Tracking ID: ${gcashTrackingId}`;
+    
+    await pool.query(
+      'UPDATE orders SET payment_method = ?, notes = ? WHERE id = ?',
+      ['gcash', newNotes, orderId]
+    );
 
     // Store payment transaction for tracking
       await pool.query(`
@@ -59,8 +63,9 @@ export const selectGCashPayment = async (req, res) => {
       'pending',
       JSON.stringify({ 
         method: 'gcash_selection', 
-        message: 'GCash payment method selected - payment status set to pending',
-        selected_at: new Date().toISOString()
+        message: 'GCash payment method selected - payment will be completed at counter',
+        selected_at: new Date().toISOString(),
+        tracking_id: gcashTrackingId
       })
     ]);
 
@@ -68,7 +73,7 @@ export const selectGCashPayment = async (req, res) => {
 
     res.json({
       success: true,
-      payment_intent_id: gcashTrackingId,
+      transaction_id: gcashTrackingId,
       payment_status: 'pending',
       payment_method: 'gcash',
       message: 'GCash payment method selected. Order status set to pending.',
@@ -91,7 +96,7 @@ export const getPaymentStatus = async (req, res) => {
 
   try {
     const [orders] = await pool.query(
-      'SELECT payment_status, payment_intent_id, payment_method FROM orders WHERE id = ? AND user_id = ?',
+      'SELECT payment_status, payment_method, notes FROM orders WHERE id = ? AND user_id = ?',
       [orderId, userId]
     );
 
@@ -100,12 +105,21 @@ export const getPaymentStatus = async (req, res) => {
     }
 
     const order = orders[0];
+    
+    // Extract transaction_id from notes if present
+    let transactionId = null;
+    if (order.notes) {
+      const match = order.notes.match(/GCash Tracking ID: ([^\s|]+)/);
+      if (match) {
+        transactionId = match[1];
+      }
+    }
       
-      res.json({
-        order_id: orderId,
-        payment_status: order.payment_status,
+    res.json({
+      order_id: orderId,
+      payment_status: order.payment_status,
       payment_method: order.payment_method,
-      payment_intent_id: order.payment_intent_id
+      transaction_id: transactionId
     });
 
   } catch (error) {

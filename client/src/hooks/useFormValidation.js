@@ -135,6 +135,7 @@ export const useFormValidation = (initialValues = {}, validationRules = {}) => {
     }
     
     return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [validationRules]);
 
   // Validate all fields
@@ -152,6 +153,7 @@ export const useFormValidation = (initialValues = {}, validationRules = {}) => {
 
     setErrors(newErrors);
     return isValid;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values, validateField]);
 
   // Handle input change

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import API from '@/lib/axios';
@@ -389,7 +389,7 @@ export default function AdminInventoryPage() {
   };
 
   // Fetch all data
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     setLoading(true);
     try {
       await Promise.all([
@@ -404,7 +404,7 @@ export default function AdminInventoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -484,7 +484,7 @@ export default function AdminInventoryPage() {
     return () => {
       isMounted = false;
     };
-  }, [socket, isConnected, joinAdminRoom]);
+  }, [socket, isConnected, joinAdminRoom, fetchAllData]);
 
   // Auto-refresh for inventory
   useAdminAutoRefresh(fetchAllData, 'inventory');

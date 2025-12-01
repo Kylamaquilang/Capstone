@@ -137,21 +137,21 @@ export default function PaymentSuccessPage() {
 
           {/* Next Steps */}
           <div className="bg-blue-50 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-bold mb-3">What's Next?</h3>
+            <h3 className="text-lg font-bold mb-3">What&apos;s Next?</h3>
             <div className="space-y-2 text-sm">
               {orderDetails?.payment_status === 'unpaid' && orderDetails?.payment_method === 'gcash' ? (
                 <>
                   <p>• You will receive an email confirmation shortly</p>
                   <p>• Please complete your GCash payment at the counter</p>
                   <p>• Your order will be processed after payment confirmation</p>
-                  <p>• You'll be notified when your order is ready for pickup</p>
+                  <p>• You&apos;ll be notified when your order is ready for pickup</p>
                   <p>• Please bring a valid ID when picking up your order</p>
                 </>
               ) : (
                 <>
                   <p>• You will receive an email confirmation shortly</p>
                   <p>• Your order will be processed and prepared for pickup</p>
-                  <p>• You'll be notified when your order is ready</p>
+                  <p>• You&apos;ll be notified when your order is ready</p>
                   <p>• Please bring a valid ID when picking up your order</p>
                 </>
               )}

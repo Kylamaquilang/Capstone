@@ -93,10 +93,22 @@ const processAddToCart = async (req, res, product_id, quantity, size_id, user_id
       });
     }
 
+    // Get size name if size_id is provided
+    let sizeName = null;
+    if (size_id) {
+      const [sizeRows] = await pool.query(
+        `SELECT size FROM product_sizes WHERE id = ?`,
+        [size_id]
+      );
+      if (sizeRows.length > 0) {
+        sizeName = sizeRows[0].size;
+      }
+    }
+
     // Check if same product & size is already in cart
     const [existing] = await pool.query(
-      `SELECT * FROM cart_items WHERE user_id = ? AND product_id = ? AND size_id = ?`,
-      [user_id, product_id, size_id || null]
+      `SELECT * FROM cart_items WHERE user_id = ? AND product_id = ? AND (size = ? OR (size IS NULL AND ? IS NULL))`,
+      [user_id, product_id, sizeName || null, sizeName || null]
     );
 
     const currentQty = existing.length > 0 ? existing[0].quantity : 0;
@@ -112,8 +124,8 @@ const processAddToCart = async (req, res, product_id, quantity, size_id, user_id
 
     if (existing.length > 0) {
       await pool.query(
-        `UPDATE cart_items SET quantity = ? WHERE id = ?`,
-        [newQty, existing[0].id]
+        `UPDATE cart_items SET quantity = ?, size = ? WHERE id = ?`,
+        [newQty, sizeName, existing[0].id]
       );
       
       // Emit real-time cart update
@@ -135,8 +147,8 @@ const processAddToCart = async (req, res, product_id, quantity, size_id, user_id
     }
 
     await pool.query(
-      `INSERT INTO cart_items (user_id, product_id, size_id, quantity) VALUES (?, ?, ?, ?)`,
-      [user_id, product_id, size_id || null, quantity]
+      `INSERT INTO cart_items (user_id, product_id, size, quantity) VALUES (?, ?, ?, ?)`,
+      [user_id, product_id, sizeName, quantity]
     );
 
     // Emit real-time cart update
@@ -203,16 +215,17 @@ export const getCart = async (req, res) => {
         c.id, 
         c.quantity, 
         c.product_id,
-        c.size_id,
+        c.size,
         p.name as product_name, 
         p.image as product_image,
         p.price as product_price,
-        ps.size,
+        ps.id as size_id,
         ps.price as size_price,
         COALESCE(ps.price, p.price) as final_price
       FROM cart_items c
       JOIN products p ON c.product_id = p.id
-      LEFT JOIN product_sizes ps ON c.size_id = ps.id
+      LEFT JOIN product_sizes ps ON c.product_id = ps.product_id 
+        AND (c.size = ps.size OR (c.size IS NULL AND ps.size IS NULL))
       WHERE c.user_id = ?
     `, [user_id]);
 
@@ -294,9 +307,21 @@ export const updateCart = async (req, res) => {
       });
     }
 
+    // Get size name if size_id is provided
+    let sizeName = null;
+    if (size_id) {
+      const [sizeRows] = await pool.query(
+        `SELECT size FROM product_sizes WHERE id = ?`,
+        [size_id]
+      );
+      if (sizeRows.length > 0) {
+        sizeName = sizeRows[0].size;
+      }
+    }
+
     await pool.query(
-      `UPDATE cart_items SET quantity = ?, size_id = ? WHERE id = ?`,
-      [quantity, size_id || null, id]
+      `UPDATE cart_items SET quantity = ?, size = ? WHERE id = ?`,
+      [quantity, sizeName, id]
     );
 
     // Emit refresh signals
@@ -327,7 +352,7 @@ export const deleteCartItem = async (req, res) => {
   try {
     // Get cart item details before deletion for Socket.io emission
     const [cartItem] = await pool.query(`
-      SELECT product_id, size_id, quantity 
+      SELECT product_id, size, quantity 
       FROM cart_items 
       WHERE id = ? AND user_id = ?
     `, [id, user_id]);
@@ -344,11 +369,23 @@ export const deleteCartItem = async (req, res) => {
     // Emit real-time cart update
     const io = req.app.get('io')
     if (io) {
+      // Get size_id from size if needed for socket emission
+      let sizeId = null;
+      if (cartItem[0].size) {
+        const [sizeRows] = await pool.query(
+          `SELECT id FROM product_sizes WHERE product_id = ? AND size = ?`,
+          [cartItem[0].product_id, cartItem[0].size]
+        );
+        if (sizeRows.length > 0) {
+          sizeId = sizeRows[0].id;
+        }
+      }
+
       emitCartUpdate(io, user_id, {
         action: 'removed',
         productId: cartItem[0].product_id,
         quantity: cartItem[0].quantity,
-        sizeId: cartItem[0].size_id
+        sizeId: sizeId
       });
       emitDataRefresh(io, 'cart', { action: 'removed', cartItemId: id });
       emitUserDataRefresh(io, user_id, 'cart', { action: 'removed', cartItemId: id });

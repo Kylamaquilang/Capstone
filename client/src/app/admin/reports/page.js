@@ -1,7 +1,7 @@
 'use client';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import API from '@/lib/axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -97,7 +97,7 @@ export default function AdminReportsPage() {
   };
 
   // Fetch sales data (detailed order items)
-  const fetchSalesData = async () => {
+  const fetchSalesData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -154,7 +154,7 @@ export default function AdminReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateFilter]);
 
 
 
@@ -191,7 +191,7 @@ export default function AdminReportsPage() {
       default:
         break;
     }
-  }, [activeTab, dateFilter]);
+  }, [activeTab, dateFilter, fetchSalesData]);
 
   // Set up real-time socket listeners
   useEffect(() => {
@@ -314,7 +314,7 @@ export default function AdminReportsPage() {
     return () => {
       isMounted = false;
     };
-  }, [socket, isConnected, joinAdminRoom, activeTab]);
+  }, [socket, isConnected, joinAdminRoom, activeTab, fetchSalesData]);
 
   // Print function
   const handlePrint = () => {

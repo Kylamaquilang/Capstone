@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
 import API from '@/lib/axios';
@@ -25,7 +25,7 @@ export default function InventoryLogsPage() {
   const itemsPerPage = 20;
 
   // Fetch stock movements
-  const fetchStockMovements = async () => {
+  const fetchStockMovements = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -52,11 +52,11 @@ export default function InventoryLogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, searchTerm, filterAction, filterDate]);
 
   useEffect(() => {
     fetchStockMovements();
-  }, [currentPage, searchTerm, filterAction, filterDate]);
+  }, [fetchStockMovements]);
 
   // Handle search
   const handleSearch = (e) => {

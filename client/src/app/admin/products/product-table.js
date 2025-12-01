@@ -124,7 +124,7 @@ export default function ProductTable({ category = '', subcategory = '', category
         socket.off('inventory-updated', handleInventoryUpdate);
       };
     }
-  }, [category, subcategory, socket, isConnected, joinAdminRoom]);
+  }, [category, subcategory, socket, isConnected, joinAdminRoom, fetchProducts]);
 
   // Filter and sort products
   const filteredAndSortedProducts = products

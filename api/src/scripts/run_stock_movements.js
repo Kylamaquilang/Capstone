@@ -1,4 +1,4 @@
-import { pool } from '../src/database/db.js';
+import { pool } from '../database/db.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,7 +11,7 @@ async function runMigration() {
     console.log('🔄 Starting size_id column migration for stock_movements table...\n');
     
     // Read the SQL migration file
-    const sqlFilePath = path.join(__dirname, 'add_size_to_stock_movements_if_missing.sql');
+    const sqlFilePath = path.join(__dirname, '../schema/migration_add_size_to_stock_movements.sql');
     const sqlContent = fs.readFileSync(sqlFilePath, 'utf8');
     
     // Split by semicolons and filter out empty statements
@@ -93,5 +93,4 @@ async function runMigration() {
 
 // Run the migration
 runMigration();
-
 

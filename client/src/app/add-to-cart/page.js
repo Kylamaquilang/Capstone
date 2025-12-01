@@ -9,7 +9,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getImageUrl } from '@/utils/imageUtils';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Swal from '@/lib/sweetalert-config';
 
 export default function ProductPage() {
@@ -25,12 +25,6 @@ export default function ProductPage() {
   const [error, setError] = useState('');
 
   const productName = searchParams.get('name');
-
-  useEffect(() => {
-    if (productName) {
-      fetchProduct();
-    }
-  }, [productName]);
 
   // Helper function to get the current price (size-specific or base price)
   const getCurrentPrice = () => {
@@ -51,7 +45,7 @@ export default function ProductPage() {
     return selectedSizeData ? parseFloat(selectedSizeData.price) : parseFloat(product.price);
   };
 
-  const fetchProduct = async () => {
+  const fetchProduct = useCallback(async () => {
     try {
       setLoading(true);
       const { data } = await API.get(`/products/name/${encodeURIComponent(productName)}`);
@@ -76,7 +70,13 @@ export default function ProductPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [productName]);
+
+  useEffect(() => {
+    if (productName) {
+      fetchProduct();
+    }
+  }, [productName, fetchProduct]);
 
   const handleDecrease = () => {
     if (quantity > 1) setQuantity(quantity - 1);

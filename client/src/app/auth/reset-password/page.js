@@ -269,7 +269,7 @@ export default function ResetPasswordPage() {
     <form onSubmit={handleVerifyCode} className="space-y-4">
       <div className="text-center mb-4">
         <p className="text-sm text-gray-600">
-          We've sent a 6-digit verification code to your email address.
+          We&apos;ve sent a 6-digit verification code to your email address.
         </p>
       </div>
 

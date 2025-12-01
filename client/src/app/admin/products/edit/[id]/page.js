@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
@@ -35,12 +35,7 @@ export default function EditProductPage() {
     return categoryName === 'lanyard' || categoryName === 'tela';
   };
 
-  useEffect(() => {
-    loadProduct();
-    loadCategories();
-  }, [productId]);
-
-  const loadProduct = async () => {
+  const loadProduct = useCallback(async () => {
     try {
       setLoading(true);
       const { data } = await API.get(`/products/${productId}`);
@@ -60,16 +55,21 @@ export default function EditProductPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [productId]);
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     try {
       const { data } = await API.get('/categories');
       setCategories(data || []);
     } catch (err) {
       console.error('Load categories error:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadProduct();
+    loadCategories();
+  }, [loadProduct, loadCategories]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

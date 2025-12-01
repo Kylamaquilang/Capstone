@@ -185,7 +185,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                   <li>• Required columns: student_id (or Student ID), first_name (or First Name), last_name (or Last Name), email (or Email), degree (or Course/Program), year_level (or Year Level), section (or Section), status (or Status)</li>
                   <li>• Optional columns: middle_name (or Middle Name), suffix (or Suffix)</li>
                   <li>• Student ID must be numeric (4-8 digits)</li>
-                  <li>• Valid degrees: BEED, BSED, BSIT, BSHM (or full names like "Bachelor of Science in Information Technology")</li>
+                  <li>• Valid degrees: BEED, BSED, BSIT, BSHM (or full names like &quot;Bachelor of Science in Information Technology&quot;)</li>
                   <li>• Valid year levels: 1st Year, 2nd Year, 3rd Year, 4th Year</li>
                   <li>• Valid status: regular, irregular</li>
                   <li>• Supported formats: .csv, .xlsx, .xls</li>

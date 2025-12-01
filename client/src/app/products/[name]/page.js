@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
@@ -22,13 +22,7 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [addingToCart, setAddingToCart] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchProduct();
-    }
-  }, [isAuthenticated, name]);
-
-  const fetchProduct = async () => {
+  const fetchProduct = useCallback(async () => {
     try {
       setLoading(true);
       // Get all products (which includes grouped sizes)
@@ -54,7 +48,13 @@ export default function ProductDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [name]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchProduct();
+    }
+  }, [isAuthenticated, fetchProduct]);
 
   // Auto-refresh for product details
   useUserAutoRefresh(fetchProduct, 'products');

@@ -50,8 +50,8 @@ export default function LoginPage() {
           <Image src="/images/cpc.png" alt="Logo" width={60} height={60} className="mb-4" />
           <h4 className="text-xl font-semibold">Log in to your <br />ESSEN account.</h4>
           <p className="text-sm font-small mt-3">
-            "Equip yourself for success, find everything you need to thrive in school, 
-            from study tools to personal essentials, all in one place."
+            &quot;Equip yourself for success, find everything you need to thrive in school, 
+            from study tools to personal essentials, all in one place.&quot;
           </p>
           <p className="text-xs text-gray-500 mt-4">ESSEN © 2024</p>
         </div>

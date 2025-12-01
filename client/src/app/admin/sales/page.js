@@ -1,7 +1,8 @@
 'use client';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import API from '@/lib/axios';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
 import { getImageUrl } from '@/utils/imageUtils';
@@ -61,7 +62,7 @@ export default function AdminSalesPage() {
   const [groupBy, setGroupBy] = useState('day');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const fetchSalesData = async () => {
+  const fetchSalesData = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -422,11 +423,11 @@ export default function AdminSalesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange, groupBy]);
 
   useEffect(() => {
     fetchSalesData();
-  }, [dateRange, groupBy]);
+  }, [fetchSalesData]);
 
   // Auto-refresh for sales
   useAdminAutoRefresh(fetchSalesData, 'sales');
@@ -584,13 +585,13 @@ export default function AdminSalesPage() {
                   <ArrowPathIcon className="w-4 h-4" />
                   <span>Refresh Data</span>
                 </button>
-                <a
+                <Link
                   href="/admin/orders"
                   className="w-full sm:w-auto px-3 py-2 bg-white text-[#000C50] rounded-md text-sm font-medium flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50"
                 >
                   <ClipboardDocumentListIcon className="w-4 h-4" />
                   <span>View Orders</span>
-                </a>
+                </Link>
               </div>
             </div>
           </div>

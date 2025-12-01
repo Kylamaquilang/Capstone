@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 
 const SocketContext = createContext();
@@ -8,7 +8,7 @@ export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  const reconnectSocket = () => {
+  const reconnectSocket = useCallback(() => {
     // Disconnect current socket
     if (socket) {
       socket.disconnect();
@@ -46,7 +46,7 @@ export function SocketProvider({ children }) {
         setIsConnected(false);
       });
     }
-  };
+  }, [socket]);
 
   useEffect(() => {
     // Get token from localStorage
@@ -119,7 +119,7 @@ export function SocketProvider({ children }) {
     return () => {
       window.removeEventListener('socket-reconnect', handleSocketReconnect);
     };
-  }, []);
+  }, [reconnectSocket]);
 
   const joinUserRoom = (userId) => {
     if (socket && isConnected) {

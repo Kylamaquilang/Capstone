@@ -27,6 +27,7 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   // Close mobile menu on escape key
@@ -39,6 +40,7 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMobileMenuOpen]);
 
   return (

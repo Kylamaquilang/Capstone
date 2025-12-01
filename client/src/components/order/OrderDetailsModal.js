@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 
@@ -8,13 +8,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (isOpen && orderId) {
-      loadOrder();
-    }
-  }, [isOpen, orderId]);
-
-  const loadOrder = async () => {
+  const loadOrder = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -52,7 +46,13 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId]);
+
+  useEffect(() => {
+    if (isOpen && orderId) {
+      loadOrder();
+    }
+  }, [isOpen, orderId, loadOrder]);
 
   const getStatusColor = (status) => {
     const colors = {

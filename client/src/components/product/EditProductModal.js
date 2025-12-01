@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import Swal from '@/lib/sweetalert-config';
@@ -24,19 +24,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
   const [previewUrl, setPreviewUrl] = useState('');
   const [selectedSizes, setSelectedSizes] = useState([]);
 
-  useEffect(() => {
-    if (isOpen && productId) {
-      loadProduct();
-      loadCategories();
-    }
-  }, [isOpen, productId]);
-
-  // Debug: Watch previewUrl changes
-  useEffect(() => {
-    console.log('🖼️ PreviewUrl changed:', previewUrl);
-  }, [previewUrl]);
-
-  const loadProduct = async () => {
+  const loadProduct = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -70,16 +58,23 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
     } finally {
       setLoading(false);
     }
-  };
+  }, [productId]);
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     try {
       const { data } = await API.get('/categories');
       setCategories(data || []);
     } catch (err) {
       console.error('Load categories error:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && productId) {
+      loadProduct();
+      loadCategories();
+    }
+  }, [isOpen, productId, loadProduct, loadCategories]);
 
   // Available size options
   const availableSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];

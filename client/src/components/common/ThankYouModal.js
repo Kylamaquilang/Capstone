@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { XMarkIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 
@@ -8,13 +8,7 @@ export default function ThankYouModal({ isOpen, onClose, orderId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (isOpen && orderId) {
-      fetchOrderDetails();
-    }
-  }, [isOpen, orderId]);
-
-  const fetchOrderDetails = async () => {
+  const fetchOrderDetails = useCallback(async () => {
     try {
       setLoading(true);
       const response = await API.get(`/orders/user/${orderId}`);
@@ -25,7 +19,13 @@ export default function ThankYouModal({ isOpen, onClose, orderId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId]);
+
+  useEffect(() => {
+    if (isOpen && orderId) {
+      fetchOrderDetails();
+    }
+  }, [isOpen, orderId, fetchOrderDetails]);
 
   const handleClose = () => {
     onClose();
@@ -131,7 +131,7 @@ export default function ThankYouModal({ isOpen, onClose, orderId }) {
                     <CheckCircleIcon className="h-4 w-4 text-blue-400" />
                   </div>
                   <div className="ml-2">
-                    <h5 className="text-xs font-medium text-blue-800">What's Next?</h5>
+                    <h5 className="text-xs font-medium text-blue-800">What&apos;s Next?</h5>
                     <p className="text-xs text-blue-700 mt-1">
                       {orderDetails.payment_method === 'gcash' && orderDetails.payment_status === 'unpaid' 
                         ? "Please proceed to the counter to complete your GCash payment. Your order will be processed after payment confirmation."

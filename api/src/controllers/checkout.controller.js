@@ -84,21 +84,21 @@ export const checkout = async (req, res) => {
       // Process only selected cart items
       const placeholders = cart_item_ids.map(() => '?').join(',');
       [cartItems] = await pool.query(`
-        SELECT c.id AS cart_id, c.quantity, c.product_id, c.size_id,
-               p.stock, p.price, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
+        SELECT c.id AS cart_id, c.quantity, c.product_id, c.size,
+               p.stock, p.price, ps.id as size_id, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
         FROM cart_items c
         JOIN products p ON c.product_id = p.id
-        LEFT JOIN product_sizes ps ON c.size_id = ps.id
+        LEFT JOIN product_sizes ps ON c.product_id = ps.product_id AND c.size = ps.size
         WHERE c.user_id = ? AND c.id IN (${placeholders})
       `, [user_id, ...cart_item_ids])
     } else {
       // Fallback: process all cart items
       [cartItems] = await pool.query(`
-        SELECT c.id AS cart_id, c.quantity, c.product_id, c.size_id,
-               p.stock, p.price, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
+        SELECT c.id AS cart_id, c.quantity, c.product_id, c.size,
+               p.stock, p.price, ps.id as size_id, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
         FROM cart_items c
         JOIN products p ON c.product_id = p.id
-        LEFT JOIN product_sizes ps ON c.size_id = ps.id
+        LEFT JOIN product_sizes ps ON c.product_id = ps.product_id AND c.size = ps.size
         WHERE c.user_id = ?
       `, [user_id])
     }
