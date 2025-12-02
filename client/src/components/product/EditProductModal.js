@@ -156,17 +156,45 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       onSuccess?.();
       onClose();
     } catch (err) {
-      console.error('Error updating product:', err);
-      
-      // Handle specific error cases
+      // Handle specific error cases gracefully
       if (err?.response?.status === 409) {
+        // Duplicate product name - expected error, show user-friendly message
         const errorMessage = err?.response?.data?.message || err?.response?.data?.error || 'Product name already exists';
+        await Swal.fire({
+          title: 'Duplicate Product Name',
+          text: errorMessage,
+          icon: 'warning',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
         setError(errorMessage);
+        setSaving(false);
+        return; // Exit early to prevent further execution
       } else if (err?.response?.status === 400) {
+        // Validation error - expected error, show user-friendly message
         const errorMessage = err?.response?.data?.error || 'Invalid product data';
+        await Swal.fire({
+          title: 'Validation Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
         setError(errorMessage);
+        setSaving(false);
+        return; // Exit early to prevent further execution
       } else {
-        setError('Failed to update product. Please try again.');
+        // Unexpected error - log for debugging but show user-friendly message
+        console.error('Unexpected error updating product:', err);
+        const errorMessage = err?.response?.data?.error || 'Failed to update product. Please try again.';
+        await Swal.fire({
+          title: 'Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
       }
     } finally {
       setSaving(false);

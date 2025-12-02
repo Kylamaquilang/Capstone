@@ -6,6 +6,7 @@ import Navbar from '@/components/common/nav-bar';
 import API from '@/lib/axios';
 import { useSocket } from '@/context/SocketContext';
 import { useAuth } from '@/context/auth-context';
+import Swal from '@/lib/sweetalert-config';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
@@ -119,6 +120,37 @@ export default function NotificationsPage() {
     }
   };
 
+  const deleteAllNotifications = async () => {
+    if (notifications.length === 0) return;
+    
+    const result = await Swal.fire({
+      title: 'Confirm Deletion',
+      text: `Are you sure you want to delete all ${notifications.length} notification(s)? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, delete all',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      await API.delete('/notifications/delete-all');
+      setNotifications([]);
+    } catch (error) {
+      console.error('Error deleting all notifications:', error);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to delete all notifications. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
 
   const getTypeColor = (type) => {
     switch (type) {
@@ -164,10 +196,15 @@ export default function NotificationsPage() {
   });
 
   // Pagination
-  const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedNotifications = filteredNotifications.slice(startIndex, endIndex);
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -201,6 +238,14 @@ export default function NotificationsPage() {
                       className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
                     >
                       Mark all as read
+                    </button>
+                  )}
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={deleteAllNotifications}
+                      className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 transition-colors"
+                    >
+                      Delete all
                     </button>
                   )}
                   <div className="text-sm text-gray-500">
@@ -324,33 +369,76 @@ export default function NotificationsPage() {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
+            {filteredNotifications.length > 0 && (
               <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                  {/* Records Info */}
                   <div className="text-sm text-gray-500">
-                    Showing {startIndex + 1} to {Math.min(endIndex, filteredNotifications.length)} of {filteredNotifications.length} notifications
+                    Showing {startIndex + 1} to {Math.min(endIndex, filteredNotifications.length)} of {filteredNotifications.length} notification{filteredNotifications.length !== 1 ? 's' : ''}
+                    {filteredNotifications.length !== notifications.length && (
+                      <span className="text-gray-400"> (filtered from {notifications.length} total)</span>
+                    )}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-1 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      &lt;
-                    </button>
-                    
-                    <span className="px-3 py-1 text-sm font-medium rounded bg-blue-500 text-white">
-                      {currentPage}
-                    </span>
-                    
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-1 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      &gt;
-                    </button>
-                  </div>
+                  
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors"
+                        aria-label="Previous page"
+                      >
+                        &lt;
+                      </button>
+                      
+                      {/* Page Numbers */}
+                      <div className="flex items-center space-x-1">
+                        {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => setCurrentPage(pageNum)}
+                              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                currentPage === pageNum
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors"
+                        aria-label="Next page"
+                      >
+                        &gt;
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* Items per page info */}
+                  {totalPages === 1 && filteredNotifications.length > 0 && (
+                    <div className="text-xs text-gray-400">
+                      Page 1 of 1
+                    </div>
+                  )}
                 </div>
               </div>
             )}

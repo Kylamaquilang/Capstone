@@ -6,6 +6,7 @@ import ProtectedRoute from '@/components/common/ProtectedRoute';
 import Navbar from '@/components/common/admin-navbar';
 import Footer from '@/components/common/footer';
 import API from '@/lib/axios';
+import Swal from '@/lib/sweetalert-config';
 
 const StockManagement = () => {
   const { user } = useAuth();
@@ -105,10 +106,20 @@ const StockManagement = () => {
       setShowAddStockModal(false);
       setSelectedProduct(null);
       
-      alert('Stock added successfully!');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Stock added successfully!',
+        confirmButtonColor: '#000C50'
+      });
     } catch (error) {
       console.error('Error adding stock:', error);
-      alert('Error adding stock. Please try again.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Error adding stock. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 
@@ -136,10 +147,20 @@ const StockManagement = () => {
       setShowAdjustStockModal(false);
       setSelectedProduct(null);
       
-      alert('Stock adjustment completed successfully!');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Stock adjustment completed successfully!',
+        confirmButtonColor: '#000C50'
+      });
     } catch (error) {
       console.error('Error adjusting stock:', error);
-      alert('Error adjusting stock. Please try again.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Error adjusting stock. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 

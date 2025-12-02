@@ -221,6 +221,30 @@ export const deleteNotification = async (req, res) => {
   }
 };
 
+// ✅ Delete all notifications for user
+export const deleteAllNotifications = async (req, res) => {
+  const user_id = req.user.id;
+
+  try {
+    const [result] = await pool.query(`
+      DELETE FROM notifications 
+      WHERE user_id = ?
+    `, [user_id]);
+
+    res.json({
+      success: true,
+      message: 'All notifications deleted successfully',
+      deletedCount: result.affectedRows
+    });
+  } catch (err) {
+    console.error('Delete all notifications error:', err);
+    res.status(500).json({
+      error: 'Server error',
+      message: 'Failed to delete all notifications'
+    });
+  }
+};
+
 // ✅ Get admin notifications (all notifications for admin users)
 export const getAdminNotifications = async (req, res) => {
   try {

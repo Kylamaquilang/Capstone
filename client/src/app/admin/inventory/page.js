@@ -95,8 +95,12 @@ export default function AdminInventoryPage() {
   // Fetch low stock alerts
   const fetchLowStockAlerts = async () => {
     try {
-      const response = await API.get('/stock/alerts/low-stock');
-      setLowStockAlerts(response.data.data || []);
+      // Add timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const response = await API.get(`/stock/alerts/low-stock?t=${timestamp}`);
+      const alerts = response.data.data || [];
+      console.log('📊 Low stock alerts fetched:', alerts.length, 'products');
+      setLowStockAlerts(alerts);
     } catch (error) {
       console.error('Error fetching low stock alerts:', error);
     }
@@ -174,8 +178,47 @@ export default function AdminInventoryPage() {
 
       const data = await response.json();
       console.log('✅ Stock added successfully:', data);
+      console.log('📦 Full response data:', JSON.stringify(data, null, 2));
 
-      handleStockActionSuccess();
+      // Get the product ID that was updated
+      const updatedProductId = data.movement?.product_id || data.product_id || parseInt(stockInForm.productId);
+      const newStockValue = data.new_stock || data.movement?.new_stock;
+      const quantityAdded = parseInt(stockInForm.quantity);
+      
+      console.log(`🔄 Stock updated for product ${updatedProductId}`);
+      console.log(`📦 Quantity added: ${quantityAdded}`);
+      console.log(`📦 New stock value from response: ${newStockValue}`);
+
+      // Get the product from low stock alerts to check current stock and reorder point
+      const productFromAlerts = lowStockAlerts.find(p => p.id === updatedProductId);
+      if (productFromAlerts) {
+        const currentStockInAlerts = parseInt(productFromAlerts.current_stock) || 0;
+        const reorderPoint = parseInt(productFromAlerts.reorder_point) || parseInt(productFromAlerts.reorder_level) || 5;
+        const calculatedNewStock = currentStockInAlerts + quantityAdded;
+        
+        console.log(`📊 Product info from alerts:`, {
+          id: productFromAlerts.id,
+          name: productFromAlerts.name,
+          currentStock: currentStockInAlerts,
+          reorderPoint: reorderPoint,
+          calculatedNewStock: calculatedNewStock
+        });
+        
+        // Remove from local state immediately if calculated stock is above reorder point
+        // Use >= to ensure it's removed when stock equals or exceeds reorder point + 1
+        // This ensures products are removed when they're no longer low stock
+        if (calculatedNewStock > reorderPoint) {
+          console.log(`✅ Product ${updatedProductId} calculated stock (${calculatedNewStock}) is above reorder point (${reorderPoint}), removing from alerts immediately`);
+          setLowStockAlerts(prev => {
+            const filtered = prev.filter(p => p.id !== updatedProductId);
+            console.log(`📊 Low stock alerts: ${prev.length} -> ${filtered.length} (removed product ${updatedProductId})`);
+            return filtered;
+          });
+        } else {
+          console.log(`⚠️ Product ${updatedProductId} calculated stock (${calculatedNewStock}) is still at or below reorder point (${reorderPoint}), keeping in alerts`);
+        }
+      }
+
       // Reset form
       setStockInForm({
         productId: '',
@@ -184,6 +227,44 @@ export default function AdminInventoryPage() {
         note: ''
       });
       setProductSizes([]);
+      
+      // Close modal first
+      setShowStockInModal(false);
+      setSelectedProduct(null);
+      setCurrentActionType('stockIn');
+      
+      // Wait a moment for database to commit
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Verify the stock was actually updated by fetching the product directly
+      try {
+        const verifyResponse = await API.get(`/products/${updatedProductId}`);
+        const verifiedProduct = verifyResponse.data;
+        const actualStock = parseInt(verifiedProduct.stock) || 0;
+        const actualReorderPoint = parseInt(verifiedProduct.reorder_point) || 5;
+        
+        console.log(`🔍 Verified product stock: ${actualStock}, reorder point: ${actualReorderPoint}`);
+        
+        // If verified stock is above reorder point, remove immediately
+        if (actualStock > actualReorderPoint) {
+          console.log(`✅ Verified: Product ${updatedProductId} stock (${actualStock}) is above reorder point (${actualReorderPoint}), removing from alerts`);
+          setLowStockAlerts(prev => {
+            const filtered = prev.filter(p => p.id !== updatedProductId);
+            console.log(`📊 Removed product from alerts. Count: ${prev.length} -> ${filtered.length}`);
+            return filtered;
+          });
+        }
+      } catch (verifyError) {
+        console.error('Error verifying product stock:', verifyError);
+      }
+      
+      // Immediately refresh low stock alerts to get fresh data from server
+      console.log('🔄 Refreshing low stock alerts immediately...');
+      await fetchLowStockAlerts();
+      
+      // Refresh current stock
+      console.log('🔄 Refreshing current stock...');
+      await fetchCurrentStock();
       
       // Show SweetAlert success message
       await Swal.fire({
@@ -194,6 +275,17 @@ export default function AdminInventoryPage() {
         timer: 2000,
         showConfirmButton: true
       });
+      
+      // Force multiple refreshes after alert to ensure data is updated
+      console.log('🔄 Starting multiple refresh attempts...');
+      const refreshAttempts = [500, 1000, 1500, 2000];
+      for (let i = 0; i < refreshAttempts.length; i++) {
+        setTimeout(async () => {
+          console.log(`🔄 Refresh attempt ${i + 1}/${refreshAttempts.length} at ${refreshAttempts[i]}ms...`);
+          await fetchLowStockAlerts();
+          await fetchCurrentStock();
+        }, refreshAttempts[i]);
+      }
     } catch (error) {
       console.error('Error adding stock:', error);
       Swal.fire({
@@ -334,10 +426,20 @@ export default function AdminInventoryPage() {
         note: ''
       });
       setStockOutProductSizes([]);
-      alert('Stock removed successfully!');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Stock removed successfully!',
+        confirmButtonColor: '#000C50'
+      });
     } catch (error) {
       console.error('Error removing stock:', error);
-      alert(error.message || 'Error removing stock. Please try again.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'Error removing stock. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 
@@ -371,7 +473,6 @@ export default function AdminInventoryPage() {
       const data = await response.json();
       console.log('✅ Stock adjusted successfully:', data);
 
-      handleStockActionSuccess();
       // Reset form
       setAdjustForm({
         productId: '',
@@ -381,10 +482,39 @@ export default function AdminInventoryPage() {
         note: ''
       });
       setAdjustProductSizes([]);
-      alert('Stock adjustment completed successfully!');
+      
+      // Close modal first
+      setShowAdjustModal(false);
+      setSelectedProduct(null);
+      setCurrentActionType('stockIn');
+      
+      // Refresh all data, with a small delay to ensure database is updated
+      setTimeout(() => {
+        fetchAllData();
+        // Explicitly refresh low stock alerts to ensure updated list
+        fetchLowStockAlerts();
+      }, 500);
+      
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Stock adjustment completed successfully!',
+        confirmButtonColor: '#000C50'
+      });
+      
+      // Refresh again after alert to ensure latest data
+      setTimeout(() => {
+        fetchLowStockAlerts();
+        fetchCurrentStock();
+      }, 1500);
     } catch (error) {
       console.error('Error adjusting stock:', error);
-      alert(error.message || 'Error adjusting stock. Please try again.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'Error adjusting stock. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 
@@ -456,6 +586,16 @@ export default function AdminInventoryPage() {
         }
       };
 
+      // Listen for low stock alerts refresh (when stock is restocked above threshold)
+      const handleLowStockAlertsRefresh = (data) => {
+        console.log('✅ Low stock alerts refresh received:', data);
+        if (isMounted) {
+          // Refresh low stock alerts to remove products that are no longer low
+          fetchLowStockAlerts();
+          fetchCurrentStock(); // Also refresh current stock to show updated values
+        }
+      };
+
       // Listen for admin notifications
       const handleAdminNotification = (notificationData) => {
         console.log('🔔 Real-time admin notification received in inventory:', notificationData);
@@ -470,6 +610,7 @@ export default function AdminInventoryPage() {
       socket.on('product-updated', handleProductUpdate);
       socket.on('product-deleted', handleProductDelete);
       socket.on('inventory-updated', handleInventoryUpdate);
+      socket.on('low-stock-alerts-refresh', handleLowStockAlertsRefresh);
       socket.on('admin-notification', handleAdminNotification);
 
       return () => {
@@ -477,6 +618,7 @@ export default function AdminInventoryPage() {
         socket.off('product-updated', handleProductUpdate);
         socket.off('product-deleted', handleProductDelete);
         socket.off('inventory-updated', handleInventoryUpdate);
+        socket.off('low-stock-alerts-refresh', handleLowStockAlertsRefresh);
         socket.off('admin-notification', handleAdminNotification);
       };
     }
@@ -702,7 +844,7 @@ export default function AdminInventoryPage() {
                   <h3 className="text-sm font-semibold text-gray-900">Quick Actions</h3>
                </div>
                <div className="p-3 sm:p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                  <div className="flex gap-2 sm:gap-3">
                     <button
                       onClick={() => {
                         setSelectedProduct(null);
@@ -718,20 +860,10 @@ export default function AdminInventoryPage() {
                         setSelectedProduct(null);
                         setShowStockOutModal(true);
                       }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium flex items-center justify-center space-x-2 active:scale-95"
+                      className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm font-medium flex items-center justify-center space-x-2 active:scale-95 w-auto"
                     >
                       <MinusIcon className="h-4 w-4" />
                       <span>Stock Out</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedProduct(null);
-                        setShowAdjustModal(true);
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center space-x-2 active:scale-95"
-                    >
-                      <ClockIcon className="h-4 w-4" />
-                      <span>Adjust Stock</span>
                     </button>
                    </div>
                    </div>

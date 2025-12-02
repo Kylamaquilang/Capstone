@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from 'react';
 import API from '@/lib/axios';
 import { useSocket } from '@/context/SocketContext';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
+import Swal from '@/lib/sweetalert-config';
 import { 
   ClockIcon, 
   CogIcon, 
@@ -193,13 +194,23 @@ export default function AdminOrdersPage() {
     // Validate status change restrictions
     if (selectedOrder.status === 'ready_for_pickup' && 
         (statusUpdate.status === 'pending' || statusUpdate.status === 'processing' || statusUpdate.status === 'cancelled')) {
-      alert('Error: Orders ready for pickup cannot be moved back to pending, processing, or cancelled status.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid Status Change',
+        text: 'Orders ready for pickup cannot be moved back to pending, processing, or cancelled status.',
+        confirmButtonColor: '#000C50'
+      });
       return;
     }
     
     if (selectedOrder.status === 'claimed' && 
         (statusUpdate.status === 'pending' || statusUpdate.status === 'processing' || statusUpdate.status === 'ready_for_pickup' || statusUpdate.status === 'cancelled')) {
-      alert('Error: Claimed orders cannot be moved back to pending, processing, ready for pickup, or cancelled status.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid Status Change',
+        text: 'Claimed orders cannot be moved back to pending, processing, ready for pickup, or cancelled status.',
+        confirmButtonColor: '#000C50'
+      });
       return;
     }
     
@@ -218,22 +229,45 @@ export default function AdminOrdersPage() {
           : order
       ));
       
+      // Get product names from order items
+      let productNames = '';
+      if (selectedOrder.items && selectedOrder.items.length > 0) {
+        const uniqueProducts = [...new Set(selectedOrder.items.map(item => item.product_name).filter(Boolean))];
+        if (uniqueProducts.length === 1) {
+          productNames = uniqueProducts[0];
+        } else if (uniqueProducts.length <= 3) {
+          productNames = uniqueProducts.join(', ');
+        } else {
+          productNames = `${uniqueProducts[0]} and ${uniqueProducts.length - 1} more`;
+        }
+      } else {
+        productNames = `Order #${selectedOrder.id}`;
+      }
+      
+      // Format status for display
+      const formattedStatus = statusUpdate.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      
       // Show success message with additional info
-      let successMessage = `Order #${selectedOrder.id} status updated to ${statusUpdate.status}`;
+      let htmlMessage = `<strong>${productNames}</strong> status updated to <strong>${formattedStatus}</strong>`;
       
       if (response.data.paymentStatusUpdated) {
-        successMessage += '\n\n✅ Payment status automatically updated to PAID';
+        htmlMessage += '<br/><br/>✅ Payment status automatically updated to PAID';
       }
       
       if (response.data.inventoryUpdated) {
-        successMessage += '\n\n📦 Stock restored for cancelled order';
+        htmlMessage += '<br/><br/>📦 Stock restored for cancelled order';
       }
       
       if (response.data.salesLogged) {
-        successMessage += '\n\n💰 Sale logged in system';
+        htmlMessage += '<br/><br/>💰 Sale logged in system';
       }
       
-      alert(successMessage);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Status Updated',
+        html: htmlMessage,
+        confirmButtonColor: '#000C50'
+      });
       
       setShowStatusModal(false);
       setSelectedOrder(null);
@@ -241,7 +275,12 @@ export default function AdminOrdersPage() {
     } catch (err) {
       console.error('Update order status error:', err);
       const errorMessage = err?.response?.data?.error || err?.response?.data?.message || 'Failed to update order status';
-      alert(`Error: ${errorMessage}`);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMessage,
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setUpdating(false);
     }
@@ -266,20 +305,30 @@ export default function AdminOrdersPage() {
       ));
       
       // Show success message
-      let successMessage = `Order #${selectedOrder.id} payment method updated to ${paymentUpdate.payment_method.toUpperCase()}`;
+      let htmlMessage = `Order #${selectedOrder.id} payment method updated to <strong>${paymentUpdate.payment_method.toUpperCase()}</strong>`;
       
       if (paymentUpdate.payment_status) {
-        successMessage += ` with status: ${paymentUpdate.payment_status.toUpperCase()}`;
+        htmlMessage += ` with status: <strong>${paymentUpdate.payment_status.toUpperCase()}</strong>`;
       }
       
-      alert(successMessage);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Payment Method Updated',
+        html: htmlMessage,
+        confirmButtonColor: '#000C50'
+      });
       
       setShowPaymentModal(false);
       setSelectedOrder(null);
       setPaymentUpdate({ payment_method: '', payment_status: '', notes: '' });
     } catch (err) {
       console.error('Payment update error:', err);
-      alert('Failed to update payment method');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to update payment method',
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setUpdatingPayment(false);
     }
@@ -451,7 +500,7 @@ export default function AdminOrdersPage() {
   };
 
   // Download PDF function
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     try {
       const pdf = new jsPDF('landscape', 'mm', 'a4');
       
@@ -557,7 +606,12 @@ export default function AdminOrdersPage() {
       pdf.save(`orders-report-${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Error generating PDF. Please try again.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Error generating PDF. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 
@@ -769,7 +823,7 @@ export default function AdminOrdersPage() {
             <div className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50">
               <div className="flex flex-col gap-3">
                 {/* Search Bar */}
-                <div className="w-full">
+                <div className="w-full max-w-md">
                   <div className="relative">
                     <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                     <input

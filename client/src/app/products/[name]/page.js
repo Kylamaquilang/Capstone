@@ -204,6 +204,9 @@ export default function ProductDetailPage() {
         }).then((result) => {
           if (result.isConfirmed) {
             router.push('/cart');
+          } else if (result.isDismissed) {
+            // User clicked "Continue Shopping" - redirect to dashboard
+            router.push('/dashboard');
           }
         });
         return true; // Return success for BUY NOW button

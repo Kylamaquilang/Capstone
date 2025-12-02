@@ -5,6 +5,7 @@ import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
 import API from '@/lib/axios';
 import { CubeIcon } from '@heroicons/react/24/outline';
+import Swal from '@/lib/sweetalert-config';
 
 export default function OrderDetailPage() {
   const [order, setOrder] = useState(null);
@@ -66,7 +67,12 @@ export default function OrderDetailPage() {
       
       setShowStatusModal(false);
     } catch (err) {
-      alert('Failed to update order status');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to update order status',
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setUpdating(false);
     }

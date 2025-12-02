@@ -282,6 +282,51 @@ export const createStockMovement = async (req, res) => {
       );
 
       await connection.commit();
+      connection.release();
+
+      // Check if stock is now above reorder point (for stock_in or positive adjustments)
+      // Use a fresh connection to ensure we see the committed data
+      let shouldRefreshLowStockAlerts = false;
+      if (movement_type === 'stock_in' || (movement_type === 'stock_adjustment' && newStock > currentStock)) {
+        // Get product reorder point and current stock to check if stock is now above threshold
+        const checkConnection = await pool.getConnection();
+        try {
+          const [productInfo] = await checkConnection.query(
+            'SELECT stock, reorder_point FROM products WHERE id = ?',
+            [product_id]
+          );
+          
+          if (productInfo.length > 0) {
+            const reorderPoint = productInfo[0].reorder_point || 5; // Default to 5 if not set
+            const actualCurrentStock = parseInt(productInfo[0].stock) || 0;
+            
+            // If updating size-specific stock, we need to check total stock
+            if (stockTarget === 'product_sizes' && size_id) {
+              // Get total stock (base + all sizes)
+              const [sizeStocks] = await checkConnection.query(
+                'SELECT SUM(stock) as total_size_stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
+                [product_id]
+              );
+              const totalStock = actualCurrentStock + (parseInt(sizeStocks[0]?.total_size_stock) || 0);
+              
+              console.log(`🔍 Checking low stock alert: Product ${product_id}, Total Stock: ${totalStock}, Reorder Point: ${reorderPoint}`);
+              if (totalStock > reorderPoint) {
+                shouldRefreshLowStockAlerts = true;
+                console.log(`✅ Product ${product_id} stock (${totalStock}) is now above reorder point (${reorderPoint}) - alert should be removed`);
+              }
+            } else {
+              // For base product stock
+              console.log(`🔍 Checking low stock alert: Product ${product_id}, Stock: ${actualCurrentStock}, Reorder Point: ${reorderPoint}`);
+              if (actualCurrentStock > reorderPoint) {
+                shouldRefreshLowStockAlerts = true;
+                console.log(`✅ Product ${product_id} stock (${actualCurrentStock}) is now above reorder point (${reorderPoint}) - alert should be removed`);
+              }
+            }
+          }
+        } finally {
+          checkConnection.release();
+        }
+      }
 
       // Emit real-time updates
       const io = req.app.get('io');
@@ -294,6 +339,16 @@ export const createStockMovement = async (req, res) => {
           quantity,
           new_stock: newStock
         });
+        
+        // Emit low stock alerts refresh if stock is now above threshold
+        if (shouldRefreshLowStockAlerts) {
+          io.to('admin-room').emit('low-stock-alerts-refresh', {
+            product_id,
+            new_stock: newStock,
+            message: 'Stock restocked above threshold - alert removed'
+          });
+          console.log(`✅ Low stock alert should be removed for product ${product_id} (stock: ${newStock})`);
+        }
       }
 
       res.status(201).json({
@@ -316,9 +371,8 @@ export const createStockMovement = async (req, res) => {
 
     } catch (error) {
       await connection.rollback();
-      throw error;
-    } finally {
       connection.release();
+      throw error;
     }
 
   } catch (error) {

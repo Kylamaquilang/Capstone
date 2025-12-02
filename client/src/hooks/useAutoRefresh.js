@@ -1,65 +1,70 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '@/context/SocketContext';
 
 /**
- * Custom hook for auto-refresh functionality
+ * Custom hook for auto-refresh functionality with debouncing
  * @param {Function} refreshFunction - Function to call when data needs to be refreshed
  * @param {string} dataType - Type of data being watched (e.g., 'products', 'orders', 'categories')
  * @param {Array} dependencies - Dependencies for the refresh function
  */
 export const useAutoRefresh = (refreshFunction, dataType, dependencies = []) => {
   const { socket, isConnected } = useSocket();
+  const isMountedRef = useRef(true);
+
+  // Refresh helper - executes immediately without debounce
+  const debouncedRefresh = useCallback((refreshFn) => {
+    if (!isMountedRef.current) return; // Don't refresh if component is unmounted
+    
+    // Execute immediately without delay
+    if (refreshFn && typeof refreshFn === 'function') {
+      refreshFn();
+    }
+  }, []);
 
   const handleDataRefresh = useCallback((data) => {
-    console.log(`🔄 Auto-refresh triggered for ${dataType}:`, data);
-    if (refreshFunction && typeof refreshFunction === 'function') {
-      refreshFunction();
+    if (data.dataType === dataType) {
+      console.log(`🔄 Auto-refresh triggered for ${dataType}:`, data);
+      debouncedRefresh(refreshFunction);
     }
-  }, [refreshFunction, dataType]);
+  }, [refreshFunction, dataType, debouncedRefresh]);
 
   const handleAdminDataRefresh = useCallback((data) => {
-    console.log(`🔄 Admin auto-refresh triggered for ${dataType}:`, data);
-    if (refreshFunction && typeof refreshFunction === 'function') {
-      refreshFunction();
+    if (data.dataType === dataType) {
+      console.log(`🔄 Admin auto-refresh triggered for ${dataType}:`, data);
+      debouncedRefresh(refreshFunction);
     }
-  }, [refreshFunction, dataType]);
+  }, [refreshFunction, dataType, debouncedRefresh]);
 
   const handleUserDataRefresh = useCallback((data) => {
-    console.log(`🔄 User auto-refresh triggered for ${dataType}:`, data);
-    if (refreshFunction && typeof refreshFunction === 'function') {
-      refreshFunction();
+    if (data.dataType === dataType) {
+      console.log(`🔄 User auto-refresh triggered for ${dataType}:`, data);
+      debouncedRefresh(refreshFunction);
     }
-  }, [refreshFunction, dataType]);
+  }, [refreshFunction, dataType, debouncedRefresh]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (socket && isConnected) {
       // Listen for general data refresh events
-      socket.on('data-refresh', (data) => {
-        if (data.dataType === dataType) {
-          handleDataRefresh(data);
-        }
-      });
+      socket.on('data-refresh', handleDataRefresh);
 
       // Listen for admin-specific data refresh events
-      socket.on('admin-data-refresh', (data) => {
-        if (data.dataType === dataType) {
-          handleAdminDataRefresh(data);
-        }
-      });
+      socket.on('admin-data-refresh', handleAdminDataRefresh);
 
       // Listen for user-specific data refresh events
-      socket.on('user-data-refresh', (data) => {
-        if (data.dataType === dataType) {
-          handleUserDataRefresh(data);
-        }
-      });
-
-      return () => {
-        socket.off('data-refresh');
-        socket.off('admin-data-refresh');
-        socket.off('user-data-refresh');
-      };
+      socket.on('user-data-refresh', handleUserDataRefresh);
     }
+    
+    return () => {
+      isMountedRef.current = false;
+      if (socket && isConnected) {
+        socket.off('data-refresh', handleDataRefresh);
+        socket.off('admin-data-refresh', handleAdminDataRefresh);
+        socket.off('user-data-refresh', handleUserDataRefresh);
+      }
+      // Cleanup - no timers to clear since we removed debounce
+    };
   }, [socket, isConnected, dataType, handleDataRefresh, handleAdminDataRefresh, handleUserDataRefresh]);
 
   // Return the refresh function for manual triggering
@@ -77,30 +82,43 @@ export const useAutoRefresh = (refreshFunction, dataType, dependencies = []) => 
  */
 export const useAdminAutoRefresh = (refreshFunction, dataType, dependencies = []) => {
   const { socket, isConnected, joinAdminRoom } = useSocket();
+  const isMountedRef = useRef(true);
+
+  // Refresh helper - executes immediately without debounce
+  const debouncedRefresh = useCallback((refreshFn) => {
+    if (!isMountedRef.current) return; // Don't refresh if component is unmounted
+    
+    // Execute immediately without delay
+    if (refreshFn && typeof refreshFn === 'function') {
+      refreshFn();
+    }
+  }, []);
 
   const handleAdminDataRefresh = useCallback((data) => {
-    console.log(`🔄 Admin auto-refresh triggered for ${dataType}:`, data);
-    if (refreshFunction && typeof refreshFunction === 'function') {
-      refreshFunction();
+    if (data.dataType === dataType) {
+      console.log(`🔄 Admin auto-refresh triggered for ${dataType}:`, data);
+      debouncedRefresh(refreshFunction);
     }
-  }, [refreshFunction, dataType]);
+  }, [refreshFunction, dataType, debouncedRefresh]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (socket && isConnected) {
       // Join admin room for admin-specific updates
       joinAdminRoom();
 
       // Listen for admin-specific data refresh events
-      socket.on('admin-data-refresh', (data) => {
-        if (data.dataType === dataType) {
-          handleAdminDataRefresh(data);
-        }
-      });
-
-      return () => {
-        socket.off('admin-data-refresh');
-      };
+      socket.on('admin-data-refresh', handleAdminDataRefresh);
     }
+    
+    return () => {
+      isMountedRef.current = false;
+      if (socket && isConnected) {
+        socket.off('admin-data-refresh', handleAdminDataRefresh);
+      }
+      // Cleanup - no timers to clear since we removed debounce
+    };
   }, [socket, isConnected, dataType, handleAdminDataRefresh, joinAdminRoom]);
 
   return {
@@ -117,27 +135,40 @@ export const useAdminAutoRefresh = (refreshFunction, dataType, dependencies = []
  */
 export const useUserAutoRefresh = (refreshFunction, dataType, dependencies = []) => {
   const { socket, isConnected, user } = useSocket();
+  const isMountedRef = useRef(true);
+
+  // Refresh helper - executes immediately without debounce
+  const debouncedRefresh = useCallback((refreshFn) => {
+    if (!isMountedRef.current) return; // Don't refresh if component is unmounted
+    
+    // Execute immediately without delay
+    if (refreshFn && typeof refreshFn === 'function') {
+      refreshFn();
+    }
+  }, []);
 
   const handleUserDataRefresh = useCallback((data) => {
-    console.log(`🔄 User auto-refresh triggered for ${dataType}:`, data);
-    if (refreshFunction && typeof refreshFunction === 'function') {
-      refreshFunction();
+    if (data.dataType === dataType) {
+      console.log(`🔄 User auto-refresh triggered for ${dataType}:`, data);
+      debouncedRefresh(refreshFunction);
     }
-  }, [refreshFunction, dataType]);
+  }, [refreshFunction, dataType, debouncedRefresh]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (socket && isConnected && user) {
       // Listen for user-specific data refresh events
-      socket.on('user-data-refresh', (data) => {
-        if (data.dataType === dataType) {
-          handleUserDataRefresh(data);
-        }
-      });
-
-      return () => {
-        socket.off('user-data-refresh');
-      };
+      socket.on('user-data-refresh', handleUserDataRefresh);
     }
+    
+    return () => {
+      isMountedRef.current = false;
+      if (socket && isConnected && user) {
+        socket.off('user-data-refresh', handleUserDataRefresh);
+      }
+      // Cleanup - no timers to clear since we removed debounce
+    };
   }, [socket, isConnected, user, dataType, handleUserDataRefresh]);
 
   return {

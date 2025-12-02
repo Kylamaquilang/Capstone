@@ -1,6 +1,6 @@
 import { pool } from '../database/db.js'
 import { createOrderStatusNotification, createAdminOrderNotification } from '../utils/notification-helper.js'
-import { emitUserNotification, emitAdminNotification, emitInventoryUpdate, emitNewOrder, emitDataRefresh, emitAdminDataRefresh, emitUserDataRefresh } from '../utils/socket-helper.js'
+import { emitUserNotification, emitAdminNotification, emitInventoryUpdate, emitNewOrder, emitDataRefresh, emitAdminDataRefresh, emitUserDataRefresh, emitCartUpdate } from '../utils/socket-helper.js'
 
 
 export const checkout = async (req, res) => {
@@ -375,6 +375,12 @@ export const checkout = async (req, res) => {
       emitUserDataRefresh(io, user_id, 'orders', { action: 'created', orderId });
       emitDataRefresh(io, 'cart', { action: 'cleared' });
       emitUserDataRefresh(io, user_id, 'cart', { action: 'cleared' });
+      
+      // Also emit direct cart-updated event for immediate UI update
+      emitCartUpdate(io, user_id, {
+        action: 'cleared',
+        timestamp: new Date().toISOString()
+      });
     }
 
     console.log('🎉 Checkout completed successfully, sending response...');

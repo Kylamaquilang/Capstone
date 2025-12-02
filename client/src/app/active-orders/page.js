@@ -100,22 +100,13 @@ export default function ActiveOrdersPage() {
         }
       };
 
-      // Listen for user-specific data refresh events
-      const handleUserDataRefresh = (data) => {
-        console.log('🔄 User data refresh received on active-orders:', data);
-        if (isMounted && data.dataType === 'orders') {
-          fetchOrders();
-        }
-      };
-
       socket.on('order-status-updated', handleOrderUpdate);
       socket.on('new-notification', handleNewNotification);
-      socket.on('user-data-refresh', handleUserDataRefresh);
+      // Note: user-data-refresh is handled by useUserAutoRefresh hook above
 
       return () => {
         socket.off('order-status-updated', handleOrderUpdate);
         socket.off('new-notification', handleNewNotification);
-        socket.off('user-data-refresh', handleUserDataRefresh);
       };
     }
 

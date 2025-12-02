@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import API from '@/lib/axios';
 import ImageUpload from '@/components/product/ImageUpload';
+import Swal from '@/lib/sweetalert-config';
 
 export default function AddProductForm() {
   const [name, setName] = useState('');
@@ -49,12 +50,22 @@ export default function AddProductForm() {
     try {
       // Validate required fields
       if (!name.trim()) {
-        alert('Please enter a product name');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a product name',
+          confirmButtonColor: '#000C50'
+        });
         setLoading(false);
         return;
       }
       if (!price || Number(price) <= 0) {
-        alert('Please enter a valid selling price');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a valid selling price',
+          confirmButtonColor: '#000C50'
+        });
         setLoading(false);
         return;
       }
@@ -95,7 +106,12 @@ export default function AddProductForm() {
       await API.post('/products', productData);
       
       // Show success message
-      alert('Product created successfully!');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Product created successfully!',
+        confirmButtonColor: '#000C50'
+      });
       router.push('/admin/products');
     } catch (err) {
       console.error('Error creating product:', err);
@@ -107,15 +123,30 @@ export default function AddProductForm() {
         
         let suggestionText = '';
         if (suggestions.length > 0) {
-          suggestionText = `\n\n💡 Suggested names:\n${suggestions.map(s => `• ${s}`).join('\n')}`;
+          suggestionText = `<br/><br/><strong>💡 Suggested names:</strong><br/>${suggestions.map(s => `• ${s}`).join('<br/>')}`;
         }
         
-        alert(`❌ ${errorMessage}${suggestionText}\n\nPlease choose a different product name.`);
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Duplicate Product Name',
+          html: `${errorMessage}${suggestionText}<br/><br/>Please choose a different product name.`,
+          confirmButtonColor: '#000C50'
+        });
       } else if (err?.response?.status === 400) {
         const errorMessage = err?.response?.data?.error || 'Invalid product data';
-        alert(`❌ ${errorMessage}\n\nPlease check your input and try again.`);
+        await Swal.fire({
+          icon: 'error',
+          title: 'Validation Error',
+          html: `${errorMessage}<br/><br/>Please check your input and try again.`,
+          confirmButtonColor: '#000C50'
+        });
       } else {
-        alert('❌ Failed to save product. Please try again.');
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'Failed to save product. Please try again.',
+          confirmButtonColor: '#000C50'
+        });
       }
     } finally {
       setLoading(false);

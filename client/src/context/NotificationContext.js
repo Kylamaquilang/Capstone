@@ -111,12 +111,44 @@ export function NotificationProvider({ children }) {
         console.log('🛒 Real-time cart update received:', data);
         // Update cart count based on action
         if (data.action === 'added') {
-          setCartCount(prev => prev + data.quantity);
+          setCartCount(prev => prev + (data.quantity || 1));
         } else if (data.action === 'removed') {
-          setCartCount(prev => Math.max(0, prev - data.quantity));
+          setCartCount(prev => Math.max(0, prev - (data.quantity || 1)));
+        } else if (data.action === 'cleared') {
+          // Cart was cleared (e.g., after checkout)
+          console.log('🛒 Cart cleared - resetting count to 0');
+          setCartCount(0);
         } else if (data.action === 'updated') {
           // For updates, we might need to refetch to get accurate count
           fetchCounts();
+        }
+      };
+
+      // Handle data-refresh events for cart
+      const handleDataRefresh = (data) => {
+        console.log('🛒 Data refresh received for cart:', data);
+        if (data.dataType === 'cart' || !data.dataType) {
+          if (data.action === 'cleared') {
+            console.log('🛒 Cart cleared via data-refresh - resetting count to 0');
+            setCartCount(0);
+          } else {
+            // Refresh cart count from server
+            fetchCounts();
+          }
+        }
+      };
+
+      // Handle user-data-refresh events for cart
+      const handleUserDataRefresh = (data) => {
+        console.log('🛒 User data refresh received for cart:', data);
+        if (data.dataType === 'cart' || !data.dataType) {
+          if (data.action === 'cleared') {
+            console.log('🛒 Cart cleared via user-data-refresh - resetting count to 0');
+            setCartCount(0);
+          } else {
+            // Refresh cart count from server
+            fetchCounts();
+          }
         }
       };
 
@@ -134,11 +166,15 @@ export function NotificationProvider({ children }) {
       };
 
       socket.on('cart-updated', handleCartUpdate);
+      socket.on('data-refresh', handleDataRefresh);
+      socket.on('user-data-refresh', handleUserDataRefresh);
       socket.on('new-notification', handleNewNotification);
       socket.on('order-status-updated', handleOrderUpdate);
 
       return () => {
         socket.off('cart-updated', handleCartUpdate);
+        socket.off('data-refresh', handleDataRefresh);
+        socket.off('user-data-refresh', handleUserDataRefresh);
         socket.off('new-notification', handleNewNotification);
         socket.off('order-status-updated', handleOrderUpdate);
       };

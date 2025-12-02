@@ -167,7 +167,7 @@ export default function PaymentSuccessPage() {
               View Order History
             </button>
             <button
-              onClick={() => router.push('/products')}
+              onClick={() => router.push('/dashboard')}
               className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-lg hover:bg-gray-300 transition-colors"
             >
               Continue Shopping

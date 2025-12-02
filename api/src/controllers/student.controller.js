@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../database/db.js';
 import { validateEmail, validateStudentId } from '../utils/validation.js';
 import { sendWelcomeEmail } from '../utils/emailService.js';
+import { emitDataRefresh, emitAdminDataRefresh } from '../utils/socket-helper.js';
 import csv from 'csv-parser';
 import fs from 'fs';
 import pkg from 'xlsx';
@@ -89,27 +90,49 @@ export const addStudent = async (req, res) => {
       });
     }
 
-    // Check if student already exists with this email (only active users)
-    const [existingEmail] = await pool.query('SELECT * FROM users WHERE email = ? AND is_active = 1', [email.trim()]);
+    // Check if student already exists with this email (case-insensitive, only active users)
+    const trimmedEmail = email.trim().toLowerCase();
+    const [existingEmail] = await pool.query(
+      'SELECT id, name, email, student_id FROM users WHERE LOWER(email) = ? AND is_active = 1', 
+      [trimmedEmail]
+    );
     if (existingEmail.length > 0) {
+      const existing = existingEmail[0];
       return res.status(409).json({ 
-        error: 'Student already exists with this email' 
+        error: 'Email already exists',
+        message: `A student with the email "${email.trim()}" already exists. Please use a different email address.`,
+        existingStudent: {
+          name: existing.name,
+          email: existing.email,
+          student_id: existing.student_id
+        }
       });
     }
 
     // Check if student already exists with this student_id (only active users)
-    const [existingStudentId] = await pool.query('SELECT * FROM users WHERE student_id = ? AND is_active = 1', [student_id.trim()]);
+    const trimmedStudentId = student_id.trim();
+    const [existingStudentId] = await pool.query(
+      'SELECT id, name, email, student_id FROM users WHERE student_id = ? AND is_active = 1', 
+      [trimmedStudentId]
+    );
     if (existingStudentId.length > 0) {
+      const existing = existingStudentId[0];
       return res.status(409).json({ 
-        error: 'Student ID already exists' 
+        error: 'Student ID already exists',
+        message: `A student with the Student ID "${trimmedStudentId}" already exists. Please use a different Student ID.`,
+        existingStudent: {
+          name: existing.name,
+          email: existing.email,
+          student_id: existing.student_id
+        }
       });
     }
 
     // Check if there's a soft-deleted user with the same email or student_id
     // If so, reactivate that user instead of creating a new one
     const [deletedUser] = await pool.query(
-      'SELECT * FROM users WHERE (email = ? OR student_id = ?) AND is_active = 0', 
-      [email.trim(), student_id.trim()]
+      'SELECT * FROM users WHERE (LOWER(email) = ? OR student_id = ?) AND is_active = 0', 
+      [trimmedEmail, trimmedStudentId]
     );
 
     if (deletedUser.length > 0) {
@@ -163,6 +186,22 @@ export const addStudent = async (req, res) => {
         await sendWelcomeEmail(email.trim(), fullName, student_id.trim(), DEFAULT_STUDENT_PASSWORD);
       } catch (emailError) {
         console.warn('Failed to send welcome email:', emailError.message);
+      }
+
+      // Emit refresh signals for real-time updates
+      const io = req.app.get('io');
+      if (io) {
+        emitDataRefresh(io, 'users', { action: 'created', userId: userToReactivate.id });
+        emitAdminDataRefresh(io, 'users', { action: 'created', userId: userToReactivate.id });
+        // Also emit new-user event for compatibility
+        io.to('admin-room').emit('new-user', {
+          id: userToReactivate.id,
+          student_id: student_id.trim(),
+          name: fullName,
+          email: email.trim(),
+          degree,
+          status: cleanStatus
+        });
       }
 
       return res.status(200).json({ 
@@ -226,6 +265,22 @@ export const addStudent = async (req, res) => {
       await sendWelcomeEmail(email.trim(), fullName, student_id.trim(), DEFAULT_STUDENT_PASSWORD);
     } catch (emailError) {
       console.warn('Failed to send welcome email:', emailError.message);
+    }
+
+    // Emit refresh signals for real-time updates
+    const io = req.app.get('io');
+    if (io) {
+      emitDataRefresh(io, 'users', { action: 'created', userId: result.insertId });
+      emitAdminDataRefresh(io, 'users', { action: 'created', userId: result.insertId });
+      // Also emit new-user event for compatibility
+      io.to('admin-room').emit('new-user', {
+        id: result.insertId,
+        student_id: student_id.trim(),
+        name: fullName,
+        email: email.trim(),
+        degree,
+        status: cleanStatus
+      });
     }
 
     res.status(201).json({ 
@@ -1133,6 +1188,13 @@ export const addStudentsBulk = async (req, res) => {
       }
 
       console.log(`📊 Bulk upload completed: ${successCount} successful, ${errorCount} errors`);
+
+      // Emit refresh signals for real-time updates after bulk upload
+      const io = req.app.get('io');
+      if (io && successCount > 0) {
+        emitDataRefresh(io, 'users', { action: 'bulk-created', count: successCount });
+        emitAdminDataRefresh(io, 'users', { action: 'bulk-created', count: successCount });
+      }
 
       res.status(200).json({
         message: 'Bulk upload completed',

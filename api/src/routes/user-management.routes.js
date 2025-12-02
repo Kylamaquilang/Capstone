@@ -7,7 +7,9 @@ import {
   getUserProfile,
   updateUserProfile,
   updateUser,
-  deleteUser
+  deleteUser,
+  bulkPromoteYearLevel,
+  getUserDegreeShifts
 } from '../controllers/user-management.controller.js';
 import { verifyToken } from '../middleware/auth.middleware.js';
 import { isAdmin } from '../middleware/auth.middleware.js';
@@ -48,6 +50,8 @@ router.put('/profile/image', verifyToken, upload.single('image'), updateUserProf
 
 // Admin routes (admin only) - parameterized routes come after specific routes
 router.get('/all', verifyToken, isAdmin, getAllUsersWithStatus);
+router.post('/bulk-promote', verifyToken, isAdmin, bulkPromoteYearLevel);
+router.get('/:id/degree-shifts', verifyToken, isAdmin, getUserDegreeShifts);
 router.put('/:id', verifyToken, isAdmin, updateUser);
 router.patch('/:userId/status', verifyToken, isAdmin, toggleUserStatus);
 router.delete('/:userId', verifyToken, isAdmin, deleteUser);

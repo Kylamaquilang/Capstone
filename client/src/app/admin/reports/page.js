@@ -7,6 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useSocket } from '@/context/SocketContext';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
+import Swal from '@/lib/sweetalert-config';
 import { 
   ChartBarIcon, 
   ExclamationTriangleIcon, 
@@ -328,7 +329,7 @@ export default function AdminReportsPage() {
   };
 
   // Download function
-  const handleDownload = () => {
+  const handleDownload = async () => {
     try {
       const reportData = getReportData();
       const pdf = generatePDFDocument(reportData);
@@ -336,7 +337,12 @@ export default function AdminReportsPage() {
       pdf.save(`${getReportTitle()}-${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Error generating PDF. Please try again.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Error generating PDF. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 

@@ -5,10 +5,11 @@ import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
 import { useSocket } from '@/context/SocketContext';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
-import { EyeIcon, PencilIcon, UserMinusIcon, UserPlusIcon, TrashIcon, MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, PencilIcon, UserMinusIcon, UserPlusIcon, TrashIcon, MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import AddStudentModal from '@/components/user/AddStudentModal';
 import BulkUploadModal from '@/components/user/BulkUploadModal';
 import EditUserModal from '@/components/user/EditUserModal';
+import Swal from '@/lib/sweetalert-config';
 
 export default function AdminUsersPage() {
   const { socket, isConnected, joinAdminRoom } = useSocket();
@@ -22,6 +23,14 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [promoteForm, setPromoteForm] = useState({
+    fromYearLevel: '',
+    toYearLevel: '',
+    degree: '',
+    section: ''
+  });
+  const [promoteLoading, setPromoteLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -32,6 +41,9 @@ export default function AdminUsersPage() {
     section: '',
     yearLevel: ''
   });
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchUsers = async () => {
     try {
@@ -73,20 +85,18 @@ export default function AdminUsersPage() {
       // Join admin room for real-time updates
       joinAdminRoom();
 
-      // Listen for user updates
+      // Listen for user updates - do full refresh to get all updated data
       const handleUserUpdate = (userData) => {
         console.log('👤 Real-time user update received:', userData);
-        setUsers(prev => prev.map(user => 
-          user.id === userData.userId 
-            ? { ...user, is_active: userData.is_active, status: userData.status }
-            : user
-        ));
+        // Do a full refresh to ensure all data is up to date
+        fetchUsers();
       };
 
-      // Listen for new user additions
+      // Listen for new user additions - do full refresh to get all data
       const handleNewUser = (userData) => {
         console.log('👤 Real-time new user received:', userData);
-        setUsers(prev => [userData, ...prev]);
+        // Do a full refresh to ensure all data is up to date
+        fetchUsers();
       };
 
       // Listen for admin notifications (might indicate user changes)
@@ -95,6 +105,8 @@ export default function AdminUsersPage() {
         // Refresh users when admin notifications arrive (might be user-related)
         fetchUsers();
       };
+
+      // Note: admin-data-refresh is handled by useAdminAutoRefresh hook above
 
       socket.on('user-updated', handleUserUpdate);
       socket.on('new-user', handleNewUser);
@@ -108,13 +120,19 @@ export default function AdminUsersPage() {
     }
   }, [socket, isConnected, joinAdminRoom]);
 
-  // Filter logic
+  // Filter and search logic
   const filteredUsers = users.filter(user => {
     const matchesDepartment = !filters.department || user.degree === filters.department;
     const matchesSection = !filters.section || user.section === filters.section;
     const matchesYearLevel = !filters.yearLevel || user.year_level === filters.yearLevel;
     
-    return matchesDepartment && matchesSection && matchesYearLevel;
+    // Search filter - matches name, email, or student_id
+    const matchesSearch = !searchTerm || 
+      (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (user.student_id && user.student_id.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    return matchesDepartment && matchesSection && matchesYearLevel && matchesSearch;
   });
 
   // Pagination logic
@@ -152,7 +170,14 @@ export default function AdminUsersPage() {
       section: '',
       yearLevel: ''
     });
+    setSearchTerm('');
     setCurrentPage(1);
+  };
+  
+  // Handle search change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when search changes
   };
 
   const handleModalSuccess = () => {
@@ -214,7 +239,17 @@ export default function AdminUsersPage() {
   const handleBulkActivate = async () => {
     if (selectedUsers.size === 0) return;
     
-    if (!confirm(`Are you sure you want to activate ${selectedUsers.size} user(s)?`)) {
+    const result = await Swal.fire({
+      title: 'Confirm Activation',
+      text: `Are you sure you want to activate ${selectedUsers.size} user(s)?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#000C50',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, activate',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -236,10 +271,20 @@ export default function AdminUsersPage() {
       );
       
       setSelectedUsers(new Set());
-      alert(`Successfully activated ${selectedUsers.size} user(s)`);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: `Successfully activated ${selectedUsers.size} user(s)`,
+        confirmButtonColor: '#000C50'
+      });
     } catch (err) {
       console.error('Failed to activate users:', err);
-      alert(err?.response?.data?.error || 'Failed to activate users');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err?.response?.data?.error || 'Failed to activate users',
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setBulkActionLoading(false);
     }
@@ -248,7 +293,17 @@ export default function AdminUsersPage() {
   const handleBulkDeactivate = async () => {
     if (selectedUsers.size === 0) return;
     
-    if (!confirm(`Are you sure you want to deactivate ${selectedUsers.size} user(s)?`)) {
+    const result = await Swal.fire({
+      title: 'Confirm Deactivation',
+      text: `Are you sure you want to deactivate ${selectedUsers.size} user(s)?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#000C50',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, deactivate',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -270,10 +325,20 @@ export default function AdminUsersPage() {
       );
       
       setSelectedUsers(new Set());
-      alert(`Successfully deactivated ${selectedUsers.size} user(s)`);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: `Successfully deactivated ${selectedUsers.size} user(s)`,
+        confirmButtonColor: '#000C50'
+      });
     } catch (err) {
       console.error('Failed to deactivate users:', err);
-      alert(err?.response?.data?.error || 'Failed to deactivate users');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err?.response?.data?.error || 'Failed to deactivate users',
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setBulkActionLoading(false);
     }
@@ -284,7 +349,17 @@ export default function AdminUsersPage() {
     
     const deleteCount = selectedUsers.size;
     
-    if (!confirm(`Are you sure you want to delete ${deleteCount} user(s)? This action cannot be undone.`)) {
+    const result = await Swal.fire({
+      title: 'Confirm Deletion',
+      text: `Are you sure you want to delete ${deleteCount} user(s)? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -303,10 +378,20 @@ export default function AdminUsersPage() {
       
       // Clear selections
       setSelectedUsers(new Set());
-      alert(`Successfully deleted ${deleteCount} user(s)`);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: `Successfully deleted ${deleteCount} user(s)`,
+        confirmButtonColor: '#000C50'
+      });
     } catch (err) {
       console.error('Failed to delete users:', err);
-      alert(err?.response?.data?.error || 'Failed to delete users');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err?.response?.data?.error || 'Failed to delete users',
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setBulkActionLoading(false);
     }
@@ -329,14 +414,115 @@ export default function AdminUsersPage() {
       );
     } catch (err) {
       console.error('Failed to update user status:', err);
-      alert(err?.response?.data?.error || 'Failed to update user status');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err?.response?.data?.error || 'Failed to update user status',
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setUpdatingStatus(null);
     }
   };
 
+  const handleBulkPromote = async () => {
+    if (!promoteForm.fromYearLevel || !promoteForm.toYearLevel) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Please select both "From" and "To" year levels',
+        confirmButtonColor: '#000C50'
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Confirm Promotion',
+      html: `Are you sure you want to promote all students from <strong>${promoteForm.fromYearLevel}</strong> to <strong>${promoteForm.toYearLevel}</strong>?${promoteForm.degree ? `<br/><br/>Degree: <strong>${promoteForm.degree}</strong>` : ''}${promoteForm.section ? `<br/>Section: <strong>${promoteForm.section}</strong>` : ''}`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#000C50',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, promote',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      setPromoteLoading(true);
+      const response = await API.post('/users/bulk-promote', promoteForm);
+      
+      // Check if it's an informational note (not an error)
+      if (response.data.message && response.data.count === 0 && !response.data.error) {
+        await Swal.fire({
+          icon: 'info',
+          title: 'Note',
+          text: response.data.message,
+          confirmButtonColor: '#000C50'
+        });
+        setShowPromoteModal(false);
+        setPromoteForm({ fromYearLevel: '', toYearLevel: '', degree: '', section: '' });
+        setPromoteLoading(false);
+        return;
+      }
+      
+      if (response.data.count === 0) {
+        // No students found - show info message instead of error
+        await Swal.fire({
+          icon: 'info',
+          title: 'No Students Found',
+          text: response.data.message || 'No students found matching the selected criteria.',
+          confirmButtonColor: '#000C50'
+        });
+      } else {
+        // Success - students were promoted
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          html: `Successfully promoted <strong>${response.data.count}</strong> student(s) from ${promoteForm.fromYearLevel} to ${promoteForm.toYearLevel}`,
+          confirmButtonColor: '#000C50'
+        });
+        
+        // Only refresh users if students were actually promoted
+        fetchUsers();
+      }
+
+      // Reset form and close modal
+      setPromoteForm({
+        fromYearLevel: '',
+        toYearLevel: '',
+        degree: '',
+        section: ''
+      });
+      setShowPromoteModal(false);
+    } catch (err) {
+      console.error('Failed to promote students:', err);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err?.response?.data?.error || 'Failed to promote students',
+        confirmButtonColor: '#000C50'
+      });
+    } finally {
+      setPromoteLoading(false);
+    }
+  };
+
   const handleDeleteUser = async (userId, userName) => {
-    if (!confirm(`Are you sure you want to delete user "${userName}"?`)) {
+    const result = await Swal.fire({
+      title: 'Confirm Deletion',
+      text: `Are you sure you want to delete user "${userName}"?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) {
       return;
     }
 
@@ -355,10 +541,20 @@ export default function AdminUsersPage() {
         return newSet;
       });
       
-      alert('User deleted successfully');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'User deleted successfully',
+        confirmButtonColor: '#000C50'
+      });
     } catch (err) {
       console.error('Failed to delete user:', err);
-      alert(err?.response?.data?.error || 'Failed to delete user');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err?.response?.data?.error || 'Failed to delete user',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 
@@ -469,6 +665,12 @@ export default function AdminUsersPage() {
                     >
                       Bulk Upload
                     </button>
+                    <button 
+                      onClick={() => setShowPromoteModal(true)}
+                      className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium active:scale-95"
+                    >
+                      Promote Year Level
+                    </button>
                   </div>
                 </div>
               </div>
@@ -476,6 +678,36 @@ export default function AdminUsersPage() {
 
             {/* Filters Section */}
             <div className="p-3 sm:p-4 border-b border-gray-200 bg-gray-50">
+              {/* Search Bar */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Search Users</label>
+                <div className="relative max-w-md">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    placeholder="Search by name, email, or student ID..."
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-[#000C50] focus:border-transparent text-sm"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setCurrentPage(1);
+                      }}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+              
               <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                 <div className="flex flex-col sm:flex-row gap-3 flex-1">
                   {/* Department Filter */}
@@ -525,7 +757,7 @@ export default function AdminUsersPage() {
                 </div>
 
                 {/* Clear Filters Button */}
-                {(filters.department || filters.section || filters.yearLevel) && (
+                {(filters.department || filters.section || filters.yearLevel || searchTerm) && (
                   <button
                     onClick={clearFilters}
                     className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
@@ -619,7 +851,17 @@ export default function AdminUsersPage() {
                           </div>
                         </td>
                         <td className="w-24 px-3 py-3">
-                          <div className="text-xs text-gray-900 uppercase">{user.degree || 'N/A'}</div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="text-xs text-gray-900 uppercase">{user.degree || 'N/A'}</div>
+                            {user.shift_count > 0 && (
+                              <span 
+                                className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-orange-100 text-orange-800 border border-orange-200 whitespace-nowrap"
+                                title={`Shifted from ${user.previous_degree || 'previous program'}. Total shifts: ${user.shift_count}`}
+                              >
+                                🔄
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="w-20 px-3 py-3">
                           <div className="text-xs text-gray-900 whitespace-nowrap">
@@ -735,6 +977,123 @@ export default function AdminUsersPage() {
         onSuccess={handleEditUserSuccess}
         user={selectedUser}
       />
+
+      {/* Promote Year Level Modal */}
+      {showPromoteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Promote Year Level</h2>
+              <button
+                onClick={() => {
+                  setShowPromoteModal(false);
+                  setPromoteForm({
+                    fromYearLevel: '',
+                    toYearLevel: '',
+                    degree: '',
+                    section: ''
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  From Year Level <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={promoteForm.fromYearLevel}
+                  onChange={(e) => setPromoteForm({ ...promoteForm, fromYearLevel: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                >
+                  <option value="">Select Year Level</option>
+                  <option value="1st Year">1st Year</option>
+                  <option value="2nd Year">2nd Year</option>
+                  <option value="3rd Year">3rd Year</option>
+                  <option value="4th Year">4th Year</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  To Year Level <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={promoteForm.toYearLevel}
+                  onChange={(e) => setPromoteForm({ ...promoteForm, toYearLevel: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                >
+                  <option value="">Select Year Level</option>
+                  <option value="1st Year">1st Year</option>
+                  <option value="2nd Year">2nd Year</option>
+                  <option value="3rd Year">3rd Year</option>
+                  <option value="4th Year">4th Year</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Degree (Optional)
+                </label>
+                <select
+                  value={promoteForm.degree}
+                  onChange={(e) => setPromoteForm({ ...promoteForm, degree: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                >
+                  <option value="">All Degrees</option>
+                  {allDepartments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Section (Optional)
+                </label>
+                <select
+                  value={promoteForm.section}
+                  onChange={(e) => setPromoteForm({ ...promoteForm, section: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                >
+                  <option value="">All Sections</option>
+                  {uniqueSections.map(section => (
+                    <option key={section} value={section}>{section}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleBulkPromote}
+                  disabled={promoteLoading || !promoteForm.fromYearLevel || !promoteForm.toYearLevel}
+                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  {promoteLoading ? 'Promoting...' : 'Promote Students'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPromoteModal(false);
+                    setPromoteForm({
+                      fromYearLevel: '',
+                      toYearLevel: '',
+                      degree: '',
+                      section: ''
+                    });
+                  }}
+                  className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

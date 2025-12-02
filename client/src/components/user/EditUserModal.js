@@ -6,6 +6,9 @@ import Swal from '@/lib/sweetalert-config';
 
 export default function EditUserModal({ isOpen, onClose, onSuccess, user }) {
   const [form, setForm] = useState({ 
+    name: '',
+    email: '',
+    student_id: '',
     year_level: '',
     section: '',
     degree: '',
@@ -18,6 +21,9 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }) {
   useEffect(() => {
     if (user) {
       setForm({
+        name: user.name || '',
+        email: user.email || '',
+        student_id: user.student_id || '',
         year_level: user.year_level || '',
         section: user.section || '',
         degree: user.degree || '',
@@ -28,7 +34,13 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+    // Allow spaces in name field, but trim other fields
+    if (name === 'name') {
+      setForm((f) => ({ ...f, [name]: value }));
+    } else {
+      const cleanValue = typeof value === 'string' ? value.trim() : value;
+      setForm((f) => ({ ...f, [name]: cleanValue }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -40,23 +52,76 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }) {
     
     try {
       setSubmitting(true);
-      await API.put(`/users/${user.id}`, form);
+      // Only trim leading/trailing spaces from name, but preserve internal spaces
+      const cleanForm = {
+        ...form,
+        name: form.name?.trim() || '',
+        email: form.email?.trim() || '',
+        student_id: form.student_id?.trim() || ''
+      };
+      const response = await API.put(`/users/${user.id}`, cleanForm);
+      
+      // Check if degree was changed (program shift)
+      const degreeChanged = user.degree && cleanForm.degree && user.degree !== cleanForm.degree;
       
       // Show SweetAlert success message
       await Swal.fire({
         title: 'Success!',
-        text: 'User updated successfully',
+        text: degreeChanged 
+          ? `User updated successfully. Program shift from ${user.degree} to ${cleanForm.degree} has been recorded.`
+          : 'User updated successfully',
         icon: 'success',
         confirmButtonText: 'OK',
         confirmButtonColor: '#000C50',
-        timer: 2000,
+        timer: degreeChanged ? 3000 : 2000,
         timerProgressBar: true
       });
       
+      // Trigger refresh callback to update the parent component
       onSuccess?.();
+      
+      // Small delay to ensure backend has processed the update
+      setTimeout(() => {
+        onSuccess?.();
+      }, 500);
+      
       onClose();
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to update user');
+      // Handle specific error cases gracefully
+      if (err?.response?.status === 409) {
+        // Duplicate email or student ID - expected error, show user-friendly message
+        const errorMessage = err?.response?.data?.error || err?.response?.data?.message || 'Email or Student ID already exists';
+        await Swal.fire({
+          title: 'Duplicate Entry',
+          text: errorMessage,
+          icon: 'warning',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
+      } else if (err?.response?.status === 400) {
+        // Validation error - expected error, show user-friendly message
+        const errorMessage = err?.response?.data?.error || 'Invalid user data';
+        await Swal.fire({
+          title: 'Validation Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
+      } else {
+        // Unexpected error - show user-friendly message
+        const errorMessage = err?.response?.data?.error || 'Failed to update user. Please try again.';
+        await Swal.fire({
+          title: 'Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -94,15 +159,6 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }) {
 
           {/* Content */}
           <div className="p-6">
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">User Information</h3>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm text-gray-900"><strong>Name:</strong> {user.name}</p>
-                <p className="text-sm text-gray-900"><strong>Email:</strong> {user.email}</p>
-                <p className="text-sm text-gray-900"><strong>Student ID:</strong> {user.student_id || 'N/A'}</p>
-              </div>
-            </div>
-
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                 <p className="text-red-600 text-sm">{error}</p>
@@ -115,6 +171,51 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }) {
             )}
             
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  disabled={submitting}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  disabled={submitting}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  Student ID
+                </label>
+                <input
+                  type="text"
+                  name="student_id"
+                  value={form.student_id}
+                  onChange={handleChange}
+                  placeholder="e.g., 20240001"
+                  disabled={submitting}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
                   Degree Program

@@ -175,6 +175,37 @@ const addStockIn = async (req, res) => {
       );
       
       await connection.commit();
+      
+      // Check if stock is now above reorder point
+      let shouldRefreshLowStockAlerts = false;
+      const [productInfo] = await connection.query(
+        'SELECT stock, reorder_point FROM products WHERE id = ?',
+        [productId]
+      );
+      
+      if (productInfo.length > 0) {
+        const currentStock = parseInt(productInfo[0].stock) || 0;
+        const reorderPoint = productInfo[0].reorder_point || 5; // Default to 5 if not set
+        
+        // If updating size-specific stock, check total stock
+        if (size && size.trim() !== '') {
+          const [sizeStocks] = await connection.query(
+            'SELECT SUM(stock) as total_size_stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
+            [productId]
+          );
+          const totalStock = currentStock + (parseInt(sizeStocks[0]?.total_size_stock) || 0);
+          
+          if (totalStock > reorderPoint) {
+            shouldRefreshLowStockAlerts = true;
+          }
+        } else {
+          // For base product stock
+          if (currentStock > reorderPoint) {
+            shouldRefreshLowStockAlerts = true;
+          }
+        }
+      }
+      
       connection.release();
       
       console.log(`✅ Successfully added ${quantity} units to stock for product ${productId}${size ? ` (size: ${size})` : ''}`);
@@ -191,6 +222,15 @@ const addStockIn = async (req, res) => {
           timestamp: new Date().toISOString()
         });
         console.log(`📡 Real-time inventory update sent for product ${productId}`);
+        
+        // Emit low stock alerts refresh if stock is now above threshold
+        if (shouldRefreshLowStockAlerts) {
+          io.to('admin-room').emit('low-stock-alerts-refresh', {
+            productId,
+            message: 'Stock restocked above threshold - alert removed'
+          });
+          console.log(`✅ Low stock alert should be removed for product ${productId}`);
+        }
       }
       
       res.json({ 
@@ -587,7 +627,8 @@ const getMonthlyStockReport = async (req, res) => {
 // Get low stock alerts
 const getLowStockAlerts = async (req, res) => {
   try {
-    const query = `
+    // Get all active products with their base stock
+    const [allProducts] = await pool.query(`
       SELECT 
         p.id,
         p.name,
@@ -597,21 +638,87 @@ const getLowStockAlerts = async (req, res) => {
         p.price,
         p.original_price,
         p.reorder_point,
-        p.max_stock,
-        CASE 
-          WHEN p.stock = 0 THEN 'CRITICAL'
-          WHEN p.stock <= p.reorder_point THEN 'LOW'
-          ELSE 'GOOD'
-        END as alert_level
+        p.max_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.is_active = TRUE 
-        AND p.stock <= p.reorder_point
+      WHERE p.is_active = TRUE
       ORDER BY p.stock ASC, p.name
-    `;
+    `);
     
-    const [rows] = await pool.query(query);
-    res.json({ success: true, data: rows });
+    // Get product sizes for all products and filter for low stock
+    const lowStockProducts = [];
+    
+    for (const product of allProducts) {
+      // If reorder_point is NULL or 0, use default of 5
+      // But only show as low stock if stock is actually low (less than or equal to threshold)
+      const reorderPoint = product.reorder_point !== null && product.reorder_point !== undefined 
+        ? parseInt(product.reorder_point) 
+        : 5; // Default to 5 if NULL or undefined
+      let isLowStock = false;
+      let alertLevel = 'GOOD';
+      
+      // Check base product stock
+      // Show as low stock if stock is less than or equal to reorder point
+      // If stock is above reorder point, it's not low
+      const currentStockNum = parseInt(product.current_stock) || 0;
+      
+      // Only show as low stock if stock is less than or equal to reorder point
+      // If stock equals reorder point, it's still considered low (needs restocking)
+      // If stock is greater than reorder point, it's not low
+      if (currentStockNum <= reorderPoint && reorderPoint > 0) {
+        isLowStock = true;
+        if (currentStockNum === 0) {
+          alertLevel = 'CRITICAL';
+        } else {
+          alertLevel = 'LOW';
+        }
+      }
+      
+      // Check size-specific stock if product has sizes
+      const [sizes] = await pool.query(
+        'SELECT id, size, stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
+        [product.id]
+      );
+      
+      if (sizes.length > 0) {
+        // Product has sizes - check if any size has low stock
+        const hasLowSizeStock = sizes.some(size => {
+          const sizeStock = parseInt(size.stock) || 0;
+          return sizeStock <= reorderPoint && reorderPoint > 0;
+        });
+        
+        if (hasLowSizeStock) {
+          isLowStock = true;
+          // Check if any size is out of stock
+          const hasOutOfStockSize = sizes.some(size => {
+            const sizeStock = parseInt(size.stock) || 0;
+            return sizeStock === 0;
+          });
+          if (hasOutOfStockSize && alertLevel !== 'CRITICAL') {
+            alertLevel = 'CRITICAL';
+          } else if (alertLevel === 'GOOD') {
+            alertLevel = 'LOW';
+          }
+        }
+      }
+      
+      // Only include products with low stock
+      if (isLowStock) {
+        lowStockProducts.push({
+          ...product,
+          alert_level: alertLevel
+        });
+      }
+    }
+    
+    // Sort by stock level (critical first, then by stock amount)
+    lowStockProducts.sort((a, b) => {
+      if (a.alert_level === 'CRITICAL' && b.alert_level !== 'CRITICAL') return -1;
+      if (a.alert_level !== 'CRITICAL' && b.alert_level === 'CRITICAL') return 1;
+      return a.current_stock - b.current_stock;
+    });
+    
+    res.json({ success: true, data: lowStockProducts });
   } catch (error) {
     console.error('Error fetching low stock alerts:', error);
     res.status(500).json({ error: 'Failed to fetch low stock alerts' });

@@ -8,12 +8,14 @@ import ThankYouModal from '@/components/common/ThankYouModal';
 import Swal from '@/lib/sweetalert-config';
 import API from '@/lib/axios';
 import { useAuth } from '@/context/auth-context';
+import { useNotifications } from '@/context/NotificationContext';
 import { BanknotesIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import { getImageUrl } from '@/utils/imageUtils';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 
 const CheckoutPage = () => {
   const { user } = useAuth();
+  const { updateCartCount, fetchCounts } = useNotifications();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedMethod, setSelectedMethod] = useState('');
@@ -136,6 +138,11 @@ const CheckoutPage = () => {
         });
 
         if (paymentResponse.data.success) {
+          // Clear cart count immediately
+          updateCartCount(0);
+          // Also refresh to ensure it's synced
+          setTimeout(() => fetchCounts(), 500);
+          
           // Show thank you modal
           setOrderId(orderId);
           setShowThankYouModal(true);
@@ -168,6 +175,11 @@ const CheckoutPage = () => {
         const orderResponse = await API.post('/checkout', checkoutData);
 
         const orderId = orderResponse.data.orderId;
+
+        // Clear cart count immediately
+        updateCartCount(0);
+        // Also refresh to ensure it's synced
+        setTimeout(() => fetchCounts(), 500);
 
         // Show thank you modal for cash payment
         setOrderId(orderId);

@@ -9,7 +9,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { getProductImageUrl } from '@/utils/imageUtils';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSocket } from '@/context/SocketContext';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 
@@ -23,57 +23,7 @@ export default function UserDashboard() {
   const [showThankYouModal, setShowThankYouModal] = useState(false);
   const [completedOrderId, setCompletedOrderId] = useState(null);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchProducts();
-
-      // Set up Socket.io listeners for real-time updates
-      if (socket && isConnected && user?.id) {
-        // Join user room for real-time updates
-        joinUserRoom(user.id.toString());
-
-        // Listen for order updates
-        const handleOrderUpdate = (orderData) => {
-          console.log('📦 Real-time order update received on dashboard:', orderData);
-          // Refresh products when orders are updated (might affect stock)
-          fetchProducts();
-        };
-
-        // Listen for new notifications (might indicate order changes)
-        const handleNewNotification = (notificationData) => {
-          console.log('🔔 Real-time notification received on dashboard:', notificationData);
-          // Refresh products when notifications arrive (might be order-related)
-          fetchProducts();
-        };
-
-        socket.on('order-status-updated', handleOrderUpdate);
-        socket.on('new-notification', handleNewNotification);
-
-        return () => {
-          socket.off('order-status-updated', handleOrderUpdate);
-          socket.off('new-notification', handleNewNotification);
-        };
-      }
-    }
-  }, [isAuthenticated, socket, isConnected, user?.id, joinUserRoom]);
-
-  // Check for order completion from URL params
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderCompleted = urlParams.get('orderCompleted');
-    const orderId = urlParams.get('orderId');
-    
-    if (orderCompleted === 'true' && orderId) {
-      setCompletedOrderId(orderId);
-      setShowThankYouModal(true);
-      
-      // Clean up URL parameters
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-    }
-  }, []);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setProductsLoading(true);
       setError(''); // Clear any previous errors
@@ -158,7 +108,68 @@ export default function UserDashboard() {
     } finally {
       setProductsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    if (isAuthenticated) {
+      fetchProducts();
+
+      // Set up Socket.io listeners for real-time updates
+      if (socket && isConnected && user?.id) {
+        // Join user room for real-time updates
+        joinUserRoom(user.id.toString());
+
+        // Listen for order updates
+        const handleOrderUpdate = (orderData) => {
+          console.log('📦 Real-time order update received on dashboard:', orderData);
+          // Refresh products when orders are updated (might affect stock)
+          if (isMounted) {
+            fetchProducts();
+          }
+        };
+
+        // Listen for new notifications (might indicate order changes)
+        const handleNewNotification = (notificationData) => {
+          console.log('🔔 Real-time notification received on dashboard:', notificationData);
+          // Refresh products when notifications arrive (might be order-related)
+          if (isMounted) {
+            fetchProducts();
+          }
+        };
+
+        socket.on('order-status-updated', handleOrderUpdate);
+        socket.on('new-notification', handleNewNotification);
+
+        return () => {
+          isMounted = false;
+          socket.off('order-status-updated', handleOrderUpdate);
+          socket.off('new-notification', handleNewNotification);
+        };
+      }
+    }
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, socket, isConnected, user?.id, joinUserRoom, fetchProducts]);
+
+  // Check for order completion from URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderCompleted = urlParams.get('orderCompleted');
+    const orderId = urlParams.get('orderId');
+    
+    if (orderCompleted === 'true' && orderId) {
+      setCompletedOrderId(orderId);
+      setShowThankYouModal(true);
+      
+      // Clean up URL parameters
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
 
   // Auto-refresh for products
   useUserAutoRefresh(fetchProducts, 'products');
@@ -293,7 +304,10 @@ export default function UserDashboard() {
               
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={() => setShowThankYouModal(false)}
+                  onClick={() => {
+                    setShowThankYouModal(false);
+                    router.push('/dashboard');
+                  }}
                   className="flex-1 bg-[#000C50] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#000C50]/90 transition-colors"
                 >
                   Continue Shopping

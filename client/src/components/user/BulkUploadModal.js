@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
+import Swal from '@/lib/sweetalert-config';
 
 export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
   const [file, setFile] = useState(null);
@@ -71,11 +72,6 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
       }, 2000);
       
     } catch (err) {
-      console.error('❌ Upload error:', err);
-      console.error('❌ Error response:', err.response);
-      console.error('❌ Error status:', err.response?.status);
-      console.error('❌ Error data:', err.response?.data);
-      
       let errorMessage = 'Failed to upload file';
       
       if (err?.response?.data?.error) {
@@ -94,19 +90,68 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
         errorMessage = 'Upload timeout - file may be too large or server is slow';
       }
       
-      if (err?.response?.status === 413) {
-        errorMessage = 'File too large - please use a smaller file';
+      // Handle specific error cases with SweetAlert
+      if (err?.response?.status === 409) {
+        // Duplicate entries - show warning
+        await Swal.fire({
+          title: 'Duplicate Entries',
+          text: errorMessage,
+          icon: 'warning',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
+      } else if (err?.response?.status === 413) {
+        // File too large
+        await Swal.fire({
+          title: 'File Too Large',
+          text: 'File size must be less than 10MB. Please use a smaller file.',
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError('File too large - please use a smaller file');
+      } else if (err?.response?.status === 401) {
+        // Authentication error
+        await Swal.fire({
+          title: 'Authentication Failed',
+          text: 'Please log in again to continue.',
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError('Authentication failed - please log in again');
+      } else if (err?.response?.status === 403) {
+        // Access denied
+        await Swal.fire({
+          title: 'Access Denied',
+          text: 'Admin privileges required to upload files.',
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError('Access denied - admin privileges required');
+      } else if (err?.response?.status === 400) {
+        // Validation error
+        await Swal.fire({
+          title: 'Validation Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
+      } else {
+        // Other errors
+        await Swal.fire({
+          title: 'Upload Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
       }
-      
-      if (err?.response?.status === 401) {
-        errorMessage = 'Authentication failed - please log in again';
-      }
-      
-      if (err?.response?.status === 403) {
-        errorMessage = 'Access denied - admin privileges required';
-      }
-      
-      setError(errorMessage);
     } finally {
       setSubmitting(false);
     }

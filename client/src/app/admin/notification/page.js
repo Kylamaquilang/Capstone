@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import API from '@/lib/axios';
 import { useSocket } from '@/context/SocketContext';
 import { CubeIcon } from '@heroicons/react/24/outline';
+import Swal from '@/lib/sweetalert-config';
 
 export default function AdminNotificationPage() {
   const { socket, isConnected, joinAdminRoom } = useSocket();
@@ -72,12 +73,22 @@ export default function AdminNotificationPage() {
       });
       
       // Show success message
-      alert('✅ Order receipt confirmed! Thank you message sent to customer.');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Order receipt confirmed! Thank you message sent to customer.',
+        confirmButtonColor: '#000C50'
+      });
       
       // Refresh notifications
       fetchNotifications();
     } catch (err) {
-      alert('❌ Failed to confirm order receipt');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to confirm order receipt',
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setProcessingOrder(null);
     }
@@ -91,12 +102,22 @@ export default function AdminNotificationPage() {
       });
       
       // Show success message
-      alert('❌ Order cancelled successfully.');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: 'Order cancelled successfully.',
+        confirmButtonColor: '#000C50'
+      });
       
       // Refresh notifications
       fetchNotifications();
     } catch (err) {
-      alert('❌ Failed to cancel order');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to cancel order',
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setProcessingOrder(null);
     }
@@ -136,7 +157,80 @@ export default function AdminNotificationPage() {
       window.dispatchEvent(new CustomEvent('notificationsMarkedAsRead'));
     } catch (err) {
       console.error('Failed to mark all notifications as read:', err);
-      alert('Failed to mark all notifications as read. Please try again.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to mark all notifications as read. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  const handleDeleteAllNotifications = async () => {
+    if (notifications.length === 0) return;
+    
+    const result = await Swal.fire({
+      title: 'Confirm Deletion',
+      text: `Are you sure you want to delete all ${notifications.length} notification(s)? This action cannot be undone.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, delete all',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      await API.delete('/notifications/delete-all');
+      setNotifications([]);
+      
+      // Dispatch custom event to notify navbar to refresh unread count
+      window.dispatchEvent(new CustomEvent('notificationsMarkedAsRead'));
+    } catch (error) {
+      console.error('Error deleting all notifications:', error);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to delete all notifications. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId) => {
+    const result = await Swal.fire({
+      title: 'Confirm Deletion',
+      text: 'Are you sure you want to delete this notification?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Yes, delete',
+      cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) {
+      return;
+    }
+
+    try {
+      await API.delete(`/notifications/${notificationId}`);
+      setNotifications(prev => 
+        prev.filter(notification => notification.id !== notificationId)
+      );
+      
+      // Dispatch custom event to notify navbar to refresh unread count
+      window.dispatchEvent(new CustomEvent('notificationsMarkedAsRead'));
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to delete notification. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 
@@ -213,14 +307,24 @@ export default function AdminNotificationPage() {
                     <span className="text-xs text-gray-500">
                       {notifications.filter(n => !n.is_read).length} unread
                     </span>
-                    {notifications.filter(n => !n.is_read).length > 0 && (
-                      <button
-                        onClick={handleMarkAllAsRead}
-                        className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors border border-blue-200"
-                      >
-                        Mark all as read
-                      </button>
-                    )}
+                    <div className="flex gap-2">
+                      {notifications.filter(n => !n.is_read).length > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors border border-blue-200"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                      {notifications.length > 0 && (
+                        <button
+                          onClick={handleDeleteAllNotifications}
+                          className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors border border-red-200"
+                        >
+                          Delete all
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -348,12 +452,7 @@ export default function AdminNotificationPage() {
                           
                           {/* Delete button */}
                           <button
-                            onClick={() => {
-                              if (confirm('Are you sure you want to delete this notification?')) {
-                                // Add delete functionality here
-                                console.log('Delete notification:', notification.id);
-                              }
-                            }}
+                            onClick={() => handleDeleteNotification(notification.id)}
                             className="p-1 text-gray-400 hover:text-red-600 transition-colors"
                             title="Delete notification"
                           >

@@ -36,29 +36,54 @@ export default function AddProductModal({ onClose, onSuccess }) {
     try {
       // Validate required fields
       if (!name.trim()) {
-        alert('Please enter a product name');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a product name',
+          confirmButtonColor: '#000C50'
+        });
         setLoading(false);
         return;
       }
       if (!price || Number(price) <= 0) {
-        alert('Please enter a valid selling price');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a valid selling price',
+          confirmButtonColor: '#000C50'
+        });
         setLoading(false);
         return;
       }
       
       if (!costPrice || Number(costPrice) <= 0) {
-        alert('Please enter a valid cost price');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a valid cost price',
+          confirmButtonColor: '#000C50'
+        });
         setLoading(false);
         return;
       }
       
       if (Number(price) <= Number(costPrice)) {
-        alert('Selling price must be higher than cost price');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Selling price must be higher than cost price',
+          confirmButtonColor: '#000C50'
+        });
         setLoading(false);
         return;
       }
       if (!stock || Number(stock) < 0) {
-        alert('Please enter a valid stock quantity');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a valid stock quantity',
+          confirmButtonColor: '#000C50'
+        });
         setLoading(false);
         return;
       }
@@ -147,24 +172,41 @@ export default function AddProductModal({ onClose, onSuccess }) {
       setPreviewUrl('');
       setSizes([{ size: 'NONE', stock: '', price: '' }]);
     } catch (err) {
-      console.error('Error creating product:', err);
-      
-      // Handle specific error cases
+      // Handle specific error cases gracefully
       if (err?.response?.status === 409) {
+        // Duplicate product name - expected error, show user-friendly message
         const errorMessage = err?.response?.data?.message || err?.response?.data?.error || 'Product name already exists';
-        const suggestions = err?.response?.data?.suggestions || [];
-        
-        let suggestionText = '';
-        if (suggestions.length > 0) {
-          suggestionText = `\n\n💡 Suggested names:\n${suggestions.map(s => `• ${s}`).join('\n')}`;
-        }
-        
-        alert(`❌ ${errorMessage}${suggestionText}\n\nPlease choose a different product name.`);
+        await Swal.fire({
+          title: 'Duplicate Product Name',
+          text: errorMessage,
+          icon: 'warning',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setLoading(false);
+        return; // Exit early to prevent further execution
       } else if (err?.response?.status === 400) {
+        // Validation error - expected error, show user-friendly message
         const errorMessage = err?.response?.data?.error || 'Invalid product data';
-        alert(`❌ ${errorMessage}\n\nPlease check your input and try again.`);
+        await Swal.fire({
+          title: 'Validation Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setLoading(false);
+        return; // Exit early to prevent further execution
       } else {
-        alert('❌ Failed to save product. Please try again.');
+        // Unexpected error - log for debugging but show user-friendly message
+        console.error('Unexpected error creating product:', err);
+        await Swal.fire({
+          title: 'Error',
+          text: err?.response?.data?.error || 'Failed to save product. Please try again.',
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
       }
     } finally {
       setLoading(false);

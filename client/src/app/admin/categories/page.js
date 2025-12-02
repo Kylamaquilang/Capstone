@@ -50,7 +50,12 @@ export default function AdminCategoriesPage() {
   const handleEditCategory = async (e) => {
     e.preventDefault();
     if (!editName.trim()) {
-      alert('Please enter a category name');
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Please enter a category name',
+        confirmButtonColor: '#000C50'
+      });
       return;
     }
 
@@ -75,7 +80,12 @@ export default function AdminCategoriesPage() {
       setEditingCategory(null);
       loadCategories();
     } catch (err) {
-      alert(err?.response?.data?.error || 'Failed to update category');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err?.response?.data?.error || 'Failed to update category',
+        confirmButtonColor: '#000C50'
+      });
     }
   };
 

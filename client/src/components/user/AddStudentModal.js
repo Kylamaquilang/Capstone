@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
+import Swal from '@/lib/sweetalert-config';
 
 export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
   const [form, setForm] = useState({ 
@@ -22,9 +23,16 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Trim whitespace and ensure clean values
-    const cleanValue = typeof value === 'string' ? value.trim() : value;
-    setForm((f) => ({ ...f, [name]: cleanValue }));
+    // Allow spaces in name fields, but trim other fields
+    const nameFields = ['first_name', 'last_name', 'middle_name', 'suffix'];
+    if (nameFields.includes(name)) {
+      // Allow spaces in name fields - don't trim
+      setForm((f) => ({ ...f, [name]: value }));
+    } else {
+      // Trim whitespace for other fields (email, student_id, etc.)
+      const cleanValue = typeof value === 'string' ? value.trim() : value;
+      setForm((f) => ({ ...f, [name]: cleanValue }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -34,9 +42,18 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
     try {
       setSubmitting(true);
       
+      // Only trim leading/trailing spaces from name fields, but preserve internal spaces
+      // Trim other fields completely
       const cleanForm = {
         ...form,
-        status: form.status?.trim().toLowerCase()
+        first_name: form.first_name?.trim() || '',
+        last_name: form.last_name?.trim() || '',
+        middle_name: form.middle_name?.trim() || '',
+        suffix: form.suffix?.trim() || '',
+        email: form.email?.trim() || '',
+        student_id: form.student_id?.trim() || '',
+        section: form.section?.trim() || '',
+        status: form.status?.trim().toLowerCase() || 'regular'
       };
       
       const response = await API.post('/students/add', cleanForm);
@@ -54,12 +71,56 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }) {
         section: 'A',
         status: 'regular' 
       });
+      
+      // Trigger refresh callback immediately and after delay to ensure update
       onSuccess?.();
       setTimeout(() => {
+        onSuccess?.(); // Trigger again after a short delay
         onClose();
       }, 1500);
     } catch (err) {
-      setError(err?.response?.data?.error || 'Failed to add student');
+      // Handle specific error cases gracefully
+      if (err?.response?.status === 409) {
+        // Duplicate email or student ID - expected error, show user-friendly message
+        const errorMessage = err?.response?.data?.message || err?.response?.data?.error || 'Email or Student ID already exists';
+        const existingStudent = err?.response?.data?.existingStudent;
+        
+        let detailText = errorMessage;
+        if (existingStudent) {
+          detailText += `\n\nExisting student:\n• Name: ${existingStudent.name}\n• Email: ${existingStudent.email}\n• Student ID: ${existingStudent.student_id}`;
+        }
+        
+        await Swal.fire({
+          title: 'Duplicate Entry',
+          html: `<div style="text-align: left;"><p>${errorMessage}</p>${existingStudent ? `<p style="margin-top: 10px; font-size: 0.9em; color: #666;"><strong>Existing student:</strong><br/>• Name: ${existingStudent.name}<br/>• Email: ${existingStudent.email}<br/>• Student ID: ${existingStudent.student_id}</p>` : ''}</div>`,
+          icon: 'warning',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
+      } else if (err?.response?.status === 400) {
+        // Validation error - expected error, show user-friendly message
+        const errorMessage = err?.response?.data?.error || 'Invalid student data';
+        await Swal.fire({
+          title: 'Validation Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
+      } else {
+        // Unexpected error - show user-friendly message
+        const errorMessage = err?.response?.data?.error || 'Failed to add student. Please try again.';
+        await Swal.fire({
+          title: 'Error',
+          text: errorMessage,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setError(errorMessage);
+      }
     } finally {
       setSubmitting(false);
     }

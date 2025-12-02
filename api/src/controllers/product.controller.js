@@ -236,7 +236,19 @@ export const createProduct = async (req, res) => {
       }
     }
 
-    // Allow duplicate product names - they will be grouped by name in the frontend
+    // Check if product name already exists (case-insensitive, only active products)
+    const trimmedName = name.trim();
+    const [existingProducts] = await pool.query(
+      'SELECT id, name FROM products WHERE LOWER(name) = LOWER(?) AND is_active = 1',
+      [trimmedName]
+    );
+    
+    if (existingProducts.length > 0) {
+      return res.status(409).json({ 
+        error: 'Product name already exists',
+        message: `A product with the name "${trimmedName}" already exists. Please choose a different name.`
+      });
+    }
 
     // Start transaction
     const connection = await pool.getConnection();
@@ -662,7 +674,21 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Allow duplicate product names - they will be grouped by name in the frontend
+    // Check if product name already exists (case-insensitive, only active products, excluding current product)
+    if (name !== undefined) {
+      const trimmedName = name.trim();
+      const [existingProducts] = await pool.query(
+        'SELECT id, name FROM products WHERE LOWER(name) = LOWER(?) AND is_active = 1 AND id != ?',
+        [trimmedName, id]
+      );
+      
+      if (existingProducts.length > 0) {
+        return res.status(409).json({ 
+          error: 'Product name already exists',
+          message: `A product with the name "${trimmedName}" already exists. Please choose a different name.`
+        });
+      }
+    }
 
     // Start transaction
     const connection = await pool.getConnection();

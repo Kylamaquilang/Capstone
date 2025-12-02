@@ -5,6 +5,7 @@ import Sidebar from '@/components/common/side-bar';
 import Navbar from '@/components/common/admin-navbar';
 import API from '@/lib/axios';
 import { getImageUrl } from '@/utils/imageUtils';
+import Swal from '@/lib/sweetalert-config';
 
 export default function EditProductPage() {
   const [product, setProduct] = useState(null);
@@ -78,31 +79,56 @@ export default function EditProductPage() {
     try {
       // Validation
       if (!name.trim()) {
-        alert('Please enter a product name');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a product name',
+          confirmButtonColor: '#000C50'
+        });
         setSaving(false);
         return;
       }
       
       if (!price || Number(price) <= 0) {
-        alert('Please enter a valid selling price');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a valid selling price',
+          confirmButtonColor: '#000C50'
+        });
         setSaving(false);
         return;
       }
       
       if (!costPrice || Number(costPrice) <= 0) {
-        alert('Please enter a valid cost price');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a valid cost price',
+          confirmButtonColor: '#000C50'
+        });
         setSaving(false);
         return;
       }
       
       if (Number(price) <= Number(costPrice)) {
-        alert('Selling price must be higher than cost price');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Selling price must be higher than cost price',
+          confirmButtonColor: '#000C50'
+        });
         setSaving(false);
         return;
       }
       
       if (!stock || Number(stock) < 0) {
-        alert('Please enter a valid stock quantity');
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please enter a valid stock quantity',
+          confirmButtonColor: '#000C50'
+        });
         setSaving(false);
         return;
       }
@@ -125,7 +151,12 @@ export default function EditProductPage() {
       
       router.push('/admin/products');
     } catch (err) {
-      alert(err?.response?.data?.error || 'Failed to update product');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err?.response?.data?.error || 'Failed to update product',
+        confirmButtonColor: '#000C50'
+      });
     } finally {
       setSaving(false);
     }

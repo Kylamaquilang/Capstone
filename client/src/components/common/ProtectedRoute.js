@@ -17,9 +17,30 @@ export default function ProtectedRoute({ children, requiredRole = null }) {
     }
   }, [loading, isAuthenticated, user, requiredRole, router]);
 
-  if (loading) return null;
-  if (!isAuthenticated) return null;
-  if (requiredRole && user?.role !== requiredRole) return null;
+  // Show loading state instead of null to prevent flash
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
+      </div>
+    );
+  }
+  
+  if (requiredRole && user?.role !== requiredRole) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
+      </div>
+    );
+  }
 
   return children;
 }

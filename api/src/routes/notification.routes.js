@@ -6,6 +6,7 @@ import {
   markAsRead,
   markAllAsRead,
   deleteNotification,
+  deleteAllNotifications,
   createNotification,
   getAdminNotifications
 } from '../controllers/notification.controller.js';
@@ -30,6 +31,9 @@ router.put('/:id/read', verifyToken, markAsRead);
 
 // Mark all notifications as read
 router.put('/mark-all-read', verifyToken, markAllAsRead);
+
+// Delete all notifications for user (must come before /:id route)
+router.delete('/delete-all', verifyToken, deleteAllNotifications);
 
 // Delete notification
 router.delete('/:id', verifyToken, deleteNotification);
