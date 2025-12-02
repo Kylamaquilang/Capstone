@@ -60,3 +60,7 @@ DEALLOCATE PREPARE addIndexIfNotExists;
 
 SELECT 'Migration completed: size_id column added to stock_movements table (if it was missing)' as message;
 
+
+
+
+
