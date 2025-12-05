@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
 import API from '@/lib/axios';
 import Swal from '@/lib/sweetalert-config';
 
-export default function PaymentCancelPage() {
+const PaymentCancelContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [orderDetails, setOrderDetails] = useState(null);
@@ -175,5 +175,24 @@ export default function PaymentCancelPage() {
 
       <Footer />
     </div>
+  );
+};
+
+export default function PaymentCancelPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#000C50] mx-auto mb-4"></div>
+            <div className="text-xl">Loading...</div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    }>
+      <PaymentCancelContent />
+    </Suspense>
   );
 }
