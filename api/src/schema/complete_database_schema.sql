@@ -69,7 +69,7 @@ CREATE TABLE products (
     category_id INT,
     image VARCHAR(255),
     is_active BOOLEAN DEFAULT TRUE,
-    reorder_point INT DEFAULT 5,
+    reorder_point INT DEFAULT 10,
     max_stock INT,
     last_restock_date DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -192,6 +192,10 @@ CREATE TABLE orders (
 );
 
 -- Order Items
+-- IMPORTANT: unit_price stores the price at the time of transaction (checkout time).
+-- This price is captured when the order is created and will NOT change even if the product price is updated later.
+-- This ensures historical sales records maintain accurate pricing information at the time of purchase.
+-- When displaying orders, always use order_items.unit_price, NOT products.price or product_sizes.price.
 CREATE TABLE order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
@@ -200,7 +204,7 @@ CREATE TABLE order_items (
     size VARCHAR(20),
     size_id INT,
     quantity INT NOT NULL,
-    unit_price DECIMAL(10,2) NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL COMMENT 'Price at transaction time - do not reference current product price',
     unit_cost DECIMAL(10,2) DEFAULT 0,
     total_price DECIMAL(10,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

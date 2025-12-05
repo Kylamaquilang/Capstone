@@ -429,11 +429,11 @@ export default function InventoryReportsPage() {
                                 <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                                   item.current_stock === 0 
                                     ? 'bg-red-100 text-red-800' 
-                                    : item.current_stock <= 5
+                                    : item.current_stock <= 10
                                     ? 'bg-yellow-100 text-yellow-800'
                                     : 'bg-green-100 text-green-800'
                                 }`}>
-                                  {item.stock_status || (item.current_stock === 0 ? 'Out of Stock' : item.current_stock <= 5 ? 'Low Stock' : 'In Stock')}
+                                  {item.stock_status || (item.current_stock === 0 ? 'Out of Stock' : item.current_stock <= 10 ? 'Low Stock' : 'In Stock')}
                                 </span>
                               </td>
                             </>

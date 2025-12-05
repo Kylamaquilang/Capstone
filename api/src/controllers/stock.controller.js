@@ -3,6 +3,43 @@ import { pool } from '../database/db.js';
 // Get current stock for all products
 const getCurrentStock = async (req, res) => {
   try {
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get total count first
+    // Build WHERE clause conditionally
+    let whereClause = 'WHERE is_active = TRUE';
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'deleted_at'
+      `);
+      if (columns.length > 0) {
+        whereClause += ' AND deleted_at IS NULL';
+      }
+    } catch (err) {
+      // Column doesn't exist yet, continue without the condition
+    }
+    
+    const [countResult] = await pool.query(
+      `SELECT COUNT(*) as total FROM products ${whereClause}`
+    );
+    const total = countResult[0].total;
+    
+    // Build WHERE clause with deleted_at check
+    let productWhereClause = 'WHERE p.is_active = TRUE';
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'deleted_at'
+      `);
+      if (columns.length > 0) {
+        productWhereClause += ' AND p.deleted_at IS NULL';
+      }
+    } catch (err) {
+      // Column doesn't exist yet, continue without the condition
+    }
+    
     const query = `
       SELECT 
         p.id,
@@ -13,21 +50,22 @@ const getCurrentStock = async (req, res) => {
         p.base_stock as base_stock,
         p.price,
         p.original_price,
-        p.reorder_point,
+        COALESCE(p.reorder_point, 10) as reorder_point,
         p.max_stock,
         CASE 
-          WHEN p.stock <= p.reorder_point THEN 'LOW'
-          WHEN p.stock <= (p.reorder_point * 2) THEN 'MEDIUM'
-          ELSE 'GOOD'
+          WHEN p.stock <= 0 THEN 'OUT_OF_STOCK'
+          WHEN p.stock <= COALESCE(p.reorder_point, 10) THEN 'LOW'
+          ELSE 'IN_STOCK'
         END as stock_status,
         p.updated_at as last_updated
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.is_active = TRUE
+      ${productWhereClause}
       ORDER BY p.name
+      LIMIT ? OFFSET ?
     `;
     
-    const [products] = await pool.query(query);
+    const [products] = await pool.query(query, [parseInt(limit), offset]);
     
     // Get sizes for each product
     const productsWithSizes = await Promise.all(
@@ -65,7 +103,16 @@ const getCurrentStock = async (req, res) => {
       })
     );
     
-    res.json({ success: true, data: productsWithSizes });
+    res.json({ 
+      success: true, 
+      data: productsWithSizes,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
   } catch (error) {
     console.error('Error fetching current stock:', error);
     res.status(500).json({ error: 'Failed to fetch current stock' });
@@ -184,24 +231,46 @@ const addStockIn = async (req, res) => {
       );
       
       if (productInfo.length > 0) {
+        // Use consistent threshold of 10 to match low stock alerts display logic
+        const LOW_STOCK_THRESHOLD = 10;
         const currentStock = parseInt(productInfo[0].stock) || 0;
-        const reorderPoint = productInfo[0].reorder_point || 5; // Default to 5 if not set
         
-        // If updating size-specific stock, check total stock
-        if (size && size.trim() !== '') {
-          const [sizeStocks] = await connection.query(
-            'SELECT SUM(stock) as total_size_stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
-            [productId]
-          );
-          const totalStock = currentStock + (parseInt(sizeStocks[0]?.total_size_stock) || 0);
+        // Check if product should be removed from low stock alerts
+        // For products with sizes, we need to check if ALL sizes are above threshold
+        // For products without sizes, check base stock
+        
+        // First, check if product has sizes
+        const [productSizes] = await connection.query(
+          'SELECT id, size, stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
+          [productId]
+        );
+        
+        if (productSizes.length > 0) {
+          // Product has sizes - calculate total size stock
+          const totalSizeStock = productSizes.reduce((sum, size) => sum + (parseInt(size.stock) || 0), 0);
           
-          if (totalStock > reorderPoint) {
+          // Check if ALL sizes are above threshold
+          const allSizesAboveThreshold = productSizes.every(size => {
+            const sizeStock = parseInt(size.stock) || 0;
+            return sizeStock > LOW_STOCK_THRESHOLD;
+          });
+          
+          // Also check if base stock is above threshold (if applicable)
+          const baseStockAboveThreshold = currentStock > LOW_STOCK_THRESHOLD;
+          
+          // Product should be removed if:
+          // 1. All sizes are above threshold AND (base stock is above threshold OR base stock is 0)
+          // 2. OR total size stock is above threshold (for size-only products)
+          if ((allSizesAboveThreshold && (baseStockAboveThreshold || currentStock === 0)) || 
+              (totalSizeStock > LOW_STOCK_THRESHOLD && totalSizeStock > 0)) {
             shouldRefreshLowStockAlerts = true;
+            console.log(`✅ Product ${productId} (with sizes) - stock above threshold (${LOW_STOCK_THRESHOLD}) - alert should be removed`);
           }
         } else {
-          // For base product stock
-          if (currentStock > reorderPoint) {
+          // Product without sizes - check base stock only
+          if (currentStock > LOW_STOCK_THRESHOLD) {
             shouldRefreshLowStockAlerts = true;
+            console.log(`✅ Product ${productId} stock (${currentStock}) is now above threshold (${LOW_STOCK_THRESHOLD}) - alert should be removed`);
           }
         }
       }
@@ -377,7 +446,17 @@ const getStockHistory = async (req, res) => {
     const { productId, page = 1, limit = 50, transactionType, startDate, endDate } = req.query;
     const offset = (page - 1) * limit;
     
-    // Build WHERE clauses and parameters for stock_transactions
+    // Check if stock_movements table exists
+    let stockMovementsExists = false;
+    try {
+      await pool.query('SELECT 1 FROM stock_movements LIMIT 1');
+      stockMovementsExists = true;
+    } catch (tableError) {
+      console.log('⚠️ Stock movements table does not exist, using stock_transactions only');
+      stockMovementsExists = false;
+    }
+    
+    // Build WHERE clauses and parameters
     let stWhereClause = 'WHERE 1=1';
     let smWhereClause = 'WHERE 1=1';
     const params = [];
@@ -420,7 +499,7 @@ const getStockHistory = async (req, res) => {
     
     // Build movement type filter for stock_movements
     let smTypeFilter = '';
-    if (transactionType) {
+    if (transactionType && stockMovementsExists) {
       if (transactionType === 'IN') {
         smTypeFilter = " AND sm.movement_type = 'stock_in'";
       } else if (transactionType === 'OUT') {
@@ -431,29 +510,105 @@ const getStockHistory = async (req, res) => {
       }
     }
     
-    // Combined query from both stock_transactions and stock_movements
-    let query = `
-      SELECT 
-        id,
-        product_id,
-        product_name,
-        transaction_type,
-        quantity,
-        reference_no,
-        batch_no,
-        expiry_date,
-        source,
-        note,
-        created_by_name,
-        created_by_role,
-        created_at
-      FROM (
+    // Build the query - use stock_movements only if table exists
+    let query = '';
+    if (stockMovementsExists) {
+      // Combined query from both stock_transactions and stock_movements
+      query = `
+        SELECT 
+          id,
+          product_id,
+          product_name,
+          transaction_type,
+          quantity,
+          previous_stock,
+          new_stock,
+          reference_no,
+          batch_no,
+          expiry_date,
+          source,
+          note,
+          created_by_name,
+          created_by_role,
+          created_at
+        FROM (
+          SELECT 
+            st.id,
+            st.product_id,
+            p.name as product_name,
+            st.transaction_type,
+            st.quantity,
+            NULL as previous_stock,
+            NULL as new_stock,
+            st.reference_no,
+            st.batch_no,
+            st.expiry_date,
+            st.source,
+            st.note,
+            CASE 
+              WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
+                THEN CONCAT(u.first_name, ' ', u.last_name)
+              WHEN u.email IS NOT NULL 
+                THEN u.email
+              ELSE 'System'
+            END as created_by_name,
+            u.role as created_by_role,
+            st.created_at
+          FROM stock_transactions st
+          JOIN products p ON st.product_id = p.id
+          LEFT JOIN users u ON st.created_by = u.id
+          ${stWhereClause}
+          ${stTypeFilter}
+          
+          UNION ALL
+          
+          SELECT 
+            sm.id + 1000000 as id,
+            sm.product_id,
+            p.name as product_name,
+            CASE 
+              WHEN sm.movement_type = 'stock_in' THEN 'IN'
+              WHEN sm.movement_type = 'stock_out' THEN 'OUT'
+              WHEN sm.movement_type = 'stock_adjustment' THEN 'ADJUSTMENT'
+              ELSE sm.movement_type
+            END as transaction_type,
+            sm.quantity,
+            sm.previous_stock,
+            sm.new_stock,
+            NULL as reference_no,
+            NULL as batch_no,
+            NULL as expiry_date,
+            COALESCE(sm.reason, 'Manual') as source,
+            COALESCE(sm.notes, sm.reason, '') as note,
+            CASE 
+              WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
+                THEN CONCAT(u.first_name, ' ', u.last_name)
+              WHEN u.email IS NOT NULL 
+                THEN u.email
+              ELSE 'System'
+            END as created_by_name,
+            u.role as created_by_role,
+            sm.created_at
+          FROM stock_movements sm
+          JOIN products p ON sm.product_id = p.id
+          LEFT JOIN users u ON sm.user_id = u.id
+          ${smWhereClause}
+          ${smTypeFilter}
+        ) combined_history
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+    } else {
+      // Use only stock_transactions if stock_movements doesn't exist
+      query = `
         SELECT 
           st.id,
           st.product_id,
           p.name as product_name,
           st.transaction_type,
           st.quantity,
+          NULL as previous_stock,
+          NULL as new_stock,
           st.reference_no,
           st.batch_no,
           st.expiry_date,
@@ -473,71 +628,48 @@ const getStockHistory = async (req, res) => {
         LEFT JOIN users u ON st.created_by = u.id
         ${stWhereClause}
         ${stTypeFilter}
-        
-        UNION ALL
-        
-        SELECT 
-          sm.id + 1000000 as id,
-          sm.product_id,
-          p.name as product_name,
-          CASE 
-            WHEN sm.movement_type = 'stock_in' THEN 'IN'
-            WHEN sm.movement_type = 'stock_out' THEN 'OUT'
-            WHEN sm.movement_type = 'stock_adjustment' THEN 'ADJUSTMENT'
-            ELSE sm.movement_type
-          END as transaction_type,
-          sm.quantity,
-          NULL as reference_no,
-          NULL as batch_no,
-          NULL as expiry_date,
-          COALESCE(sm.reason, 'Manual') as source,
-          sm.notes as note,
-          CASE 
-            WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL 
-              THEN CONCAT(u.first_name, ' ', u.last_name)
-            WHEN u.email IS NOT NULL 
-              THEN u.email
-            ELSE 'System'
-          END as created_by_name,
-          u.role as created_by_role,
-          sm.created_at
-        FROM stock_movements sm
-        JOIN products p ON sm.product_id = p.id
-        LEFT JOIN users u ON sm.user_id = u.id
-        ${smWhereClause}
-        ${smTypeFilter}
-      ) combined_history
-      ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
-    `;
+        ORDER BY st.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+    }
     
     params.push(parseInt(limit), offset);
     
     const [rows] = await pool.query(query, params);
     
-    // Get total count from both tables
-    let countQuery = `
-      SELECT COUNT(*) as total FROM (
-        SELECT st.id
+    // Get total count
+    let countQuery = '';
+    if (stockMovementsExists) {
+      countQuery = `
+        SELECT COUNT(*) as total FROM (
+          SELECT st.id
+          FROM stock_transactions st
+          ${stWhereClause}
+          ${stTypeFilter}
+          
+          UNION ALL
+          
+          SELECT sm.id
+          FROM stock_movements sm
+          ${smWhereClause}
+          ${smTypeFilter}
+        ) combined_count
+      `;
+    } else {
+      countQuery = `
+        SELECT COUNT(*) as total
         FROM stock_transactions st
         ${stWhereClause}
         ${stTypeFilter}
-        
-        UNION ALL
-        
-        SELECT sm.id
-        FROM stock_movements sm
-        ${smWhereClause}
-        ${smTypeFilter}
-      ) combined_count
-    `;
+      `;
+    }
     
     const [countResult] = await pool.query(countQuery, countParams);
-    const total = countResult[0].total;
+    const total = countResult[0]?.total || 0;
     
     res.json({
       success: true,
-      data: rows,
+      data: rows || [],
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -546,8 +678,18 @@ const getStockHistory = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching stock history:', error);
-    res.status(500).json({ error: 'Failed to fetch stock history' });
+    console.error('❌ Error fetching stock history:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error details:', {
+      message: error.message,
+      code: error.code,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage
+    });
+    res.status(500).json({ 
+      error: 'Failed to fetch stock history',
+      message: error.message || 'An error occurred while fetching stock history'
+    });
   }
 };
 
@@ -627,6 +769,8 @@ const getMonthlyStockReport = async (req, res) => {
 // Get low stock alerts
 const getLowStockAlerts = async (req, res) => {
   try {
+    const { page = 1, limit = 20 } = req.query;
+    
     // Get all active products with their base stock
     const [allProducts] = await pool.query(`
       SELECT 
@@ -648,80 +792,325 @@ const getLowStockAlerts = async (req, res) => {
     // Get product sizes for all products and filter for low stock
     const lowStockProducts = [];
     
+    // Use consistent threshold of 10 to match product table display
+    const LOW_STOCK_THRESHOLD = 10;
+    
     for (const product of allProducts) {
-      // If reorder_point is NULL or 0, use default of 5
-      // But only show as low stock if stock is actually low (less than or equal to threshold)
-      const reorderPoint = product.reorder_point !== null && product.reorder_point !== undefined 
-        ? parseInt(product.reorder_point) 
-        : 5; // Default to 5 if NULL or undefined
       let isLowStock = false;
       let alertLevel = 'GOOD';
       
-      // Check base product stock
-      // Show as low stock if stock is less than or equal to reorder point
-      // If stock is above reorder point, it's not low
-      const currentStockNum = parseInt(product.current_stock) || 0;
+      // Get size-specific stock if product has sizes
+      const [sizes] = await pool.query(
+        'SELECT id, size, stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
+        [product.id]
+      );
       
-      // Only show as low stock if stock is less than or equal to reorder point
-      // If stock equals reorder point, it's still considered low (needs restocking)
-      // If stock is greater than reorder point, it's not low
-      if (currentStockNum <= reorderPoint && reorderPoint > 0) {
+      // Calculate actual current stock:
+      // - For products WITH sizes: current stock = sum of all size stocks (actual available stock)
+      // - For products WITHOUT sizes: current stock = base stock
+      let actualCurrentStock = 0;
+      if (sizes.length > 0) {
+        // Product has sizes - use sum of all size stocks as current stock
+        actualCurrentStock = sizes.reduce((sum, size) => sum + (parseInt(size.stock) || 0), 0);
+      } else {
+        // Product without sizes - use base stock
+        actualCurrentStock = parseInt(product.current_stock) || 0;
+      }
+      
+      // Check if current stock is low (based on actual current stock, not base stock)
+      if (actualCurrentStock <= LOW_STOCK_THRESHOLD) {
         isLowStock = true;
-        if (currentStockNum === 0) {
+        if (actualCurrentStock === 0) {
           alertLevel = 'CRITICAL';
         } else {
           alertLevel = 'LOW';
         }
       }
       
-      // Check size-specific stock if product has sizes
-      const [sizes] = await pool.query(
-        'SELECT id, size, stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
-        [product.id]
-      );
-      
+      // For products with sizes, also check individual sizes for more detailed alert level
       if (sizes.length > 0) {
-        // Product has sizes - check if any size has low stock
-        const hasLowSizeStock = sizes.some(size => {
+        // Check if any size is out of stock
+        const hasOutOfStockSize = sizes.some(size => {
           const sizeStock = parseInt(size.stock) || 0;
-          return sizeStock <= reorderPoint && reorderPoint > 0;
+          return sizeStock === 0;
         });
-        
-        if (hasLowSizeStock) {
-          isLowStock = true;
-          // Check if any size is out of stock
-          const hasOutOfStockSize = sizes.some(size => {
-            const sizeStock = parseInt(size.stock) || 0;
-            return sizeStock === 0;
-          });
-          if (hasOutOfStockSize && alertLevel !== 'CRITICAL') {
-            alertLevel = 'CRITICAL';
-          } else if (alertLevel === 'GOOD') {
-            alertLevel = 'LOW';
-          }
+        if (hasOutOfStockSize && alertLevel !== 'CRITICAL') {
+          alertLevel = 'CRITICAL';
         }
       }
       
-      // Only include products with low stock
+      // Only include products with low stock (based on actual current stock)
       if (isLowStock) {
+        // Calculate suggested reorder quantity
+        // Suggested = (max_stock or reorder_point * 3) - current_stock
+        const maxStock = parseInt(product.max_stock) || (parseInt(product.reorder_point) || LOW_STOCK_THRESHOLD) * 3;
+        const suggestedReorder = Math.max(0, maxStock - actualCurrentStock);
+        
+        // Determine status text
+        const status = actualCurrentStock === 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK';
+        
         lowStockProducts.push({
           ...product,
-          alert_level: alertLevel
+          current_stock: actualCurrentStock, // Use actual current stock
+          alert_level: alertLevel,
+          status: status, // Add status field
+          reorder_level: LOW_STOCK_THRESHOLD, // Use consistent threshold
+          suggested_reorder_quantity: suggestedReorder,
+          sizes: sizes.length > 0 ? sizes.map(s => ({
+            id: s.id,
+            size: s.size,
+            stock: parseInt(s.stock) || 0
+          })) : null // Include size information for display
         });
       }
     }
     
     // Sort by stock level (critical first, then by stock amount)
+    // Use the updated current_stock value (which is total size stock for products with sizes)
     lowStockProducts.sort((a, b) => {
       if (a.alert_level === 'CRITICAL' && b.alert_level !== 'CRITICAL') return -1;
       if (a.alert_level !== 'CRITICAL' && b.alert_level === 'CRITICAL') return 1;
-      return a.current_stock - b.current_stock;
+      // Sort by the actual current_stock (which we set correctly above)
+      const aStock = parseInt(a.current_stock) || 0;
+      const bStock = parseInt(b.current_stock) || 0;
+      return aStock - bStock;
     });
     
-    res.json({ success: true, data: lowStockProducts });
+    // Apply pagination
+    const total = lowStockProducts.length;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedProducts = lowStockProducts.slice(offset, offset + parseInt(limit));
+    
+    console.log(`📊 Low Stock Alerts: Found ${total} products with stock <= ${LOW_STOCK_THRESHOLD} (showing page ${page}, ${paginatedProducts.length} items)`);
+    
+    res.json({ 
+      success: true, 
+      data: paginatedProducts,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      },
+      threshold: LOW_STOCK_THRESHOLD
+    });
   } catch (error) {
     console.error('Error fetching low stock alerts:', error);
     res.status(500).json({ error: 'Failed to fetch low stock alerts' });
+  }
+};
+
+// Get comprehensive inventory/stock report
+const getInventoryStockReport = async (req, res) => {
+  try {
+    const { start_date, end_date, product_id, category_id, size, status } = req.query;
+    
+    // Build date filter
+    let dateFilter = '';
+    let dateParams = [];
+    
+    if (start_date) {
+      dateFilter += 'AND DATE(sm.created_at) >= ? ';
+      dateParams.push(start_date);
+    }
+    if (end_date) {
+      dateFilter += 'AND DATE(sm.created_at) <= ? ';
+      dateParams.push(end_date);
+    }
+    
+    // Build product filter
+    if (product_id) {
+      dateFilter += 'AND p.id = ? ';
+      dateParams.push(parseInt(product_id));
+    }
+    
+    // Build category filter
+    if (category_id) {
+      dateFilter += 'AND p.category_id = ? ';
+      dateParams.push(parseInt(category_id));
+    }
+    
+    // Build size filter
+    if (size && size !== 'N/A' && size !== 'NONE') {
+      dateFilter += 'AND (ps.size = ? OR (ps.size IS NULL AND ? = \'N/A\')) ';
+      dateParams.push(size, size);
+    }
+    
+    // Get all products with their sizes
+    let productQuery = `
+      SELECT DISTINCT
+        p.id as product_id,
+        p.name as product_name,
+        p.category_id,
+        COALESCE(c.name, 'Uncategorized') as category_name,
+        p.price,
+        p.original_price,
+        ps.id as size_id,
+        ps.size,
+        ps.price as size_price
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN product_sizes ps ON p.id = ps.product_id AND ps.is_active = 1
+      WHERE p.is_active = TRUE AND p.deleted_at IS NULL
+    `;
+    
+    if (product_id) {
+      productQuery += ' AND p.id = ?';
+    }
+    if (category_id) {
+      productQuery += ' AND p.category_id = ?';
+    }
+    
+    const productParams = [];
+    if (product_id) productParams.push(parseInt(product_id));
+    if (category_id) productParams.push(parseInt(category_id));
+    
+    const [products] = await pool.query(productQuery, productParams);
+    
+    // For each product/size combination, calculate stock movements
+    const reportData = [];
+    
+    for (const product of products) {
+      const sizeId = product.size_id;
+      const productSize = product.size || 'N/A';
+      
+      // Skip if size filter is applied and doesn't match
+      if (size && size !== 'N/A' && size !== 'NONE' && productSize !== size) {
+        continue;
+      }
+      if (size && (size === 'N/A' || size === 'NONE') && productSize !== 'N/A' && productSize !== 'NONE') {
+        continue;
+      }
+      
+      // Get beginning stock (stock at start_date or current stock if no start_date)
+      let beginningStock = 0;
+      if (start_date) {
+        // Get stock before the start date
+        const [beginningStockQuery] = await pool.query(`
+          SELECT 
+            COALESCE(ps.stock, p.stock, 0) as stock
+          FROM products p
+          LEFT JOIN product_sizes ps ON p.id = ps.product_id AND ps.id = ? AND ps.is_active = 1
+          WHERE p.id = ?
+        `, [sizeId || null, product.product_id]);
+        
+        beginningStock = beginningStockQuery[0]?.stock || 0;
+        
+        // Subtract all movements before start_date
+        const [movementsBefore] = await pool.query(`
+          SELECT 
+            SUM(CASE WHEN sm.movement_type = 'stock_in' THEN sm.quantity ELSE 0 END) as stock_in,
+            SUM(CASE WHEN sm.movement_type = 'stock_out' THEN sm.quantity ELSE 0 END) as stock_out
+          FROM stock_movements sm
+          WHERE sm.product_id = ?
+            AND (sm.size_id = ? OR (sm.size_id IS NULL AND ? IS NULL))
+            AND DATE(sm.created_at) < ?
+        `, [product.product_id, sizeId, sizeId, start_date]);
+        
+        const stockInBefore = parseFloat(movementsBefore[0]?.stock_in || 0);
+        const stockOutBefore = parseFloat(movementsBefore[0]?.stock_out || 0);
+        beginningStock = beginningStock - stockInBefore + stockOutBefore;
+      } else {
+        // No start date - use current stock
+        if (sizeId) {
+          const [sizeStock] = await pool.query(
+            'SELECT stock FROM product_sizes WHERE id = ?',
+            [sizeId]
+          );
+          beginningStock = sizeStock[0]?.stock || 0;
+        } else {
+          const [productStock] = await pool.query(
+            'SELECT stock FROM products WHERE id = ?',
+            [product.product_id]
+          );
+          beginningStock = productStock[0]?.stock || 0;
+        }
+      }
+      
+      // Get stock movements in the period
+      let movementQuery = `
+        SELECT 
+          SUM(CASE WHEN sm.movement_type = 'stock_in' THEN sm.quantity ELSE 0 END) as stock_in,
+          SUM(CASE WHEN sm.movement_type = 'stock_out' THEN sm.quantity ELSE 0 END) as stock_out,
+          SUM(CASE WHEN sm.movement_type = 'stock_adjustment' AND sm.quantity > 0 THEN sm.quantity ELSE 0 END) as adjustments_in,
+          SUM(CASE WHEN sm.movement_type = 'stock_adjustment' AND sm.quantity < 0 THEN ABS(sm.quantity) ELSE 0 END) as adjustments_out,
+          GROUP_CONCAT(DISTINCT sm.notes SEPARATOR '; ') as remarks
+        FROM stock_movements sm
+        WHERE sm.product_id = ?
+          AND (sm.size_id = ? OR (sm.size_id IS NULL AND ? IS NULL))
+          ${dateFilter}
+      `;
+      
+      const movementParams = [product.product_id, sizeId, sizeId, ...dateParams];
+      const [movements] = await pool.query(movementQuery, movementParams);
+      
+      const stockIn = parseFloat(movements[0]?.stock_in || 0) + parseFloat(movements[0]?.adjustments_in || 0);
+      const stockOut = parseFloat(movements[0]?.stock_out || 0) + parseFloat(movements[0]?.adjustments_out || 0);
+      const endingStock = beginningStock + stockIn - stockOut;
+      
+      // Get unit price (size price if available, otherwise product price)
+      const unitPrice = product.size_price || product.price || 0;
+      const totalStockValue = endingStock * unitPrice;
+      
+      // Determine stock status
+      const LOW_STOCK_THRESHOLD = 10;
+      let stockStatus = 'IN_STOCK';
+      if (endingStock === 0) {
+        stockStatus = 'OUT_OF_STOCK';
+      } else if (endingStock <= LOW_STOCK_THRESHOLD) {
+        stockStatus = 'LOW_STOCK';
+      }
+      
+      // Apply status filter if provided
+      if (status) {
+        if (status === 'IN_STOCK' && stockStatus !== 'IN_STOCK') {
+          continue;
+        }
+        if (status === 'LOW_STOCK' && stockStatus !== 'LOW_STOCK') {
+          continue;
+        }
+        if (status === 'OUT_OF_STOCK' && stockStatus !== 'OUT_OF_STOCK') {
+          continue;
+        }
+      }
+      
+      // Only include if there are movements or if explicitly requested
+      if (stockIn > 0 || stockOut > 0 || !start_date) {
+        reportData.push({
+          product_id: product.product_id,
+          product_name: product.product_name,
+          category_name: product.category_name,
+          size: productSize,
+          beginning_stock: Math.max(0, beginningStock),
+          stock_in: stockIn,
+          stock_out: stockOut,
+          ending_stock: Math.max(0, endingStock),
+          unit_price: unitPrice,
+          total_stock_value: totalStockValue,
+          stock_status: stockStatus,
+          remarks: movements[0]?.remarks || ''
+        });
+      }
+    }
+    
+    // Calculate summary
+    const summary = {
+      total_products: new Set(reportData.map(r => r.product_id)).size,
+      total_beginning_stock: reportData.reduce((sum, r) => sum + r.beginning_stock, 0),
+      total_stock_in: reportData.reduce((sum, r) => sum + r.stock_in, 0),
+      total_stock_out: reportData.reduce((sum, r) => sum + r.stock_out, 0),
+      total_ending_stock: reportData.reduce((sum, r) => sum + r.ending_stock, 0),
+      total_stock_value: reportData.reduce((sum, r) => sum + r.total_stock_value, 0)
+    };
+    
+    res.json({
+      success: true,
+      data: reportData,
+      summary
+    });
+  } catch (error) {
+    console.error('Error fetching inventory stock report:', error);
+    res.status(500).json({ error: 'Failed to fetch inventory stock report' });
   }
 };
 
@@ -761,5 +1150,6 @@ export {
   getStockItems,
   getMonthlyStockReport,
   getLowStockAlerts,
+  getInventoryStockReport,
   processOrderStockOut
 };

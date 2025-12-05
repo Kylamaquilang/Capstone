@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import Swal from '@/lib/sweetalert-config';
+import Modal from '@/components/common/Modal';
 
 export default function AddProductModal({ onClose, onSuccess }) {
   const [name, setName] = useState('');
@@ -17,14 +17,18 @@ export default function AddProductModal({ onClose, onSuccess }) {
   const [categories, setCategories] = useState([]);
   const [sizes, setSizes] = useState([{ size: 'NONE', stock: '', price: '' }]);
   const [loading, setLoading] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   useEffect(() => {
     const loadCategories = async () => {
       try {
+        setCategoriesLoading(true);
         const { data } = await API.get('/categories');
         setCategories(data);
       } catch {
         setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
       }
     };
     loadCategories();
@@ -40,6 +44,16 @@ export default function AddProductModal({ onClose, onSuccess }) {
           icon: 'warning',
           title: 'Validation Error',
           text: 'Please enter a product name',
+          confirmButtonColor: '#000C50'
+        });
+        setLoading(false);
+        return;
+      }
+      if (!categoryId || categoryId === '') {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please select a category',
           confirmButtonColor: '#000C50'
         });
         setLoading(false);
@@ -88,6 +102,18 @@ export default function AddProductModal({ onClose, onSuccess }) {
         return;
       }
 
+      // Validate image is required
+      if (!file) {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please upload a product image',
+          confirmButtonColor: '#000C50'
+        });
+        setLoading(false);
+        return;
+      }
+
       // Validate that total size stock matches base stock exactly
       if (!isSizeStockValid()) {
         const totalSizeStock = getTotalSizeStock();
@@ -109,16 +135,48 @@ export default function AddProductModal({ onClose, onSuccess }) {
         // If sizes have no stock specified (totalSizeStock = 0), they will use base stock automatically
       }
 
+      // Validate: If base stock is fully allocated and there's a size without quantity, prevent submission
+      const baseStock = Number(stock) || 0;
+      const totalSizeStock = getTotalSizeStock();
+      const sizesWithNoStock = sizes.filter(sizeItem => {
+        const sizeStock = Number(sizeItem.stock) || 0;
+        return sizeItem.size && sizeItem.size.trim() !== '' && sizeItem.size !== 'NONE' && sizeStock === 0;
+      });
+
+      // If base stock is fully allocated (total size stock equals base stock) and there are sizes without stock
+      if (totalSizeStock === baseStock && baseStock > 0 && sizesWithNoStock.length > 0) {
+        const sizesToRemove = sizesWithNoStock.map(s => s.size).join(', ');
+        await Swal.fire({
+          title: 'Invalid Size Configuration',
+          text: `Base stock (${baseStock}) is fully allocated. Please remove size(s) without quantity: ${sizesToRemove}.`,
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#000C50'
+        });
+        setLoading(false);
+        return;
+      }
+
       let finalImageUrl = null;
       
-      // Upload image if provided
-      if (file) {
+      // Upload image (required - already validated above)
         const formData = new FormData();
         formData.append('image', file);
         const uploadRes = await API.post('/products/upload-image', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
         finalImageUrl = uploadRes.data.url;
+
+      // Verify image was uploaded successfully
+      if (!finalImageUrl) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Upload Error',
+          text: 'Failed to upload image. Please try again.',
+          confirmButtonColor: '#000C50'
+        });
+        setLoading(false);
+        return;
       }
 
       // Prepare sizes data
@@ -254,21 +312,16 @@ export default function AddProductModal({ onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto scrollbar-hide">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Add Product</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <XMarkIcon className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-4">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Add Product"
+      size="xl"
+      isLoading={categoriesLoading}
+      closeOnBackdrop={!loading}
+      closeOnEscape={!loading}
+    >
+      <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             {/* Top Row - Left: Product Info, Right: Product Sizes */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -338,10 +391,11 @@ export default function AddProductModal({ onClose, onSuccess }) {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category <span className="text-red-500">*</span></label>
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
+                    required
                     className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="" disabled>Select category</option>
@@ -503,7 +557,22 @@ export default function AddProductModal({ onClose, onSuccess }) {
                     onClick={() => document.getElementById('product-file-input')?.click()}
                   >
                     {previewUrl ? (
-                      <div className="space-y-2">
+                      <div className="space-y-2 relative">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFile(null);
+                            setPreviewUrl('');
+                            // Reset file input
+                            const fileInput = document.getElementById('product-file-input');
+                            if (fileInput) fileInput.value = '';
+                          }}
+                          className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 transition-colors z-10"
+                          title="Remove image"
+                        >
+                          ×
+                        </button>
                         <img src={previewUrl} alt="Preview" className="w-24 h-24 object-cover rounded-lg mx-auto border-2 border-gray-200" />
                         <div>
                           <p className="text-xs font-medium text-gray-900">{file?.name}</p>
@@ -560,7 +629,6 @@ export default function AddProductModal({ onClose, onSuccess }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

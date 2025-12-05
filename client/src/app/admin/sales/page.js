@@ -1,7 +1,7 @@
 'use client';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import API from '@/lib/axios';
 import { useAdminAutoRefresh } from '@/hooks/useAutoRefresh';
@@ -53,14 +53,138 @@ export default function AdminSalesPage() {
     salesLogsSummary: {},
     summary: {}
   });
+  const [productSales, setProductSales] = useState({
+    productSales: [],
+    summary: {}
+  });
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [productSalesLoading, setProductSalesLoading] = useState(false);
   const [error, setError] = useState('');
   const [dateRange, setDateRange] = useState({
     start_date: '',
     end_date: ''
   });
+  const [productSalesFilters, setProductSalesFilters] = useState({
+    product_id: '',
+    size: '',
+    min_price: '',
+    max_price: ''
+  });
+  const [availableSizes, setAvailableSizes] = useState([]);
+  const prevProductIdRef = useRef('');
   const [groupBy, setGroupBy] = useState('day');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Fetch products list for filter dropdown
+  const fetchProducts = useCallback(async () => {
+    try {
+      const { data } = await API.get('/products');
+      setProducts(data || []);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      setProducts([]);
+    }
+  }, []);
+
+  // Update available sizes when product is selected
+  useEffect(() => {
+    const currentProductId = productSalesFilters.product_id;
+    
+    // Only update if product_id actually changed
+    if (prevProductIdRef.current === currentProductId) {
+      return;
+    }
+    
+    prevProductIdRef.current = currentProductId;
+    
+    if (currentProductId) {
+      const productId = parseInt(currentProductId);
+      const selectedProduct = products.find(p => p.id === productId);
+      
+      // Get sizes from product definition (primary source - most reliable)
+      let sizesFromProduct = [];
+      if (selectedProduct && selectedProduct.sizes && selectedProduct.sizes.length > 0) {
+        // Get all sizes from product definition, excluding 'NONE'
+        sizesFromProduct = selectedProduct.sizes
+          .map(s => s.size)
+          .filter(s => s && s !== 'NONE' && s !== null && s !== undefined && s !== '');
+      }
+      
+      // Also get unique sizes from sales data for the selected product
+      // This ensures we show sizes that may have been sold even if not in current product definition
+      const productSalesData = productSales.productSales || [];
+      const sizesFromSales = productSalesData
+        .filter(item => item.product_id === productId)
+        .map(item => item.size)
+        .filter(size => size && size !== null && size !== undefined && size !== 'NONE' && size !== 'N/A' && size !== '');
+      
+      // Combine both sources and get unique sizes, sorted alphabetically
+      const allSizes = [...new Set([...sizesFromProduct, ...sizesFromSales])];
+      
+      if (allSizes.length > 0) {
+        // Product has sizes - show all available sizes in the filter
+        setAvailableSizes(allSizes.sort());
+      } else if (selectedProduct) {
+        // Product exists but has no sizes - set empty array (size filter will be disabled)
+        setAvailableSizes([]);
+      } else {
+        // Product not found yet, wait for products to load
+        setAvailableSizes([]);
+      }
+      
+      // Reset size filter when product changes
+      setProductSalesFilters(prev => ({ ...prev, size: '' }));
+    } else {
+      setAvailableSizes([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productSalesFilters.product_id]);
+
+  const fetchProductSales = useCallback(async () => {
+    try {
+      setProductSalesLoading(true);
+      
+      const params = new URLSearchParams();
+      
+      // Only add date filters if they are provided
+      if (dateRange.start_date) {
+        params.append('start_date', dateRange.start_date);
+      }
+      if (dateRange.end_date) {
+        params.append('end_date', dateRange.end_date);
+      }
+      
+      // Add product, size, and price filters
+      if (productSalesFilters.product_id) {
+        params.append('product_id', productSalesFilters.product_id);
+      }
+      if (productSalesFilters.size) {
+        params.append('size', productSalesFilters.size);
+      }
+      if (productSalesFilters.min_price) {
+        params.append('min_price', productSalesFilters.min_price);
+      }
+      if (productSalesFilters.max_price) {
+        params.append('max_price', productSalesFilters.max_price);
+      }
+      
+      const { data } = await API.get(`/orders/product-sales-report?${params}`);
+      
+      setProductSales({
+        productSales: data.productSales || [],
+        summary: data.summary || {}
+      });
+    } catch (err) {
+      console.error('Error fetching product sales:', err);
+      setProductSales({
+        productSales: [],
+        summary: {}
+      });
+    } finally {
+      setProductSalesLoading(false);
+    }
+  }, [dateRange.start_date, dateRange.end_date, productSalesFilters.product_id, productSalesFilters.size, productSalesFilters.min_price, productSalesFilters.max_price]);
 
   const fetchSalesData = useCallback(async () => {
     try {
@@ -425,6 +549,17 @@ export default function AdminSalesPage() {
     }
   }, [dateRange, groupBy]);
 
+  // Fetch products list on mount
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  // Fetch product sales when date range or filters change
+  useEffect(() => {
+    fetchProductSales();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.start_date, dateRange.end_date, productSalesFilters.product_id, productSalesFilters.size, productSalesFilters.min_price, productSalesFilters.max_price]);
+
   useEffect(() => {
     fetchSalesData();
   }, [fetchSalesData]);
@@ -639,10 +774,13 @@ export default function AdminSalesPage() {
               </div>
               
               <button
-                onClick={fetchSalesData}
-                className="w-full sm:w-auto px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-800 text-sm font-medium active:scale-95"
+                onClick={() => {
+                  setDateRange({ start_date: '', end_date: '' });
+                  setGroupBy('day');
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium active:scale-95"
               >
-                Apply Filters
+                Clear Filters
               </button>
             </div>
           </div>
@@ -804,6 +942,7 @@ export default function AdminSalesPage() {
                 )}
                 </div>
               </div>
+
             </>
           )}
         </div>

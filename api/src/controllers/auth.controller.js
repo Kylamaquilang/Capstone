@@ -282,20 +282,24 @@ export const changePassword = async (req, res) => {
       return res.status(403).json({ error: 'Account is deactivated. Please contact support.' });
     }
 
+    // Normalize verification code (trim and ensure string)
+    const normalizedCode = String(verificationCode).trim();
+
     // Check if verification code is valid and verified
+    // Compare code as string to ensure type consistency
     const [codes] = await pool.query(`
       SELECT * FROM password_reset_codes 
-      WHERE user_id = ? AND code = ? AND expires_at > NOW() AND verified = 1
+      WHERE user_id = ? AND CAST(code AS CHAR) = ? AND expires_at > NOW() AND verified = 1
       ORDER BY created_at DESC LIMIT 1
-    `, [user.id, verificationCode]);
+    `, [user.id, normalizedCode]);
 
     if (codes.length === 0) {
       // Check if code exists but is not verified
       const [unverifiedCodes] = await pool.query(`
         SELECT * FROM password_reset_codes 
-        WHERE user_id = ? AND code = ? AND expires_at > NOW() AND verified = 0
+        WHERE user_id = ? AND CAST(code AS CHAR) = ? AND expires_at > NOW() AND verified = 0
         ORDER BY created_at DESC LIMIT 1
-      `, [user.id, verificationCode]);
+      `, [user.id, normalizedCode]);
 
       if (unverifiedCodes.length > 0) {
         return res.status(400).json({ error: 'Verification code has not been verified. Please verify the code first.' });
@@ -304,9 +308,9 @@ export const changePassword = async (req, res) => {
       // Check if code exists but is expired
       const [expiredCodes] = await pool.query(`
         SELECT * FROM password_reset_codes 
-        WHERE user_id = ? AND code = ? AND expires_at <= NOW()
+        WHERE user_id = ? AND CAST(code AS CHAR) = ? AND expires_at <= NOW()
         ORDER BY created_at DESC LIMIT 1
-      `, [user.id, verificationCode]);
+      `, [user.id, normalizedCode]);
 
       if (expiredCodes.length > 0) {
         return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
@@ -513,20 +517,37 @@ export const verifyPasswordResetCode = async (req, res) => {
   try {
     const { email, student_id, verificationCode } = req.body;
 
-    if (!email && !student_id || !verificationCode) {
+    // Validate input
+    if ((!email && !student_id) || !verificationCode) {
       return res.status(400).json({ 
         error: 'Email/Student ID and verification code are required' 
       });
     }
 
-    // Find user by email or student_id
-    const lookupField = email ? 'email' : 'student_id';
-    const lookupValue = email ? email.trim() : student_id.trim();
-    
-    const [users] = await pool.query(
-      `SELECT id FROM users WHERE ${lookupField} = ?`,
-      [lookupValue]
-    );
+    // Normalize verification code (trim and ensure string)
+    const normalizedCode = String(verificationCode).trim();
+
+    // Validate verification code format (should be 6 digits)
+    const codeRegex = /^\d{6}$/;
+    if (!codeRegex.test(normalizedCode)) {
+      return res.status(400).json({ 
+        error: 'Verification code must be exactly 6 digits' 
+      });
+    }
+
+    // Find user by email or student_id (use parameterized query to prevent SQL injection)
+    let users;
+    if (email) {
+      [users] = await pool.query(
+        `SELECT id FROM users WHERE email = ?`,
+        [email.trim()]
+      );
+    } else {
+      [users] = await pool.query(
+        `SELECT id FROM users WHERE student_id = ?`,
+        [student_id.trim()]
+      );
+    }
 
     if (users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -535,15 +556,28 @@ export const verifyPasswordResetCode = async (req, res) => {
     const userId = users[0].id;
 
     // Check if verification code is valid and not expired
+    // Compare code as string to ensure type consistency
     const [codes] = await pool.query(
       `SELECT * FROM password_reset_codes 
-       WHERE user_id = ? AND code = ? AND expires_at > NOW() 
+       WHERE user_id = ? AND CAST(code AS CHAR) = ? AND expires_at > NOW() 
        ORDER BY created_at DESC LIMIT 1`,
-      [userId, verificationCode]
+      [userId, normalizedCode]
     );
 
     if (codes.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired verification code' });
+      // Check if code exists but is expired
+      const [expiredCodes] = await pool.query(
+        `SELECT * FROM password_reset_codes 
+         WHERE user_id = ? AND CAST(code AS CHAR) = ? AND expires_at <= NOW() 
+         ORDER BY created_at DESC LIMIT 1`,
+        [userId, normalizedCode]
+      );
+
+      if (expiredCodes.length > 0) {
+        return res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+      }
+
+      return res.status(400).json({ error: 'Invalid verification code. Please check and try again.' });
     }
 
     // Generate a temporary reset token (valid for 15 minutes)
@@ -554,10 +588,42 @@ export const verifyPasswordResetCode = async (req, res) => {
     );
 
     // Mark the code as verified
-    await pool.query(
-      `UPDATE password_reset_codes SET verified = 1 WHERE id = ?`,
-      [codes[0].id]
-    );
+    // Ensure verified column exists, if not add it
+    try {
+      await pool.query(
+        `UPDATE password_reset_codes SET verified = 1 WHERE id = ?`,
+        [codes[0].id]
+      );
+    } catch (updateError) {
+      // If verified column doesn't exist, try to add it
+      if (updateError.code === 'ER_BAD_FIELD_ERROR' || updateError.message?.includes('Unknown column')) {
+        console.log('⚠️  verified column not found, adding it...');
+        try {
+          await pool.query(`ALTER TABLE password_reset_codes ADD COLUMN verified BOOLEAN DEFAULT 0`);
+          console.log('✅ Added verified column to password_reset_codes table');
+          // Retry the update
+          await pool.query(
+            `UPDATE password_reset_codes SET verified = 1 WHERE id = ?`,
+            [codes[0].id]
+          );
+        } catch (alterError) {
+          // If column already exists (race condition), just retry the update
+          if (alterError.code === 'ER_DUP_FIELDNAME' || alterError.message?.includes('Duplicate column')) {
+            console.log('ℹ️  verified column already exists, retrying update...');
+            await pool.query(
+              `UPDATE password_reset_codes SET verified = 1 WHERE id = ?`,
+              [codes[0].id]
+            );
+          } else {
+            console.error('❌ Error adding verified column:', alterError);
+            throw alterError;
+          }
+        }
+      } else {
+        console.error('❌ Error updating verified status:', updateError);
+        throw updateError;
+      }
+    }
 
     res.status(200).json({ 
       message: 'Verification code verified successfully',
@@ -566,6 +632,7 @@ export const verifyPasswordResetCode = async (req, res) => {
   } catch (error) {
     console.error('❌ Verify password reset code error:', error);
     console.error('❌ Error stack:', error.stack);
+    console.error('❌ Request body:', req.body);
     res.status(500).json({ 
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined

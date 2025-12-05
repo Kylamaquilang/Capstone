@@ -53,8 +53,14 @@ export default function useLogin() {
         router.push('/dashboard');
       }
     } catch (err) {
-      console.error('Login error:', err);
-      setError(err?.response?.data?.error || 'Login failed');
+      // Handle 401 (Unauthorized) errors gracefully - invalid credentials
+      if (err?.response?.status === 401) {
+        setError(err?.response?.data?.error || 'Invalid credentials. Please check your Student ID/Email and password.');
+      } else {
+        // Handle other errors
+        console.error('Login error:', err);
+        setError(err?.response?.data?.error || 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

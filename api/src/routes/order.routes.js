@@ -10,6 +10,7 @@ import {
   getOrderStats,
   getSalesPerformance,
   getDetailedSalesReport,
+  getProductSalesReport,
   confirmOrderReceipt,
   userConfirmOrderReceipt,
   confirmOrderReceiptNotification,
@@ -44,6 +45,7 @@ router.get('/test-db', async (req, res) => {
 router.get('/stats', verifyToken, isAdmin, getOrderStats)
 router.get('/sales-performance', verifyToken, isAdmin, getSalesPerformance)
 router.get('/detailed-sales-report', verifyToken, isAdmin, getDetailedSalesReport)
+router.get('/product-sales-report', verifyToken, isAdmin, getProductSalesReport)
 
 // Public sales data endpoint for testing (remove in production)
 router.get('/sales-performance/public', getSalesPerformance)

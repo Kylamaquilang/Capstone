@@ -213,7 +213,7 @@ export const emitAdminDataRefresh = (io, dataType, data) => {
  * @param {string} dataType - Type of data that was updated
  * @param {Object} data - Updated data
  */
-export const emitUserDataRefresh = (io, userId, dataType, data) => {
+export const emitUserDataRefresh = (io, userId, dataType, data = {}) => {
   if (io) {
     io.to(`user-${userId}`).emit('user-data-refresh', {
       dataType,

@@ -31,6 +31,9 @@ import autoConfirmRoutes from './src/routes/auto-confirm.routes.js';
 // Import scheduled tasks
 import { autoConfirmClaimedOrders } from './src/controllers/auto-confirm.controller.js';
 
+// Import migration helper
+import { ensureDeletedAtColumn } from './src/utils/migration-helper.js';
+
 // Import error handling middleware
 import { errorHandler, notFoundHandler } from './src/utils/errorHandler.js'
 
@@ -132,7 +135,11 @@ app.get('/api/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
+// Debug: Log cart route registration
+console.log('🔍 Registering cart route at /api/cart');
 app.use('/api/cart', cartRoutes);
+// Debug: Log checkout route registration
+console.log('🔍 Registering checkout route at /api/checkout');
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -239,10 +246,17 @@ io.engine.on('connection_error', (err) => {
 
 app.set('io', io);
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
   console.log(`Health check available at http://localhost:${PORT}/health`);
   console.log(`Socket.io server ready for real-time connections`);
+  
+  // Run migrations on startup
+  try {
+    await ensureDeletedAtColumn();
+  } catch (error) {
+    console.error('Migration check failed:', error);
+  }
   
   setupScheduledTasks(io);
 });

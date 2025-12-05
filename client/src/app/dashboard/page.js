@@ -121,6 +121,30 @@ export default function UserDashboard() {
         // Join user room for real-time updates
         joinUserRoom(user.id.toString());
 
+        // Listen for new products
+        const handleNewProduct = (productData) => {
+          console.log('📦 Real-time new product received on dashboard:', productData);
+          if (isMounted) {
+            fetchProducts();
+          }
+        };
+
+        // Listen for product updates
+        const handleProductUpdate = (productData) => {
+          console.log('📦 Real-time product update received on dashboard:', productData);
+          if (isMounted) {
+            fetchProducts();
+          }
+        };
+
+        // Listen for product deletions
+        const handleProductDelete = (productData) => {
+          console.log('🗑️ Real-time product deletion received on dashboard:', productData);
+          if (isMounted) {
+            fetchProducts();
+          }
+        };
+
         // Listen for order updates
         const handleOrderUpdate = (orderData) => {
           console.log('📦 Real-time order update received on dashboard:', orderData);
@@ -139,11 +163,17 @@ export default function UserDashboard() {
           }
         };
 
+        socket.on('new-product', handleNewProduct);
+        socket.on('product-updated', handleProductUpdate);
+        socket.on('product-deleted', handleProductDelete);
         socket.on('order-status-updated', handleOrderUpdate);
         socket.on('new-notification', handleNewNotification);
 
         return () => {
           isMounted = false;
+          socket.off('new-product', handleNewProduct);
+          socket.off('product-updated', handleProductUpdate);
+          socket.off('product-deleted', handleProductDelete);
           socket.off('order-status-updated', handleOrderUpdate);
           socket.off('new-notification', handleNewNotification);
         };
@@ -173,6 +203,18 @@ export default function UserDashboard() {
 
   // Auto-refresh for products
   useUserAutoRefresh(fetchProducts, 'products');
+
+  // Helper function to check if product is out of stock
+  const isProductOutOfStock = (product) => {
+    // If product has sizes, check if any size has stock
+    if (product.sizes && product.sizes.length > 0) {
+      // Check if all sizes are out of stock
+      const hasStock = product.sizes.some(size => (size.stock || 0) > 0);
+      return !hasStock;
+    }
+    // If no sizes, check base stock
+    return (product.stock || 0) <= 0;
+  };
 
   return (
     <ProtectedRoute>
@@ -230,9 +272,57 @@ export default function UserDashboard() {
                 <div key={categoryName} className="space-y-6">
                   {/* Products Row for this Category */}
                   <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                    {categoryProducts.map((item) => (
+                    {categoryProducts.map((item) => {
+                      const outOfStock = isProductOutOfStock(item);
+                      return (
+                        <div
+                          key={item.id}
+                          className={`relative ${outOfStock ? 'cursor-not-allowed' : ''}`}
+                        >
+                          {outOfStock ? (
+                            <div className="block group">
+                              <div className="bg-white rounded-xl p-3 sm:p-4 transition-all duration-300 opacity-60 relative">
+                                {/* Blur overlay for entire card */}
+                                <div className="blur-sm pointer-events-none">
+                                  {/* Product Image - Rectangular */}
+                                  <div className="relative h-48 sm:h-56 lg:h-64 mb-4 sm:mb-6 rounded-lg overflow-hidden">
+                                    <Image
+                                      src={item.src}
+                                      alt={item.name}
+                                      fill
+                                      className="object-contain p-3"
+                                      onError={(e) => {
+                                        e.target.src = '/images/polo.png';
+                                      }}
+                                    />
+                                  </div>
+                                  
+                                  {/* Product Info */}
+                                  <div className="text-center">
+                                    <h3 className="font-semibold text-gray-900 text-sm sm:text-base lg:text-lg mb-2 line-clamp-2 uppercase">
+                                      {item.name}
+                                    </h3>
+                                    <p className="text-base sm:text-lg font-medium text-[#000C50]">
+                                      {item.price}
+                                    </p>
+                                    {/* Size Indicator */}
+                                    {item.sizes && item.sizes.length > 1 && (
+                                      <div className="mt-2">
+                                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                          {item.sizes.length} sizes available
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {/* Stock Badge - Always visible on top */}
+                                <div className="absolute top-4 right-4 bg-red-500 text-white text-xs px-2 py-1 rounded-full z-10 pointer-events-auto">
+                                  Out of Stock
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
                       <Link
-                        key={item.id}
                         href={`/products/${encodeURIComponent(item.name)}`}
                         className="block group"
                       >
@@ -275,7 +365,10 @@ export default function UserDashboard() {
                           </div>
                         </div>
                       </Link>
-                    ))}
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}

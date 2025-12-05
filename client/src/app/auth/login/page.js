@@ -38,13 +38,13 @@ export default function LoginPage() {
 
   return (
     <div
-      className="flex justify-center items-center min-h-screen text-black"
-      style={{ backgroundColor: '#000C50', margin: 0, padding: 0 }}
+      className="flex justify-center items-center min-h-screen text-black px-4 md:px-6"
+      style={{ backgroundColor: '#000C50', margin: 0, paddingTop: 0, paddingBottom: 0 }}
     >
-      <div className="bg-white w-full max-w-3xl h-110 rounded-xl shadow-lg flex overflow-hidden">
-        {/* Left Section */}
+      <div className="bg-white w-full max-w-2xl min-h-[600px] md:min-h-[500px] md:max-h-[600px] rounded-xl shadow-lg flex flex-col md:flex-row overflow-hidden">
+        {/* Decorative Section - Top on mobile, Left on desktop */}
         <div
-          className="w-1/2 p-8 border-r-4 flex flex-col justify-between"
+          className="w-full md:w-1/2 p-6 md:p-6 border-b-4 md:border-b-0 md:border-r-4 flex flex-col justify-between order-1 md:order-1"
           style={{ borderColor: '#000C50' }}
         >
           <Image src="/images/cpc.png" alt="Logo" width={60} height={60} className="mb-4" />
@@ -56,8 +56,8 @@ export default function LoginPage() {
           <p className="text-xs text-gray-500 mt-4">ESSEN © 2024</p>
         </div>
 
-        {/* Right Section */}
-        <div className="w-1/2 p-8 relative">
+        {/* Form Section - Bottom on mobile, Right on desktop */}
+        <div className="w-full md:w-1/2 p-6 md:p-6 order-2 md:order-2 relative">
           <Image
             src="/images/logo.png"
             alt="ESSEN Logo"
@@ -68,7 +68,11 @@ export default function LoginPage() {
           <h4 className="text-lg font-semibold mb-8">Sign in</h4>
 
           {error && (
-            <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">
+            <div className={`p-3 rounded mb-4 text-sm ${
+              error.toLowerCase().includes('invalid credentials') || error.toLowerCase().includes('invalid')
+                ? 'bg-yellow-50 text-yellow-800 border border-yellow-200'
+                : 'bg-red-100 text-red-700'
+            }`}>
               {error}
             </div>
           )}

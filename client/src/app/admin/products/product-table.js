@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Swal from '@/lib/sweetalert-config';
-import { PencilIcon, TrashIcon, MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon, FunnelIcon, CubeIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon, FunnelIcon, CubeIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import EditProductModal from '@/components/product/EditProductModal';
 import { useSocket } from '@/context/SocketContext';
@@ -34,6 +34,8 @@ export default function ProductTable({ category = '', subcategory = '', category
       if (category) {
         params.set('category', category);
       }
+      // Include inactive products for admin management
+      params.set('includeInactive', 'true');
       const query = params.toString();
       const url = query ? `/products/detailed?${query}` : '/products/detailed';
       
@@ -180,12 +182,17 @@ export default function ProductTable({ category = '', subcategory = '', category
   const getPaginatedProducts = () => {
     const allRows = [];
     filteredAndSortedProducts.forEach((product, productIndex) => {
+      // Ensure product.id exists, use productIndex as fallback
+      const productId = product.id || `product-${productIndex}`;
+      
       if (product.sizes && product.sizes.length > 0) {
         product.sizes.forEach((size, sizeIndex) => {
+          // Ensure size.size exists
+          const sizeValue = size.size || `size-${sizeIndex}`;
           allRows.push({
             ...product,
             size,
-            rowKey: `${product.id}-${size.size}`,
+            rowKey: `${productId}-${sizeValue}-${sizeIndex}`,
             isSizeRow: true,
             productIndex,
             sizeIndex
@@ -195,7 +202,7 @@ export default function ProductTable({ category = '', subcategory = '', category
         allRows.push({
           ...product,
           size: null,
-          rowKey: `${product.id}-no-size`,
+          rowKey: `${productId}-no-size-${productIndex}`,
           isSizeRow: false,
           productIndex,
           sizeIndex: 0
@@ -242,10 +249,29 @@ export default function ProductTable({ category = '', subcategory = '', category
     console.log('Product updated successfully - table refreshed');
   }, [fetchProducts]);
 
+  const handleToggleVisibility = async (id, name, currentStatus) => {
+    const newStatus = !currentStatus;
+    const action = newStatus ? 'show' : 'hide';
+    
+    try {
+      await API.put(`/products/${id}`, { is_active: newStatus });
+      await fetchProducts();
+      Swal.fire({
+        title: 'Success!',
+        text: `Product ${newStatus ? 'shown' : 'hidden'} successfully.`,
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false
+      });
+    } catch (err) {
+      Swal.fire('Error', err?.response?.data?.error || 'Failed to update product visibility', 'error');
+    }
+  };
+
   const handleDelete = (id, name) => {
     Swal.fire({
       title: 'Are you sure?',
-      text: `Delete ${name}? This action cannot be undone!`,
+      html: `<p>Delete <strong>${name}</strong>?</p><p class="text-sm text-gray-600 mt-2">The product will be removed from the store, but sales data will remain in reports for historical records.</p>`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -256,7 +282,12 @@ export default function ProductTable({ category = '', subcategory = '', category
         try {
           await API.delete(`/products/${id}`);
           await fetchProducts();
-          Swal.fire('Deleted!', 'The product has been removed.', 'success');
+          Swal.fire({
+            title: 'Deleted!',
+            text: 'The product has been removed from the store. Sales data is preserved in reports.',
+            icon: 'success',
+            timer: 3000
+          });
         } catch (err) {
           Swal.fire('Error', err?.response?.data?.error || 'Failed to delete product', 'error');
         }
@@ -482,7 +513,7 @@ export default function ProductTable({ category = '', subcategory = '', category
           <tbody>
             {paginatedProducts.map((row, rowIndex) => (
                   <tr 
-                key={row.rowKey} 
+                key={row.rowKey || `row-${rowIndex}`} 
                     className="hover:bg-gray-50 transition-colors border-b border-gray-100 bg-white"
                   >
                     <td className="px-4 py-3">
@@ -494,7 +525,14 @@ export default function ProductTable({ category = '', subcategory = '', category
                   />
                 </td>
                 <td className="px-4 py-3 border-r border-gray-100">
+                  <div className="flex items-center gap-2">
                   <div className="text-xs font-medium text-gray-900 uppercase">{row.name}</div>
+                    {row.is_active === 0 || row.is_active === false ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        Hidden
+                      </span>
+                    ) : null}
+                  </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 uppercase">
@@ -532,7 +570,7 @@ export default function ProductTable({ category = '', subcategory = '', category
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                       Number(row.size.stock) === 0 
                           ? 'bg-red-50 text-red-700' 
-                        : Number(row.size.stock) <= 5 
+                        : Number(row.size.stock) <= 10 
                           ? 'bg-yellow-50 text-yellow-700' 
                           : 'bg-green-50 text-green-700'
                       }`}>
@@ -542,7 +580,7 @@ export default function ProductTable({ category = '', subcategory = '', category
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                       Number(row.stock) === 0 
                           ? 'bg-red-50 text-red-700' 
-                        : Number(row.stock) <= 5 
+                        : Number(row.stock) <= 10 
                           ? 'bg-yellow-50 text-yellow-700' 
                           : 'bg-green-50 text-green-700'
                       }`}>

@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import Swal from '@/lib/sweetalert-config';
 import { getImageUrl } from '@/utils/imageUtils';
+import Modal from '@/components/common/Modal';
 
 export default function EditProductModal({ isOpen, onClose, productId, onSuccess }) {
   const [product, setProduct] = useState(null);
@@ -23,6 +23,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState('');
   const [selectedSizes, setSelectedSizes] = useState([]);
+  const [isActive, setIsActive] = useState(true);
 
   const loadProduct = useCallback(async () => {
     try {
@@ -45,6 +46,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
       setCategoryId(data.category_id || '');
       setDescription(data.description || '');
       setPreviewUrl(imageUrl);
+      setIsActive(data.is_active !== undefined ? (data.is_active === 1 || data.is_active === true) : true);
       
       // Handle sizes
       if (data.sizes && data.sizes.length > 0) {
@@ -137,7 +139,8 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
         // stock field removed - auto-managed by inventory
         category_id: categoryId ? Number(categoryId) : null,
         image: finalImageUrl,
-        sizes: sizesData.length > 0 ? sizesData : undefined
+        sizes: sizesData.length > 0 ? sizesData : undefined,
+        is_active: isActive
       };
 
       await API.put(`/products/${productId}`, productData);
@@ -208,42 +211,27 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
     }
   };
 
-  // Remove unused functions - sizes are now handled with checkboxes
-
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto scrollbar-hide">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Edit Product</h2>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Edit Product"
+      size="xl"
+      isLoading={loading}
+      closeOnBackdrop={!saving && !loading}
+      closeOnEscape={!saving && !loading}
+    >
+      {error && !product ? (
+        <div className="text-center py-8">
+          <p className="text-red-600 text-sm mb-4">{error}</p>
           <button
-            onClick={handleClose}
-            disabled={saving}
-            className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+            onClick={loadProduct}
+            className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
           >
-            <XMarkIcon className="h-6 w-6" />
+            Try Again
           </button>
         </div>
-
-        {/* Modal Body */}
-        <div className="p-4">
-            {loading ? (
-              <div className="flex justify-center items-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
-              </div>
-            ) : error && !product ? (
-              <div className="text-center py-8">
-                <p className="text-red-600 text-sm mb-4">{error}</p>
-                <button
-                  onClick={loadProduct}
-                  className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-                >
-                  Try Again
-                </button>
-              </div>
-            ) : (
+      ) : (
               <form onSubmit={handleSubmit}>
                 <div className="space-y-4">
                   {/* Error Message */}
@@ -322,6 +310,25 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                           <span className="text-gray-900 font-bold">Auto-managed (read-only)</span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Product Visibility Toggle */}
+                    <div>
+                      <label className="flex items-center space-x-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isActive}
+                          onChange={(e) => setIsActive(e.target.checked)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          disabled={saving}
+                        />
+                        <div>
+                          <span className="block text-sm font-medium text-gray-700">Show on Store</span>
+                          <span className="block text-xs text-gray-500">
+                            {isActive ? 'Product is visible to customers' : 'Product is hidden from customers'}
+                          </span>
+                        </div>
+                      </label>
                     </div>
                     </div>
 
@@ -460,9 +467,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                   </button>
                 </div>
               </form>
-            )}
-        </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }

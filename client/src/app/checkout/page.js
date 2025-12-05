@@ -190,10 +190,19 @@ const CheckoutPage = () => {
 
     } catch (error) {
       console.error('Checkout error:', error);
+      console.error('Checkout error response:', error.response?.data);
+      
+      // Get the most helpful error message
+      const errorMessage = error.response?.data?.message 
+        || error.response?.data?.error 
+        || error.message 
+        || 'An error occurred during checkout. Please try again.';
+      
       Swal.fire({
         icon: 'error',
         title: 'Checkout Failed',
-        text: error.response?.data?.error || 'An error occurred during checkout'
+        text: errorMessage,
+        confirmButtonColor: '#000C50'
       });
     } finally {
       setProcessingPayment(false);

@@ -39,6 +39,17 @@ export default function UserProfilePage() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Auto-clear error message after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError('');
+      }, 5000); // Clear after 5 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
   const [editing, setEditing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -433,94 +444,46 @@ export default function UserProfilePage() {
     
     // Enhanced frontend validation for password step
     if (!newPassword) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Password Required',
-        text: 'Please enter a new password',
-        confirmButtonColor: '#000C50',
-      });
       setError('New password is required');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Passwords Don\'t Match',
-        text: 'The passwords you entered do not match. Please try again.',
-        confirmButtonColor: '#000C50',
-      });
       setError('Passwords do not match');
       return;
     }
 
     // Match backend validation requirements
     if (newPassword.length < 8) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Password Too Short',
-        text: 'Password must be at least 8 characters long',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must be at least 8 characters long');
       return;
     }
 
     if (newPassword.length > 128) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Password Too Long',
-        text: 'Password must be less than 128 characters',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must be less than 128 characters');
       return;
     }
 
     // Check for uppercase letter
     if (!/[A-Z]/.test(newPassword)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Invalid Password',
-        text: 'Password must contain at least one uppercase letter (A-Z)',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must contain at least one uppercase letter');
       return;
     }
 
     // Check for lowercase letter
     if (!/[a-z]/.test(newPassword)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Invalid Password',
-        text: 'Password must contain at least one lowercase letter (a-z)',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must contain at least one lowercase letter');
       return;
     }
 
     // Check for number
     if (!/\d/.test(newPassword)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Invalid Password',
-        text: 'Password must contain at least one number (0-9)',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must contain at least one number');
       return;
     }
 
     // Check for special character
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Invalid Password',
-        text: 'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
       return;
     }
@@ -528,12 +491,6 @@ export default function UserProfilePage() {
     // Check for common weak passwords
     const weakPasswords = ['password', '123456', 'qwerty', 'abc123', 'password123'];
     if (weakPasswords.includes(newPassword.toLowerCase())) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Weak Password',
-        text: 'Please choose a stronger password. Avoid common passwords like "password", "123456", etc.',
-        confirmButtonColor: '#000C50',
-      });
       setError('Please choose a stronger password. Avoid common passwords like "password", "123456", etc.');
       return;
     }

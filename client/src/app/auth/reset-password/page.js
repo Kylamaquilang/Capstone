@@ -21,7 +21,6 @@ export default function ResetPasswordPage() {
 
   const [step, setStep] = useState(1); // 1: request reset, 2: verify code, 3: new password
   const [email, setEmail] = useState('');
-  const [studentId, setStudentId] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,6 +30,17 @@ export default function ResetPasswordPage() {
   const [resetToken, setResetToken] = useState('');
   const router = useRouter();
 
+  // Auto-clear error message after 5 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError('');
+      }, 5000); // Clear after 5 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
   const handleRequestReset = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -39,8 +49,7 @@ export default function ResetPasswordPage() {
 
     try {
       const response = await API.post('/auth/request-reset', {
-        email: email.trim() || undefined,
-        student_id: studentId.trim() || undefined
+        email: email.trim()
       });
 
       setSuccess(`Verification code sent to ${response.data.email}`);
@@ -59,8 +68,7 @@ export default function ResetPasswordPage() {
 
     try {
       const response = await API.post('/auth/verify-code', {
-        email: email.trim() || undefined,
-        student_id: studentId.trim() || undefined,
+        email: email.trim(),
         verificationCode: verificationCode.trim()
       });
 
@@ -80,12 +88,6 @@ export default function ResetPasswordPage() {
     setError('');
 
     if (newPassword !== confirmPassword) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Passwords Don\'t Match',
-        text: 'The passwords you entered do not match. Please try again.',
-        confirmButtonColor: '#000C50',
-      });
       setError('Passwords do not match');
       setLoading(false);
       return;
@@ -93,24 +95,12 @@ export default function ResetPasswordPage() {
 
     // Match backend validation requirements
     if (newPassword.length < 8) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Password Too Short',
-        text: 'Password must be at least 8 characters long',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must be at least 8 characters long');
       setLoading(false);
       return;
     }
 
     if (newPassword.length > 128) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Password Too Long',
-        text: 'Password must be less than 128 characters',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must be less than 128 characters');
       setLoading(false);
       return;
@@ -118,12 +108,6 @@ export default function ResetPasswordPage() {
 
     // Check for uppercase letter
     if (!/[A-Z]/.test(newPassword)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Invalid Password',
-        text: 'Password must contain at least one uppercase letter (A-Z)',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must contain at least one uppercase letter');
       setLoading(false);
       return;
@@ -131,12 +115,6 @@ export default function ResetPasswordPage() {
 
     // Check for lowercase letter
     if (!/[a-z]/.test(newPassword)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Invalid Password',
-        text: 'Password must contain at least one lowercase letter (a-z)',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must contain at least one lowercase letter');
       setLoading(false);
       return;
@@ -144,12 +122,6 @@ export default function ResetPasswordPage() {
 
     // Check for number
     if (!/\d/.test(newPassword)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Invalid Password',
-        text: 'Password must contain at least one number (0-9)',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must contain at least one number');
       setLoading(false);
       return;
@@ -157,12 +129,6 @@ export default function ResetPasswordPage() {
 
     // Check for special character
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(newPassword)) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Invalid Password',
-        text: 'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)',
-        confirmButtonColor: '#000C50',
-      });
       setError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
       setLoading(false);
       return;
@@ -224,32 +190,13 @@ export default function ResetPasswordPage() {
           }}
           placeholder="Enter your email address"
           className="w-full border border-gray-300 px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
-        />
-      </div>
-      
-      <div className="text-center text-gray-500">
-        <span>OR</span>
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Student ID
-        </label>
-        <input
-          type="text"
-          value={studentId}
-          onChange={(e) => {
-            setStudentId(e.target.value);
-            setError(''); // Clear error when typing
-          }}
-          placeholder="Enter your student ID"
-          className="w-full border border-gray-300 px-3 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+          required
         />
       </div>
 
       <button
         type="submit"
-        disabled={loading || (!email.trim() && !studentId.trim())}
+        disabled={loading || !email.trim()}
         className="w-full bg-[#000C50] text-white py-2 rounded-md font-semibold hover:bg-blue-900 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Sending...' : 'Send Verification Code'}
@@ -398,7 +345,7 @@ export default function ResetPasswordPage() {
 
   const getStepDescription = () => {
     switch (step) {
-      case 1: return 'Enter your email or student ID to receive a verification code';
+      case 1: return 'Enter your email address to receive a verification code';
       case 2: return 'Enter the 6-digit code sent to your email';
       case 3: return 'Create a new password for your account';
       default: return '';
@@ -407,15 +354,28 @@ export default function ResetPasswordPage() {
 
   return (
     <div
-      className="flex justify-center items-center h-screen w-screen text-black"
-      style={{ backgroundColor: '#000C50', margin: 0, padding: 0 }}
+      className="flex justify-center items-center h-screen w-screen text-black px-4 md:px-6"
+      style={{ backgroundColor: '#000C50', margin: 0, paddingTop: 0, paddingBottom: 0 }}
     >
-      <div className="bg-white w-full max-w-4xl h-[85vh] max-h-[600px] rounded-xl shadow-lg flex overflow-hidden">
-        {/* Left Side - Form */}
+      <div className="bg-white w-full max-w-2xl min-h-[85vh] md:min-h-[500px] md:max-h-[600px] rounded-xl shadow-lg flex flex-col md:flex-row overflow-hidden">
+        {/* Decorative Section - Top on mobile, Right on desktop */}
         <div
-          className="w-1/2 p-8 border-r-4 flex flex-col justify-center overflow-y-auto"
+          className="w-full md:w-1/2 bg-white relative flex flex-col items-center justify-center p-6 md:p-6 border-b-4 md:border-b-0 md:border-l-4 order-1 md:order-2"
           style={{ borderColor: '#000C50' }}
         >
+          <Image
+            src="/images/cpc.png"
+            alt="Logo"
+            width={90}
+            height={90}
+            className="mb-6"
+          />
+          <h2 className="text-3xl font-bold text-black text-center mb-4">Welcome to<br />CPC Essen!</h2>
+          <p className="text-xs font-semibold text-gray-600 absolute bottom-4 right-8">ESSEN © 2024</p>
+        </div>
+
+        {/* Form Section - Bottom on mobile, Left on desktop */}
+        <div className="w-full md:w-1/2 p-6 md:p-6 flex flex-col justify-center overflow-y-auto order-2 md:order-1">
           <div className="max-w-md mx-auto w-full py-4">
             <h2 className="text-xl font-bold text-black mb-2">{getStepTitle()}</h2>
             <p className="text-xs text-gray-600 mb-4">{getStepDescription()}</p>
@@ -459,19 +419,6 @@ export default function ResetPasswordPage() {
             {step === 2 && renderStep2()}
             {step === 3 && renderStep3()}
           </div>
-        </div>
-
-        {/* Right Side - Welcome */}
-        <div className="w-1/2 bg-white relative flex flex-col items-center justify-center p-8">
-          <Image
-            src="/images/cpc.png"
-            alt="Logo"
-            width={90}
-            height={90}
-            className="mb-6"
-          />
-          <h2 className="text-3xl font-bold text-black text-center mb-4">Welcome to<br />CPC Essen!</h2>
-          <p className="text-xs font-semibold text-gray-600 absolute bottom-4 right-8">ESSEN © 2024</p>
         </div>
       </div>
     </div>

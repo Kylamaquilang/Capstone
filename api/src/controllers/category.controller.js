@@ -52,7 +52,12 @@ export const updateCategory = async (req, res) => {
     const [exists] = await pool.query(`SELECT * FROM categories WHERE name = ? AND id != ?`, [name, id])
     if (exists.length > 0) return res.status(409).json({ error: 'Category already exists' })
 
-    await pool.query(`UPDATE categories SET name = ? WHERE id = ?`, [name, id])
+    const [result] = await pool.query(`UPDATE categories SET name = ? WHERE id = ?`, [name, id])
+    
+    // Check if category was actually updated
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Category not found' })
+    }
     
     // Emit refresh signal for updated category
     const io = req.app.get('io');
@@ -61,7 +66,12 @@ export const updateCategory = async (req, res) => {
       emitDataRefresh(io, 'categories', { action: 'updated', categoryId: id });
     }
     
-    res.json({ message: 'Category updated' })
+    // Return explicit success response with status 200
+    res.status(200).json({ 
+      success: true,
+      message: 'Category updated successfully',
+      data: { id: parseInt(id), name: name }
+    })
   } catch (err) {
     console.error('Update category error:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -74,9 +84,12 @@ export const deleteCategory = async (req, res) => {
 
   try {
     // Check if category has products
-    const [products] = await pool.query(`SELECT COUNT(*) as count FROM products WHERE category_id = ?`, [id])
+    const [products] = await pool.query(`SELECT COUNT(*) as count FROM products WHERE category_id = ? AND deleted_at IS NULL`, [id])
     if (products[0].count > 0) {
-      return res.status(400).json({ error: 'Cannot delete category with products. Move or delete products first.' })
+      return res.status(400).json({ 
+        success: false,
+        message: 'Cannot delete category because it is still used by products.'
+      })
     }
 
     // Soft delete by setting is_active to false
@@ -89,10 +102,16 @@ export const deleteCategory = async (req, res) => {
       emitDataRefresh(io, 'categories', { action: 'deleted', categoryId: id });
     }
     
-    res.json({ message: 'Category deleted' })
+    res.json({ 
+      success: true,
+      message: 'Category deleted successfully.'
+    })
   } catch (err) {
     console.error('Delete category error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    })
   }
 }
 

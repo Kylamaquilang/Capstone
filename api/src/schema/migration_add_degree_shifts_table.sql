@@ -23,3 +23,10 @@ CREATE TABLE IF NOT EXISTS degree_shifts (
     INDEX idx_new_degree (new_degree)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+
+
+
+
+
+

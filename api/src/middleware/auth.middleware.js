@@ -30,7 +30,16 @@ export const verifyToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(403).json({ message: 'No token provided.' });
+    console.error('❌ Auth middleware - No token provided:', {
+      url: req.originalUrl,
+      path: req.path,
+      method: req.method,
+      headers: req.headers
+    });
+    return res.status(401).json({ 
+      error: 'Unauthorized',
+      message: 'No token provided. Please log in to continue.' 
+    });
   }
 
   const token = authHeader.split(' ')[1];
@@ -38,10 +47,19 @@ export const verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+    console.log('✅ Auth middleware - Token verified for user:', decoded.id);
     next();
   } catch (err) {
-    console.error('Token verification failed:', err.message);
-    return res.status(401).json({ message: 'Unauthorized access.' });
+    console.error('❌ Token verification failed:', {
+      error: err.message,
+      url: req.originalUrl,
+      path: req.path,
+      method: req.method
+    });
+    return res.status(401).json({ 
+      error: 'Unauthorized',
+      message: 'Invalid or expired token. Please log in again.' 
+    });
   }
 };
 

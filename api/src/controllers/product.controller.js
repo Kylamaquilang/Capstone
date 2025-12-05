@@ -9,6 +9,7 @@ import {
     validateStock
 } from '../utils/validation.js';
 import { emitAdminDataRefresh, emitDataRefresh } from '../utils/socket-helper.js';
+import { ensureDeletedAtColumn, getDeletedAtConditionSafe } from '../utils/migration-helper.js';
 import { 
   AppError, 
   ValidationError, 
@@ -19,7 +20,7 @@ import {
 } from '../utils/errorHandler.js';
 
 // Low stock threshold
-const LOW_STOCK_THRESHOLD = 5;
+const LOW_STOCK_THRESHOLD = 10;
 
 // Stock movement types
 const STOCK_MOVEMENT_TYPES = {
@@ -32,11 +33,27 @@ const STOCK_MOVEMENT_TYPES = {
 // ✅ Get All Products - Simple version for frontend
 export const getAllProductsSimple = async (req, res) => {
   try {
+    // Ensure deleted_at column exists
+    await ensureDeletedAtColumn();
+    
     const { category } = req.query;
     
     // Build WHERE clause
     let whereConditions = ['p.is_active = 1'];
     let queryParams = [];
+    
+    // Check if deleted_at column exists before adding condition
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'deleted_at'
+      `);
+      if (columns.length > 0) {
+        whereConditions.push('p.deleted_at IS NULL');
+      }
+    } catch (err) {
+      // Column doesn't exist yet, continue without the condition
+    }
     
     if (category) {
       // Filter by category name
@@ -115,7 +132,7 @@ export const getAllProductsSimple = async (req, res) => {
             sizes: sizes.map(size => ({
               id: size.id,
               size: size.size,
-              stock: parseInt(size.stock),
+              stock: parseInt(size.stock) || 0, // Use size-specific stock, default to 0 if NULL
               base_stock: parseInt(size.base_stock || 0),
               price: parseFloat(size.price)
             }))
@@ -222,21 +239,34 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    if (image && !validateImageUrl(image)) {
+    // Validate image is required
+    if (!image || !image.trim()) {
+      return res.status(400).json({ 
+        error: 'Product image is required' 
+      });
+    }
+
+    if (!validateImageUrl(image)) {
       return res.status(400).json({ 
         error: 'Invalid image URL format' 
       });
     }
 
-    // Check if category exists if provided
-    if (category_id) {
+    // Validate category is required
+    if (!category_id) {
+      return res.status(400).json({ 
+        error: 'Category is required' 
+      });
+    }
+
+    // Check if category exists
       const [categories] = await pool.query('SELECT id FROM categories WHERE id = ?', [category_id]);
       if (categories.length === 0) {
         return res.status(400).json({ error: 'Category not found' });
-      }
     }
 
-    // Check if product name already exists (case-insensitive, only active products)
+    // Check if product with same name AND same sizes already exists
+    // Allow same name with different sizes, but prevent exact duplicates
     const trimmedName = name.trim();
     const [existingProducts] = await pool.query(
       'SELECT id, name FROM products WHERE LOWER(name) = LOWER(?) AND is_active = 1',
@@ -244,10 +274,38 @@ export const createProduct = async (req, res) => {
     );
     
     if (existingProducts.length > 0) {
+      // Get sizes for the new product (normalize: sort and filter empty)
+      const newProductSizes = sizes && Array.isArray(sizes) 
+        ? sizes
+            .filter(s => s.size && s.size.trim() !== '' && s.size !== 'NONE')
+            .map(s => s.size.trim().toUpperCase())
+            .sort()
+        : [];
+      
+      // If new product has no sizes, treat as having 'NONE'
+      const newSizesSet = newProductSizes.length === 0 ? ['NONE'] : newProductSizes;
+      
+      // Check each existing product for matching sizes
+      for (const existingProduct of existingProducts) {
+        const [existingSizes] = await pool.query(
+          'SELECT size FROM product_sizes WHERE product_id = ? AND is_active = 1',
+          [existingProduct.id]
+        );
+        
+        const existingSizesList = existingSizes.length > 0
+          ? existingSizes.map(s => s.size.toUpperCase()).sort()
+          : ['NONE'];
+        
+        // Compare size sets (order doesn't matter)
+        const sizesMatch = JSON.stringify(newSizesSet) === JSON.stringify(existingSizesList);
+        
+        if (sizesMatch) {
       return res.status(409).json({ 
-        error: 'Product name already exists',
-        message: `A product with the name "${trimmedName}" already exists. Please choose a different name.`
+            error: 'Duplicate product',
+            message: `A product with the name "${trimmedName}" and the same sizes already exists. Please use different sizes or a different name.`
       });
+        }
+      }
     }
 
     // Start transaction
@@ -317,6 +375,27 @@ export const createProduct = async (req, res) => {
         });
       }
 
+      // Validate: If base stock is fully allocated and there's a size without quantity, reject
+      const baseStock = parseInt(stock);
+      if (totalSizeStock === baseStock && baseStock > 0) {
+        const sizesWithNoStock = sizes.filter(sizeItem => {
+          if (!sizeItem.size || sizeItem.size.trim() === '' || sizeItem.size === 'NONE') {
+            return false;
+          }
+          const sizeStock = parseInt(sizeItem.stock) || 0;
+          return sizeStock === 0;
+        });
+
+        if (sizesWithNoStock.length > 0) {
+          await connection.rollback();
+          connection.release();
+          const sizesToRemove = sizesWithNoStock.map(s => s.size).join(', ');
+          return res.status(400).json({ 
+            error: `Base stock (${baseStock}) is fully allocated. Please remove size(s) without quantity: ${sizesToRemove}.` 
+          });
+        }
+      }
+
       for (const sizeItem of sizes) {
         console.log('🔍 Processing size item:', sizeItem);
         if (sizeItem.size && sizeItem.size.trim() !== '') {
@@ -346,7 +425,14 @@ export const createProduct = async (req, res) => {
       // Emit refresh signal for new product
       const io = req.app.get('io');
       if (io) {
-        // Emit specific new-product event
+        // Emit specific new-product event to all users (admin and regular users)
+        io.emit('new-product', {
+          productId,
+          name,
+          action: 'created',
+          timestamp: new Date().toISOString()
+        });
+        // Also emit to admin room specifically
         io.to('admin-room').emit('new-product', {
           productId,
           name,
@@ -378,7 +464,10 @@ export const createProduct = async (req, res) => {
 // ✅ Get All Products with pagination and filtering
 export const getAllProducts = async (req, res) => {
   try {
-    const { page = 1, limit = 10, category, search, minPrice, maxPrice, inStock } = req.query;
+    // Ensure deleted_at column exists
+    await ensureDeletedAtColumn();
+    
+    const { page = 1, limit = 10, category, search, minPrice, maxPrice, inStock, includeInactive } = req.query;
     
     // Validate pagination
     const { page: validPage, limit: validLimit } = validatePagination(page, limit);
@@ -413,8 +502,26 @@ export const getAllProducts = async (req, res) => {
       whereConditions.push('p.stock > 0');
     }
 
-    // Always exclude soft-deleted products
+    // Exclude deleted products (soft delete) - only if column exists
+    // Check if deleted_at column exists before adding condition
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'deleted_at'
+      `);
+      if (columns.length > 0) {
+        whereConditions.push('p.deleted_at IS NULL');
+      }
+    } catch (err) {
+      // Column doesn't exist yet, continue without the condition
+      console.log('deleted_at column not found, skipping filter');
+    }
+    
+    // Only exclude inactive products if includeInactive is not set to 'true'
+    // This allows admin to see all products including inactive ones
+    if (includeInactive !== 'true') {
     whereConditions.push('p.is_active = 1');
+    }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
@@ -463,8 +570,8 @@ export const getAllProducts = async (req, res) => {
             sizes: sizes.map(size => ({
               id: size.id,
               size: size.size,
-              stock: parseInt(size.stock),
-              base_stock: parseInt(size.base_stock),
+              stock: parseInt(size.stock) || 0, // Use size-specific stock, default to 0 if NULL
+              base_stock: parseInt(size.base_stock) || 0,
               price: parseFloat(size.price)
             }))
           };
@@ -499,13 +606,30 @@ export const getProductById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   
   try {
+    // Ensure deleted_at column exists
+    await ensureDeletedAtColumn();
+    
     const validatedId = validateId(id);
+    
+    // Build WHERE clause conditionally
+    let whereClause = 'WHERE p.id = ?';
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'deleted_at'
+      `);
+      if (columns.length > 0) {
+        whereClause += ' AND p.deleted_at IS NULL';
+      }
+    } catch (err) {
+      // Column doesn't exist yet, continue without the condition
+    }
     
     const [rows] = await pool.query(`
       SELECT p.*, c.name AS category_name 
       FROM products p 
       LEFT JOIN categories c ON p.category_id = c.id 
-      WHERE p.id = ?
+      ${whereClause}
     `, [validatedId]);
 
     if (rows.length === 0) {
@@ -517,7 +641,8 @@ export const getProductById = asyncHandler(async (req, res) => {
     // Try to get product sizes if the table exists, otherwise set empty array
     try {
       const [sizes] = await pool.query(
-        `SELECT * FROM product_sizes 
+        `SELECT id, size, stock, base_stock, price, is_active 
+         FROM product_sizes 
          WHERE product_id = ? AND is_active = 1 
          ORDER BY 
            CASE size 
@@ -532,7 +657,14 @@ export const getProductById = asyncHandler(async (req, res) => {
            END`,
         [validatedId]
       );
-      product.sizes = sizes;
+      product.sizes = sizes.map(size => ({
+        id: size.id,
+        size: size.size,
+        stock: parseInt(size.stock) || 0, // Use size-specific stock, default to 0 if NULL
+        base_stock: parseInt(size.base_stock) || 0,
+        price: parseFloat(size.price) || 0,
+        is_active: size.is_active
+      }));
     } catch (sizeError) {
       // If product_sizes table doesn't exist, just set empty array
       logger.debug('Product sizes table not available, setting empty array');
@@ -594,8 +726,8 @@ export const getProductByName = async (req, res) => {
       product.sizes = sizes.map(size => ({
         id: size.id,
         size: size.size,
-        stock: parseInt(size.stock),
-        price: parseFloat(size.price)
+        stock: parseInt(size.stock) || 0, // Use size-specific stock, default to 0 if NULL
+        price: parseFloat(size.price) || 0
       }));
     } catch (sizeError) {
       // If product_sizes table doesn't exist, just set empty array
@@ -614,13 +746,13 @@ export const getProductByName = async (req, res) => {
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, original_price, stock, sizes, category_id, image } = req.body;
+    const { name, description, price, original_price, stock, sizes, category_id, image, is_active } = req.body;
 
     if (!validateId(id)) {
       return res.status(400).json({ error: 'Invalid product ID' });
     }
 
-    // Check if product exists and get current stock
+    // Check if product exists and get current stock (exclude deleted)
     const [existing] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
@@ -674,7 +806,8 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // Check if product name already exists (case-insensitive, only active products, excluding current product)
+    // Check if product with same name AND same sizes already exists (excluding current product)
+    // Allow same name with different sizes, but prevent exact duplicates
     if (name !== undefined) {
       const trimmedName = name.trim();
       const [existingProducts] = await pool.query(
@@ -683,10 +816,51 @@ export const updateProduct = async (req, res) => {
       );
       
       if (existingProducts.length > 0) {
+        // Get sizes for the updated product
+        // If sizes are provided in the update, use those; otherwise get current sizes
+        let updatedProductSizes = [];
+        
+        if (sizes !== undefined && Array.isArray(sizes)) {
+          // Use provided sizes
+          updatedProductSizes = sizes
+            .filter(s => s.size && s.size.trim() !== '' && s.size !== 'NONE')
+            .map(s => s.size.trim().toUpperCase())
+            .sort();
+        } else {
+          // Get current sizes from database
+          const [currentSizes] = await pool.query(
+            'SELECT size FROM product_sizes WHERE product_id = ? AND is_active = 1',
+            [id]
+          );
+          updatedProductSizes = currentSizes.length > 0
+            ? currentSizes.map(s => s.size.toUpperCase()).sort()
+            : [];
+        }
+        
+        // If updated product has no sizes, treat as having 'NONE'
+        const newSizesSet = updatedProductSizes.length === 0 ? ['NONE'] : updatedProductSizes;
+        
+        // Check each existing product for matching sizes
+        for (const existingProduct of existingProducts) {
+          const [existingSizes] = await pool.query(
+            'SELECT size FROM product_sizes WHERE product_id = ? AND is_active = 1',
+            [existingProduct.id]
+          );
+          
+          const existingSizesList = existingSizes.length > 0
+            ? existingSizes.map(s => s.size.toUpperCase()).sort()
+            : ['NONE'];
+          
+          // Compare size sets (order doesn't matter)
+          const sizesMatch = JSON.stringify(newSizesSet) === JSON.stringify(existingSizesList);
+          
+          if (sizesMatch) {
         return res.status(409).json({ 
-          error: 'Product name already exists',
-          message: `A product with the name "${trimmedName}" already exists. Please choose a different name.`
+              error: 'Duplicate product',
+              message: `A product with the name "${trimmedName}" and the same sizes already exists. Please use different sizes or a different name.`
         });
+          }
+        }
       }
     }
 
@@ -710,6 +884,9 @@ export const updateProduct = async (req, res) => {
       }
 
       if (price !== undefined) {
+        // IMPORTANT: Updating product price only affects future sales.
+        // Historical sales prices are locked in order_items.unit_price and will NEVER change.
+        // This ensures accurate historical sales reporting and revenue tracking.
         updateFields.push('price = ?');
         updateValues.push(parseFloat(price));
       }
@@ -732,6 +909,11 @@ export const updateProduct = async (req, res) => {
       if (image !== undefined) {
         updateFields.push('image = ?');
         updateValues.push(image?.trim() || null);
+      }
+
+      if (is_active !== undefined) {
+        updateFields.push('is_active = ?');
+        updateValues.push(is_active === true || is_active === 1 || is_active === 'true' ? 1 : 0);
       }
 
       updateValues.push(id);
@@ -818,8 +1000,8 @@ export const updateProduct = async (req, res) => {
       // Emit refresh signal for updated product
       const io = req.app.get('io');
       if (io) {
-        // Emit specific product-updated event
-        io.to('admin-room').emit('product-updated', {
+        // Emit specific product-updated event to all users
+        io.emit('product-updated', {
           productId: id,
           name: name || existing[0].name,
           action: 'updated',
@@ -854,7 +1036,7 @@ export const deleteProduct = async (req, res) => {
       return res.status(400).json({ error: 'Invalid product ID' });
     }
 
-    // Check if product exists
+    // Check if product exists (exclude deleted)
     const [existing] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
@@ -876,14 +1058,39 @@ export const deleteProduct = async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      // Soft delete product by setting is_active to false
-      const [result] = await connection.query(
-        'UPDATE products SET is_active = 0 WHERE id = ?', 
-        [id]
-      );
+      // Check if deleted_at column exists, if not add it
+      try {
+        const [columns] = await connection.query(`
+          SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'deleted_at'
+        `);
+        if (columns.length === 0) {
+          console.log('🔧 Adding deleted_at column to products table...');
+          await connection.query('ALTER TABLE products ADD COLUMN deleted_at DATETIME NULL AFTER updated_at');
+          await connection.query('ALTER TABLE products ADD INDEX idx_deleted_at (deleted_at)');
+          console.log('✅ deleted_at column added successfully.');
+        }
+      } catch (alterError) {
+        console.error('Error checking/adding deleted_at column:', alterError);
+        // Continue with deletion even if column addition fails
+      }
+
+      // Soft delete product by setting deleted_at timestamp
+      // Keep is_active for visibility toggle (separate from deletion)
+      // Check if deleted_at column exists before using it
+      let updateQuery = 'UPDATE products SET is_active = 0 WHERE id = ?';
+      const [colCheck] = await connection.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'deleted_at'
+      `);
+      if (colCheck.length > 0) {
+        updateQuery = 'UPDATE products SET deleted_at = NOW(), is_active = 0 WHERE id = ? AND deleted_at IS NULL';
+      }
+      
+      const [result] = await connection.query(updateQuery, [id]);
 
       if (result.affectedRows === 0) {
-        throw new Error('Product not found');
+        throw new Error('Product not found or already deleted');
       }
 
       await connection.commit();
@@ -892,8 +1099,8 @@ export const deleteProduct = async (req, res) => {
       // Emit refresh signal for deleted product
       const io = req.app.get('io');
       if (io) {
-        // Emit specific product-deleted event
-        io.to('admin-room').emit('product-deleted', {
+        // Emit specific product-deleted event to all users
+        io.emit('product-deleted', {
           productId: id,
           action: 'deleted',
           timestamp: new Date().toISOString()
@@ -1054,7 +1261,7 @@ export const updateProductStock = async (req, res) => {
       return res.status(400).json({ error: 'Invalid movement type' });
     }
 
-    // Get current stock
+    // Get current stock (exclude deleted)
     const [currentProduct] = await pool.query(
       'SELECT stock FROM products WHERE id = ?',
       [id]
@@ -1171,7 +1378,7 @@ export const getProductSizes = async (req, res) => {
       return res.status(400).json({ error: 'Invalid product ID' });
     }
 
-    // Check if product exists
+    // Check if product exists (exclude deleted)
     const [products] = await pool.query(
       'SELECT id, name FROM products WHERE id = ? AND is_active = 1',
       [id]

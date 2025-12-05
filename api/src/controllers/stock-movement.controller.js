@@ -128,10 +128,24 @@ export const createStockMovement = async (req, res) => {
     });
 
     // Validation
-    if (!product_id || !movement_type || !quantity || !reason) {
+    if (!product_id || !movement_type || !quantity) {
       return res.status(400).json({ 
-        error: 'Product ID, movement type, quantity, and reason are required' 
+        error: 'Product ID, movement type, and quantity are required' 
       });
+    }
+    
+    // Set default reason if not provided
+    let finalReason = reason;
+    if (!finalReason || finalReason.trim() === '') {
+      if (movement_type === 'stock_in') {
+        finalReason = 'restock';
+      } else if (movement_type === 'stock_out') {
+        finalReason = 'deduction';
+      } else if (movement_type === 'stock_adjustment') {
+        finalReason = 'adjustment';
+      } else {
+        finalReason = 'other';
+      }
     }
 
     if (!['stock_in', 'stock_out', 'stock_adjustment'].includes(movement_type)) {
@@ -146,9 +160,50 @@ export const createStockMovement = async (req, res) => {
       });
     }
 
-    // Check if stock_movements table exists
+    // Check if stock_movements table exists and has required columns
     try {
       await pool.query('SELECT 1 FROM stock_movements LIMIT 1');
+      
+      // Check if size_id column exists
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'stock_movements' 
+        AND COLUMN_NAME = 'size_id'
+      `);
+      
+      if (columns.length === 0) {
+        console.log('📦 Adding size_id column to stock_movements table...');
+        await pool.query(`
+          ALTER TABLE stock_movements 
+          ADD COLUMN size_id INT NULL AFTER product_id
+        `);
+        
+        // Add foreign key constraint
+        try {
+          await pool.query(`
+            ALTER TABLE stock_movements 
+            ADD CONSTRAINT fk_stock_movements_size 
+            FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL
+          `);
+        } catch (fkError) {
+          // Foreign key might already exist, ignore
+          console.log('ℹ️ Foreign key constraint may already exist:', fkError.message);
+        }
+        
+        // Add index
+        try {
+          await pool.query(`
+            CREATE INDEX idx_stock_movements_size ON stock_movements (size_id)
+          `);
+        } catch (indexError) {
+          // Index might already exist, ignore
+          console.log('ℹ️ Index may already exist:', indexError.message);
+        }
+        
+        console.log('✅ size_id column added successfully');
+      }
     } catch (tableError) {
       console.log('Stock movements table does not exist, creating it...');
       // Create the table if it doesn't exist
@@ -238,10 +293,12 @@ export const createStockMovement = async (req, res) => {
     }
 
     // Check if stock out would result in negative stock (not for adjustments)
+    // Only block if it would go below 0
     if (movement_type === 'stock_out' && currentStock < quantity) {
-      return res.status(400).json({ 
-        error: `Insufficient stock. Current stock: ${currentStock}, requested: ${quantity}` 
-      });
+      // Allow if admin wants to adjust to negative (for corrections)
+      // Just log a warning instead of blocking
+      console.warn(`⚠️ Stock out would result in negative stock. Current: ${currentStock}, Requested: ${quantity}`);
+      // Allow the operation to proceed - admin may be correcting inventory
     }
 
     // Start transaction
@@ -278,7 +335,7 @@ export const createStockMovement = async (req, res) => {
         `INSERT INTO stock_movements 
          (product_id, size_id, user_id, movement_type, quantity, reason, supplier, notes, previous_stock, new_stock, created_at) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [product_id, size_id, user_id, movement_type, quantity, reason, supplier, notes, currentStock, newStock]
+        [product_id, size_id, user_id, movement_type, quantity, finalReason, supplier, notes, currentStock, newStock]
       );
 
       await connection.commit();
@@ -297,29 +354,49 @@ export const createStockMovement = async (req, res) => {
           );
           
           if (productInfo.length > 0) {
-            const reorderPoint = productInfo[0].reorder_point || 5; // Default to 5 if not set
+            // Use consistent threshold of 10 to match low stock alerts display logic
+            const LOW_STOCK_THRESHOLD = 10;
             const actualCurrentStock = parseInt(productInfo[0].stock) || 0;
             
-            // If updating size-specific stock, we need to check total stock
-            if (stockTarget === 'product_sizes' && size_id) {
-              // Get total stock (base + all sizes)
-              const [sizeStocks] = await checkConnection.query(
-                'SELECT SUM(stock) as total_size_stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
-                [product_id]
-              );
-              const totalStock = actualCurrentStock + (parseInt(sizeStocks[0]?.total_size_stock) || 0);
+            // Check if product should be removed from low stock alerts
+            // For products with sizes, we need to check if ALL sizes are above threshold
+            // For products without sizes, check base stock
+            
+            // First, check if product has sizes
+            const [productSizes] = await checkConnection.query(
+              'SELECT id, size, stock FROM product_sizes WHERE product_id = ? AND is_active = 1',
+              [product_id]
+            );
+            
+            if (productSizes.length > 0) {
+              // Product has sizes - calculate total size stock
+              const totalSizeStock = productSizes.reduce((sum, size) => sum + (parseInt(size.stock) || 0), 0);
               
-              console.log(`🔍 Checking low stock alert: Product ${product_id}, Total Stock: ${totalStock}, Reorder Point: ${reorderPoint}`);
-              if (totalStock > reorderPoint) {
+              // Check if ALL sizes are above threshold
+              const allSizesAboveThreshold = productSizes.every(size => {
+                const sizeStock = parseInt(size.stock) || 0;
+                return sizeStock > LOW_STOCK_THRESHOLD;
+              });
+              
+              // Also check if base stock is above threshold (if applicable)
+              const baseStockAboveThreshold = actualCurrentStock > LOW_STOCK_THRESHOLD;
+              
+              // Product should be removed if:
+              // 1. All sizes are above threshold AND (base stock is above threshold OR base stock is 0)
+              // 2. OR total size stock is above threshold (for size-only products)
+              if ((allSizesAboveThreshold && (baseStockAboveThreshold || actualCurrentStock === 0)) || 
+                  (totalSizeStock > LOW_STOCK_THRESHOLD && totalSizeStock > 0)) {
                 shouldRefreshLowStockAlerts = true;
-                console.log(`✅ Product ${product_id} stock (${totalStock}) is now above reorder point (${reorderPoint}) - alert should be removed`);
+                console.log(`✅ Product ${product_id} (with sizes) - stock above threshold (${LOW_STOCK_THRESHOLD}) - alert should be removed`);
+              } else {
+                console.log(`⚠️ Product ${product_id} (with sizes) - some sizes still at or below threshold (${LOW_STOCK_THRESHOLD})`);
               }
             } else {
-              // For base product stock
-              console.log(`🔍 Checking low stock alert: Product ${product_id}, Stock: ${actualCurrentStock}, Reorder Point: ${reorderPoint}`);
-              if (actualCurrentStock > reorderPoint) {
+              // Product without sizes - check base stock only
+              console.log(`🔍 Checking low stock alert: Product ${product_id}, Stock: ${actualCurrentStock}, Threshold: ${LOW_STOCK_THRESHOLD}`);
+              if (actualCurrentStock > LOW_STOCK_THRESHOLD) {
                 shouldRefreshLowStockAlerts = true;
-                console.log(`✅ Product ${product_id} stock (${actualCurrentStock}) is now above reorder point (${reorderPoint}) - alert should be removed`);
+                console.log(`✅ Product ${product_id} stock (${actualCurrentStock}) is now above threshold (${LOW_STOCK_THRESHOLD}) - alert should be removed`);
               }
             }
           }
@@ -340,8 +417,17 @@ export const createStockMovement = async (req, res) => {
           new_stock: newStock
         });
         
-        // Emit low stock alerts refresh if stock is now above threshold
-        if (shouldRefreshLowStockAlerts) {
+        // Always emit low stock alerts refresh when stock is added (stock_in)
+        // The frontend will refresh and the backend will filter out products above threshold
+        if (movement_type === 'stock_in') {
+          io.to('admin-room').emit('low-stock-alerts-refresh', {
+            product_id,
+            new_stock: newStock,
+            message: 'Stock restocked - refreshing alerts'
+          });
+          console.log(`🔄 Low stock alerts refresh emitted for product ${product_id} after stock_in`);
+        } else if (shouldRefreshLowStockAlerts) {
+          // For other movement types, only refresh if stock is above threshold
           io.to('admin-room').emit('low-stock-alerts-refresh', {
             product_id,
             new_stock: newStock,
@@ -560,7 +646,7 @@ export const getStockMovementSummary = async (req, res) => {
 // ✅ Get Current Inventory Report
 export const getCurrentInventoryReport = async (req, res) => {
   try {
-    const { category, low_stock_threshold = 5 } = req.query;
+    const { category, low_stock_threshold = 10 } = req.query;
 
     let whereConditions = ['p.is_active = 1'];
     let queryParams = [];
@@ -870,7 +956,7 @@ export const getSalesUsageReport = async (req, res) => {
 // ✅ Get Low Stock Alert Report
 export const getLowStockAlertReport = async (req, res) => {
   try {
-    const { threshold = 5, category } = req.query;
+    const { threshold = 10, category } = req.query;
 
     let whereConditions = [
       'p.is_active = 1',

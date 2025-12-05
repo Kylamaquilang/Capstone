@@ -248,6 +248,7 @@ export const getAllOrders = async (req, res) => {
 }
 
 // 📦 Get order items (with size)
+// IMPORTANT: Returns oi.unit_price (transaction-time price), NOT current product price
 export const getOrderItems = async (req, res) => {
   const { id } = req.params
 
@@ -311,6 +312,8 @@ export const getOrderById = async (req, res) => {
     const order = orders[0]
 
     // Get order items
+    // IMPORTANT: Using oi.unit_price (transaction-time price), NOT p.price or ps.price (current product price)
+    // This ensures historical orders show the price at the time of purchase, not the current price
     const [items] = await pool.query(`
       SELECT 
         oi.quantity, 
@@ -693,7 +696,7 @@ export const getDetailedSalesReport = async (req, res) => {
   try {
     console.log('📊 Detailed sales report request received:', req.query)
     
-    const { start_date, end_date } = req.query
+    const { start_date, end_date, product_id, size, category_id } = req.query
     
     // Build date filter
     let dateFilter = '';
@@ -708,22 +711,69 @@ export const getDetailedSalesReport = async (req, res) => {
       dateParams.push(end_date);
     }
     
+    // Build product filter
+    if (product_id) {
+      dateFilter += 'AND p.id = ? ';
+      dateParams.push(parseInt(product_id));
+    }
+    
+    // Build size filter
+    if (size) {
+      // Handle both explicit size values and 'N/A' for products without sizes
+      if (size === 'N/A' || size === 'NONE') {
+        dateFilter += 'AND (COALESCE(oi.size, ps.size, \'N/A\') = \'N/A\' OR COALESCE(oi.size, ps.size, \'N/A\') = \'NONE\') ';
+      } else {
+        dateFilter += 'AND (COALESCE(oi.size, ps.size, \'N/A\') = ?) ';
+        dateParams.push(size);
+      }
+    }
+    
+    // Build category filter
+    if (category_id) {
+      dateFilter += 'AND p.category_id = ? ';
+      dateParams.push(parseInt(category_id));
+    }
+    
     // Get detailed order items for claimed/completed orders
     // Note: size is saved to order_items during checkout, but we also join with product_sizes to ensure all sizes are displayed
+    // IMPORTANT: Using oi.unit_price (transaction-time price) for accurate historical sales reporting
+    // Historical prices are LOCKED and never change, even if product prices are updated later
     const [orderItems] = await pool.query(`
       SELECT 
         o.created_at as order_date,
+        p.id as product_id,
         p.name as product_name,
+        p.category_id,
+        COALESCE(c.name, 'Uncategorized') as category_name,
         COALESCE(oi.size, ps.size, 'N/A') as size,
         oi.quantity,
         oi.unit_price,
         oi.total_price as item_total,
         o.payment_method,
-        o.status
+        o.status,
+        u.name as customer_name,
+        u.student_id,
+        u.email as customer_email,
+        -- Compare historical price (oi.unit_price) with current price to identify price changes
+        CASE 
+          WHEN oi.size_id IS NOT NULL THEN
+            CASE 
+              WHEN ABS(oi.unit_price - COALESCE(ps.price, p.price)) > 0.01 THEN 1
+              ELSE 0
+            END
+          ELSE
+            CASE 
+              WHEN ABS(oi.unit_price - p.price) > 0.01 THEN 1
+              ELSE 0
+            END
+        END as is_historical_price,
+        COALESCE(ps.price, p.price) as current_price
       FROM orders o
       JOIN order_items oi ON o.id = oi.order_id
       JOIN products p ON oi.product_id = p.id
+      LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+      LEFT JOIN users u ON o.user_id = u.id
       WHERE o.status IN ('claimed', 'completed')
       ${dateFilter}
       ORDER BY o.created_at DESC, p.name
@@ -746,7 +796,7 @@ export const getDetailedSalesReport = async (req, res) => {
       console.log('📊 No order items found for sales report!');
     }
     
-    // Calculate summary
+    // Calculate summary (using same filters)
     const [summary] = await pool.query(`
       SELECT 
         COUNT(DISTINCT o.id) as total_orders,
@@ -757,6 +807,75 @@ export const getDetailedSalesReport = async (req, res) => {
         SUM(CASE WHEN LOWER(o.payment_method) = 'cash' THEN oi.total_price ELSE 0 END) as cash_revenue
       FROM orders o
       JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+      WHERE o.status IN ('claimed', 'completed')
+      ${dateFilter}
+    `, dateParams);
+    
+    // Calculate revenue breakdown by price point (historical vs current)
+    // Compare order_items.unit_price (historical/locked price) with current product price
+    const [priceBreakdown] = await pool.query(`
+      SELECT 
+        -- Historical prices (locked at time of sale, may differ from current price)
+        SUM(CASE 
+          WHEN oi.size_id IS NOT NULL THEN
+            CASE 
+              WHEN ABS(oi.unit_price - COALESCE(ps.price, p.price)) > 0.01 THEN oi.total_price
+              ELSE 0
+            END
+          ELSE
+            CASE 
+              WHEN ABS(oi.unit_price - p.price) > 0.01 THEN oi.total_price
+              ELSE 0
+            END
+        END) as revenue_from_historical_prices,
+        
+        -- Current price (sales made at current product price)
+        SUM(CASE 
+          WHEN oi.size_id IS NOT NULL THEN
+            CASE 
+              WHEN ABS(oi.unit_price - COALESCE(ps.price, p.price)) <= 0.01 THEN oi.total_price
+              ELSE 0
+            END
+          ELSE
+            CASE 
+              WHEN ABS(oi.unit_price - p.price) <= 0.01 THEN oi.total_price
+              ELSE 0
+            END
+        END) as revenue_from_current_price,
+        
+        -- Count of items sold at historical prices
+        SUM(CASE 
+          WHEN oi.size_id IS NOT NULL THEN
+            CASE 
+              WHEN ABS(oi.unit_price - COALESCE(ps.price, p.price)) > 0.01 THEN oi.quantity
+              ELSE 0
+            END
+          ELSE
+            CASE 
+              WHEN ABS(oi.unit_price - p.price) > 0.01 THEN oi.quantity
+              ELSE 0
+            END
+        END) as items_at_historical_price,
+        
+        -- Count of items sold at current price
+        SUM(CASE 
+          WHEN oi.size_id IS NOT NULL THEN
+            CASE 
+              WHEN ABS(oi.unit_price - COALESCE(ps.price, p.price)) <= 0.01 THEN oi.quantity
+              ELSE 0
+            END
+          ELSE
+            CASE 
+              WHEN ABS(oi.unit_price - p.price) <= 0.01 THEN oi.quantity
+              ELSE 0
+            END
+        END) as items_at_current_price
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
       WHERE o.status IN ('claimed', 'completed')
       ${dateFilter}
     `, dateParams);
@@ -772,10 +891,192 @@ export const getDetailedSalesReport = async (req, res) => {
         cash_orders: 0,
         gcash_revenue: 0,
         cash_revenue: 0
+      },
+      priceBreakdown: priceBreakdown[0] || {
+        revenue_from_historical_prices: 0,
+        revenue_from_current_price: 0,
+        items_at_historical_price: 0,
+        items_at_current_price: 0
       }
     });
   } catch (err) {
     console.error('Detailed sales report error:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+};
+
+// 📊 Get product sales report (grouped by product with historical prices)
+export const getProductSalesReport = async (req, res) => {
+  try {
+    console.log('📊 Product sales report request received:', req.query);
+    
+    const { start_date, end_date, product_id, size, min_price, max_price } = req.query;
+    
+    // Build date filter
+    let dateFilter = '';
+    let dateParams = [];
+    
+    if (start_date) {
+      dateFilter += 'AND DATE(o.created_at) >= ? ';
+      dateParams.push(start_date);
+    }
+    if (end_date) {
+      dateFilter += 'AND DATE(o.created_at) <= ? ';
+      dateParams.push(end_date);
+    }
+    
+    // Build product filter
+    if (product_id) {
+      dateFilter += 'AND p.id = ? ';
+      dateParams.push(parseInt(product_id));
+    }
+    
+    // Build size filter
+    if (size) {
+      // Handle both explicit size values and 'N/A' for products without sizes
+      if (size === 'N/A' || size === 'NONE') {
+        dateFilter += 'AND (COALESCE(oi.size, ps.size, \'N/A\') = \'N/A\' OR COALESCE(oi.size, ps.size, \'N/A\') = \'NONE\') ';
+      } else {
+        dateFilter += 'AND (COALESCE(oi.size, ps.size, \'N/A\') = ?) ';
+        dateParams.push(size);
+      }
+    }
+    
+    // Build price filter
+    if (min_price) {
+      dateFilter += 'AND oi.unit_price >= ? ';
+      dateParams.push(parseFloat(min_price));
+    }
+    if (max_price) {
+      dateFilter += 'AND oi.unit_price <= ? ';
+      dateParams.push(parseFloat(max_price));
+    }
+    
+    // Get product sales grouped by product, showing historical prices
+    // IMPORTANT: Using oi.unit_price (transaction-time price) to preserve historical pricing
+    const [productSales] = await pool.query(`
+      SELECT 
+        p.id as product_id,
+        p.name as product_name,
+        p.image as product_image,
+        COALESCE(oi.size, ps.size, 'N/A') as size,
+        oi.unit_price as sale_price,
+        SUM(oi.quantity) as total_quantity_sold,
+        COUNT(DISTINCT o.id) as order_count,
+        SUM(oi.total_price) as total_revenue,
+        MIN(o.created_at) as first_sale_date,
+        MAX(o.created_at) as last_sale_date
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+      WHERE o.status IN ('claimed', 'completed')
+      ${dateFilter}
+      GROUP BY p.id, p.name, p.image, COALESCE(oi.size, ps.size, 'N/A'), oi.unit_price
+      ORDER BY p.name, oi.unit_price DESC, total_quantity_sold DESC
+    `, dateParams);
+    
+    console.log(`📊 Found ${productSales.length} product sales records`);
+    
+    // Calculate summary (using same filters)
+    const [summary] = await pool.query(`
+      SELECT 
+        COUNT(DISTINCT o.id) as total_orders,
+        COUNT(DISTINCT oi.product_id) as unique_products,
+        SUM(oi.total_price) as total_revenue,
+        SUM(oi.quantity) as total_items_sold
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      WHERE o.status IN ('claimed', 'completed')
+      ${dateFilter}
+    `, dateParams);
+    
+    // Calculate revenue breakdown by price point (historical vs current)
+    // IMPORTANT: This compares order_items.unit_price (locked historical price) with current product price
+    // Historical prices are NEVER modified - they remain locked at the time of purchase
+    const [priceBreakdown] = await pool.query(`
+      SELECT 
+        -- Revenue from historical prices (sales made at old prices, before price changes)
+        SUM(CASE 
+          WHEN oi.size_id IS NOT NULL THEN
+            CASE 
+              WHEN ABS(oi.unit_price - COALESCE(ps.price, p.price)) > 0.01 THEN oi.total_price
+              ELSE 0
+            END
+          ELSE
+            CASE 
+              WHEN ABS(oi.unit_price - p.price) > 0.01 THEN oi.total_price
+              ELSE 0
+            END
+        END) as revenue_from_historical_prices,
+        
+        -- Revenue from current price (sales made at current product price)
+        SUM(CASE 
+          WHEN oi.size_id IS NOT NULL THEN
+            CASE 
+              WHEN ABS(oi.unit_price - COALESCE(ps.price, p.price)) <= 0.01 THEN oi.total_price
+              ELSE 0
+            END
+          ELSE
+            CASE 
+              WHEN ABS(oi.unit_price - p.price) <= 0.01 THEN oi.total_price
+              ELSE 0
+            END
+        END) as revenue_from_current_price,
+        
+        -- Count of items sold at historical prices
+        SUM(CASE 
+          WHEN oi.size_id IS NOT NULL THEN
+            CASE 
+              WHEN ABS(oi.unit_price - COALESCE(ps.price, p.price)) > 0.01 THEN oi.quantity
+              ELSE 0
+            END
+          ELSE
+            CASE 
+              WHEN ABS(oi.unit_price - p.price) > 0.01 THEN oi.quantity
+              ELSE 0
+            END
+        END) as items_at_historical_price,
+        
+        -- Count of items sold at current price
+        SUM(CASE 
+          WHEN oi.size_id IS NOT NULL THEN
+            CASE 
+              WHEN ABS(oi.unit_price - COALESCE(ps.price, p.price)) <= 0.01 THEN oi.quantity
+              ELSE 0
+            END
+          ELSE
+            CASE 
+              WHEN ABS(oi.unit_price - p.price) <= 0.01 THEN oi.quantity
+              ELSE 0
+            END
+        END) as items_at_current_price
+      FROM orders o
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+      WHERE o.status IN ('claimed', 'completed')
+      ${dateFilter}
+    `, dateParams);
+    
+    res.json({
+      productSales,
+      summary: summary[0] || {
+        total_orders: 0,
+        unique_products: 0,
+        total_revenue: 0,
+        total_items_sold: 0
+      },
+      priceBreakdown: priceBreakdown[0] || {
+        revenue_from_historical_prices: 0,
+        revenue_from_current_price: 0,
+        items_at_historical_price: 0,
+        items_at_current_price: 0
+      }
+    });
+  } catch (err) {
+    console.error('Product sales report error:', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 };

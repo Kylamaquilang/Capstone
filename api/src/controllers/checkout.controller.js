@@ -4,17 +4,46 @@ import { emitUserNotification, emitAdminNotification, emitInventoryUpdate, emitN
 
 
 export const checkout = async (req, res) => {
+  // Validate user authentication
+  if (!req.user || !req.user.id) {
+    console.error('❌ Checkout - No user found in request');
+    return res.status(401).json({ 
+      error: 'Unauthorized',
+      message: 'Please log in to complete checkout'
+    });
+  }
+
   const user_id = req.user.id
   const { payment_method, pay_at_counter, cart_item_ids, products } = req.body
   const io = req.app.get('io');
 
   console.log('🛒 Checkout request:', { user_id, payment_method, pay_at_counter, cart_item_ids, products });
+  console.log('🛒 Checkout request user:', req.user);
+  console.log('🛒 Checkout request headers:', req.headers);
 
   if (!payment_method) {
     return res.status(400).json({ 
       error: 'Payment method required',
       message: 'Please select a payment method'
     })
+  }
+
+  // Validate user exists in database
+  try {
+    const [userCheck] = await pool.query('SELECT id FROM users WHERE id = ?', [user_id]);
+    if (userCheck.length === 0) {
+      console.error(`❌ User ${user_id} not found in database`);
+      return res.status(404).json({ 
+        error: 'User not found',
+        message: 'Your account was not found. Please log in again.'
+      });
+    }
+  } catch (userCheckError) {
+    console.error('❌ Error checking user existence:', userCheckError);
+    return res.status(500).json({ 
+      error: 'Database error',
+      message: 'Unable to verify your account. Please try again.'
+    });
   }
 
   try {
@@ -45,7 +74,7 @@ export const checkout = async (req, res) => {
           SELECT p.id as product_id, p.stock, p.price, ps.id as size_id, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
           FROM products p
           LEFT JOIN product_sizes ps ON p.id = ps.product_id AND ps.id = ?
-          WHERE p.id = ?
+          WHERE p.id = ? AND p.is_active = 1
         `, [product.size_id || null, product_id]);
         
         console.log('🔍 Product query result:', productData);
@@ -54,29 +83,38 @@ export const checkout = async (req, res) => {
           console.log('❌ Product not found in checkout:', product);
           return res.status(404).json({ 
             error: 'Product not found',
-            message: `Product ID ${product_id} not found`
+            message: `Product ID ${product_id} not found or is inactive`
           });
         }
         
         const item = productData[0];
         
         // Validate that we have a valid price
-        const price = item.size_id ? item.size_price : item.price;
-        if (!price || isNaN(price)) {
+        const price = parseFloat(item.size_id ? (item.size_price || item.price) : (item.price || 0));
+        if (!price || isNaN(price) || price <= 0) {
           return res.status(400).json({ 
             error: 'Invalid price',
-            message: `Price not found for product ID ${product.product_id}${product.size_id ? ` with size ID ${product.size_id}` : ''}`
+            message: `Invalid price for product ID ${product.product_id}${product.size_id ? ` with size ID ${product.size_id}` : ''}. Price: ${price}`
+          });
+        }
+        
+        // Validate quantity
+        const quantity = parseInt(product.quantity) || 0;
+        if (quantity <= 0) {
+          return res.status(400).json({ 
+            error: 'Invalid quantity',
+            message: `Invalid quantity for product ID ${product_id}. Quantity must be greater than 0.`
           });
         }
         
         cartItems.push({
           cart_id: null, // No cart ID for direct products
-          quantity: product.quantity,
+          quantity: quantity,
           product_id: item.product_id,
           size_id: product.size_id || null,
           size_name: item.size_name || null,
-          stock: item.size_id ? item.size_stock : item.stock,
-          price: parseFloat(price),
+          stock: item.size_id ? (item.size_stock || 0) : (item.stock || 0),
+          price: price,
           size_price: parseFloat(item.size_price || 0)
         });
       }
@@ -87,8 +125,10 @@ export const checkout = async (req, res) => {
         SELECT c.id AS cart_id, c.quantity, c.product_id, c.size,
                p.stock, p.price, ps.id as size_id, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
         FROM cart_items c
-        JOIN products p ON c.product_id = p.id
-        LEFT JOIN product_sizes ps ON c.product_id = ps.product_id AND c.size = ps.size
+        JOIN products p ON c.product_id = p.id AND p.is_active = 1
+        LEFT JOIN product_sizes ps ON c.product_id = ps.product_id 
+          AND ps.is_active = 1
+          AND (c.size IS NULL OR c.size = '' OR UPPER(TRIM(c.size)) = UPPER(TRIM(ps.size)))
         WHERE c.user_id = ? AND c.id IN (${placeholders})
       `, [user_id, ...cart_item_ids])
     } else {
@@ -97,8 +137,10 @@ export const checkout = async (req, res) => {
         SELECT c.id AS cart_id, c.quantity, c.product_id, c.size,
                p.stock, p.price, ps.id as size_id, ps.stock as size_stock, ps.price as size_price, ps.size as size_name
         FROM cart_items c
-        JOIN products p ON c.product_id = p.id
-        LEFT JOIN product_sizes ps ON c.product_id = ps.product_id AND c.size = ps.size
+        JOIN products p ON c.product_id = p.id AND p.is_active = 1
+        LEFT JOIN product_sizes ps ON c.product_id = ps.product_id 
+          AND ps.is_active = 1
+          AND (c.size IS NULL OR c.size = '' OR UPPER(TRIM(c.size)) = UPPER(TRIM(ps.size)))
         WHERE c.user_id = ?
       `, [user_id])
     }
@@ -142,16 +184,25 @@ export const checkout = async (req, res) => {
     })));
 
     const total_amount = cartItems.reduce((sum, item) => {
-      const price = item.size_id ? item.size_price : item.price
-      const itemTotal = price * item.quantity
+      const price = parseFloat(item.size_id ? (item.size_price || item.price) : (item.price || 0));
+      const quantity = parseInt(item.quantity) || 0;
+      const itemTotal = price * quantity;
       
-      console.log(`💰 Price calculation: Product ${item.product_id}, Size ${item.size_id}, Price ${price}, Quantity ${item.quantity}, Total ${itemTotal}`);
+      console.log(`💰 Price calculation: Product ${item.product_id}, Size ${item.size_id}, Price ${price}, Quantity ${quantity}, Total ${itemTotal}`);
       
-      if (isNaN(itemTotal)) {
-        throw new Error(`Invalid price calculation for product ID ${item.product_id}: price=${price}, quantity=${item.quantity}`)
+      if (isNaN(price) || price <= 0) {
+        throw new Error(`Invalid price for product ID ${item.product_id}: price=${price}`);
       }
       
-      return sum + itemTotal
+      if (isNaN(quantity) || quantity <= 0) {
+        throw new Error(`Invalid quantity for product ID ${item.product_id}: quantity=${quantity}`);
+      }
+      
+      if (isNaN(itemTotal) || itemTotal <= 0) {
+        throw new Error(`Invalid price calculation for product ID ${item.product_id}: price=${price}, quantity=${quantity}, total=${itemTotal}`);
+      }
+      
+      return sum + itemTotal;
     }, 0)
 
     console.log('💰 Total amount calculated:', total_amount);
@@ -204,18 +255,48 @@ export const checkout = async (req, res) => {
         // Get size name from cart item (already fetched from product_sizes table)
         const sizeName = item.size_name || null;
         
+        // IMPORTANT: Capture the price at transaction time
+        // This price is stored in order_items.unit_price and will NOT change even if the product price is updated later.
+        // This ensures historical sales records maintain the price at the time of purchase.
+        const transactionPrice = parseFloat(item.size_price || item.price || 0);
+        
+        // Validate transaction price
+        if (!transactionPrice || isNaN(transactionPrice) || transactionPrice <= 0) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({ 
+            error: 'Invalid product price',
+            message: `Invalid price for product "${productName}". Please contact support.`
+          });
+        }
+        
+        const transactionTotal = transactionPrice * item.quantity;
+        
+        // Validate transaction total
+        if (isNaN(transactionTotal) || transactionTotal <= 0) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({ 
+            error: 'Invalid order total',
+            message: `Invalid total for product "${productName}". Please contact support.`
+          });
+        }
+        
         console.log(`📦 Creating order item:`);
         console.log(`   - Product: "${productName}"`);
         console.log(`   - Size Name: "${sizeName || 'NULL'}"`);
         console.log(`   - Size ID: ${item.size_id || 'NULL'}`);
         console.log(`   - Quantity: ${item.quantity}`);
+        console.log(`   - Transaction Price (stored): ${transactionPrice}`);
+        console.log(`   - Transaction Total: ${transactionTotal}`);
         console.log(`   - Item object:`, JSON.stringify(item, null, 2));
 
         // Insert order item with size name
+        // NOTE: unit_price stores the price at the time of transaction, not the current product price
         const insertResult = await connection.query(
           `INSERT INTO order_items (order_id, product_id, size_id, size, product_name, quantity, unit_price, unit_cost, total_price)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [orderId, item.product_id, item.size_id || null, sizeName, productName, item.quantity, item.size_price || item.price, costPrice, (item.size_price || item.price) * item.quantity]
+          [orderId, item.product_id, item.size_id || null, sizeName, productName, item.quantity, transactionPrice, costPrice, transactionTotal]
         )
         
         // Verify what was actually saved
@@ -368,8 +449,9 @@ export const checkout = async (req, res) => {
       // Don't fail the checkout if notification fails
     }
 
-    // Emit refresh signals
+    // Emit refresh signals (wrapped in try-catch to prevent checkout failure)
     if (io) {
+      try {
       emitDataRefresh(io, 'orders', { action: 'created', orderId });
       emitAdminDataRefresh(io, 'orders', { action: 'created', orderId });
       emitUserDataRefresh(io, user_id, 'orders', { action: 'created', orderId });
@@ -381,6 +463,10 @@ export const checkout = async (req, res) => {
         action: 'cleared',
         timestamp: new Date().toISOString()
       });
+      } catch (socketError) {
+        console.error('❌ Error emitting socket events (non-fatal):', socketError);
+        // Don't fail checkout if socket emission fails
+      }
     }
 
     console.log('🎉 Checkout completed successfully, sending response...');
@@ -395,6 +481,40 @@ export const checkout = async (req, res) => {
   } catch (err) {
     console.error('❌ Checkout error:', err);
     console.error('❌ Error stack:', err.stack);
+    console.error('❌ Error details:', {
+      message: err.message,
+      code: err.code,
+      sqlState: err.sqlState,
+      sqlMessage: err.sqlMessage
+    });
+    
+    // Handle validation errors (400)
+    if (err.message && (
+      err.message.includes('Invalid price') || 
+      err.message.includes('Invalid quantity') || 
+      err.message.includes('Invalid total') ||
+      err.message.includes('Insufficient stock')
+    )) {
+      return res.status(400).json({ 
+        error: 'Validation error',
+        message: err.message
+      });
+    }
+    
+    // Handle foreign key constraint errors
+    if (err.code === 'ER_NO_REFERENCED_ROW_2' || err.errno === 1452) {
+      console.error('❌ Foreign key constraint error:', err.sqlMessage);
+      if (err.sqlMessage && err.sqlMessage.includes('user_id')) {
+        return res.status(404).json({ 
+          error: 'User account error',
+          message: 'Your account was not found. Please log out and log in again.'
+        });
+      }
+      return res.status(400).json({ 
+        error: 'Data integrity error',
+        message: 'Unable to process order due to data inconsistency. Please contact support.'
+      });
+    }
     
     // Handle specific database errors
     if (err.code === 'ER_NO_SUCH_TABLE') {

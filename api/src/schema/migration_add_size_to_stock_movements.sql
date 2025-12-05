@@ -65,3 +65,10 @@ SELECT 'Migration completed: size_id column added to stock_movements table (if i
 
 
 
+
+
+
+
+
+
+

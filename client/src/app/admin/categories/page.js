@@ -23,13 +23,20 @@ export default function AdminCategoriesPage() {
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const loadCategories = useCallback(async () => {
+  const loadCategories = useCallback(async (silent = false) => {
     try {
       setLoading(true);
       const { data } = await API.get('/categories');
       setCategories(data);
+      // Clear error on successful load
+      if (!silent) {
+        setError('');
+      }
     } catch (err) {
-      setError('Failed to load categories');
+      // Only set error if not in silent mode (e.g., after successful update)
+      if (!silent) {
+        setError('Failed to load categories');
+      }
       console.error('Load categories error:', err);
     } finally {
       setLoading(false);
@@ -60,12 +67,22 @@ export default function AdminCategoriesPage() {
     }
 
     try {
-      await API.put(`/categories/${editingId}`, { name: editName.trim() });
+      // Make the API call
+      const response = await API.put(`/categories/${editingId}`, { name: editName.trim() });
+      
+      // If we reach here, the request was successful (axios throws for status >= 400)
+      // Verify response status explicitly
+      if (!response || response.status < 200 || response.status >= 300) {
+        throw new Error('Invalid response status');
+      }
+      
+      // Clear any previous errors
+      setError('');
       
       // Show SweetAlert success message
       await Swal.fire({
         title: 'Success!',
-        text: 'Category updated successfully',
+        text: response.data?.message || 'Category updated successfully',
         icon: 'success',
         confirmButtonText: 'OK',
         confirmButtonColor: '#000C50',
@@ -73,17 +90,33 @@ export default function AdminCategoriesPage() {
         timerProgressBar: true
       });
       
+      // Reset form state
       setShowEditModal(false);
       setEditingId(null);
       setEditName('');
-      setNewSubcategoryName('');
       setEditingCategory(null);
-      loadCategories();
+      
+      // Reload categories separately - wrapped in try-catch to prevent any errors from bubbling up
+      setTimeout(() => {
+        loadCategories(true).catch((loadError) => {
+          // Silently handle load error - the update was successful
+          console.error('Failed to reload categories after update:', loadError);
+        });
+      }, 100);
+      
     } catch (err) {
+      // This catch block ONLY runs if the API call itself failed
+      // Axios throws errors for status codes >= 400 or network errors
+      console.error('Category update error:', err);
+      
+      // Clear error state
+      setError('');
+      
+      // Show error alert only for actual failures
       await Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: err?.response?.data?.error || 'Failed to update category',
+        text: err?.response?.data?.error || err?.message || 'Failed to update category',
         confirmButtonColor: '#000C50'
       });
     }
@@ -92,40 +125,73 @@ export default function AdminCategoriesPage() {
 
 
   const handleDeleteCategory = async (id, name) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `This will delete "${name}". This action cannot be undone.`,
+    // Show confirmation dialog first
+    const confirmResult = await Swal.fire({
+      title: 'Delete Category?',
+      text: `Are you sure you want to delete "${name}"?`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete it!',
+      confirmButtonText: 'Yes, delete it',
       cancelButtonText: 'Cancel'
     });
 
-    if (result.isConfirmed) {
-      try {
-        await API.delete(`/categories/${id}`);
+    if (!confirmResult.isConfirmed) {
+      return;
+    }
+
+    // Proceed with deletion
+    try {
+        const response = await API.delete(`/categories/${id}`);
+        
+        // Check if deletion was successful
+        if (response.data?.success === false) {
+          // Category is still in use
+          await Swal.fire({
+            icon: 'error',
+            title: 'Category In Use',
+            text: response.data?.message || 'This category cannot be deleted because it is currently used by products.',
+            confirmButtonColor: '#000C50'
+          });
+          return;
+        }
+        
+        // Success - category deleted
+        await Swal.fire({
+          icon: 'success',
+          title: 'Deleted!',
+          text: response.data?.message || 'Category has been deleted successfully.',
+          confirmButtonColor: '#000C50',
+          timer: 2000,
+          timerProgressBar: true
+        });
         
         // Update the categories state immediately
         setCategories(prevCategories => prevCategories.filter(cat => cat.id !== id));
         
-        Swal.fire(
-          'Deleted!',
-          'The category has been deleted.',
-          'success'
-        );
-        
         // Also reload from server to ensure consistency
         loadCategories();
       } catch (err) {
-        Swal.fire(
-          'Error!',
-          err?.response?.data?.error || 'Failed to delete category',
-          'error'
-        );
+        // Handle error response
+        if (err?.response?.data?.success === false) {
+          // Category is still in use
+          await Swal.fire({
+            icon: 'error',
+            title: 'Category In Use',
+            text: err?.response?.data?.message || 'This category cannot be deleted because it is currently used by products.',
+            confirmButtonColor: '#000C50'
+          });
+        } else {
+          // Other errors
+          await Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: err?.response?.data?.error || err?.response?.data?.message || 'Failed to delete category',
+            confirmButtonColor: '#000C50'
+          });
+        }
       }
-    }
   };
 
   const startEdit = (category) => {
@@ -181,33 +247,76 @@ export default function AdminCategoriesPage() {
     if (result.isConfirmed) {
       try {
         // Delete all selected categories
-        await Promise.all(
+        const deleteResults = await Promise.allSettled(
           selectedCategories.map(id => API.delete(`/categories/${id}`))
         );
 
-        // Update state immediately
-        setCategories(prevCategories => 
-          prevCategories.filter(cat => !selectedCategories.includes(cat.id))
-        );
+        // Check results
+        const successful = [];
+        const failed = [];
+
+        deleteResults.forEach((result, index) => {
+          if (result.status === 'fulfilled' && result.value.data?.success !== false) {
+            successful.push(selectedCategories[index]);
+          } else {
+            const errorMsg = result.status === 'rejected' 
+              ? result.reason?.response?.data?.message || 'Failed to delete'
+              : result.value?.data?.message || 'Category is in use';
+            failed.push({ id: selectedCategories[index], message: errorMsg });
+          }
+        });
+
+        // Update state for successful deletions
+        if (successful.length > 0) {
+          setCategories(prevCategories => 
+            prevCategories.filter(cat => !successful.includes(cat.id))
+          );
+        }
 
         // Clear selection
         setSelectedCategories([]);
         setSelectAll(false);
 
-        Swal.fire(
-          'Deleted!',
-          `${selectedCategories.length} categor${selectedCategories.length > 1 ? 'ies' : 'y'} deleted successfully.`,
-          'success'
-        );
+        // Show appropriate message
+        if (successful.length > 0 && failed.length === 0) {
+          // All successful
+          await Swal.fire({
+            icon: 'success',
+            title: 'Deleted!',
+            text: `${successful.length} categor${successful.length > 1 ? 'ies' : 'y'} deleted successfully.`,
+            confirmButtonColor: '#000C50',
+            timer: 2000,
+            timerProgressBar: true
+          });
+        } else if (successful.length > 0 && failed.length > 0) {
+          // Partial success
+          await Swal.fire({
+            icon: 'warning',
+            title: 'Partial Success',
+            html: `${successful.length} categor${successful.length > 1 ? 'ies' : 'y'} deleted.<br/>${failed.length} categor${failed.length > 1 ? 'ies' : 'y'} could not be deleted (in use by products).`,
+            confirmButtonColor: '#000C50'
+          });
+        } else {
+          // All failed
+          await Swal.fire({
+            icon: 'error',
+            title: 'Deletion Failed',
+            text: failed.length > 0 
+              ? failed[0].message || 'Categories cannot be deleted because they are in use by products.'
+              : 'Failed to delete categories',
+            confirmButtonColor: '#000C50'
+          });
+        }
 
         // Reload from server to ensure consistency
         loadCategories();
       } catch (err) {
-        Swal.fire(
-          'Error!',
-          err?.response?.data?.error || 'Failed to delete categories',
-          'error'
-        );
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: err?.response?.data?.error || err?.response?.data?.message || 'Failed to delete categories',
+          confirmButtonColor: '#000C50'
+        });
       }
     }
   };
@@ -225,6 +334,9 @@ export default function AdminCategoriesPage() {
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
                   <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Categories</h1>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Note: You can edit categories anytime. Deleting is restricted if products are using this category.
+                  </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   {selectedCategories.length > 0 && (

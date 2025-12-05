@@ -59,6 +59,16 @@ export default function AddProductForm() {
         setLoading(false);
         return;
       }
+      if (!categoryId || categoryId === '') {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please select a category',
+          confirmButtonColor: '#000C50'
+        });
+        setLoading(false);
+        return;
+      }
       if (!price || Number(price) <= 0) {
         await Swal.fire({
           icon: 'warning',
@@ -73,6 +83,18 @@ export default function AddProductForm() {
       // Removed cost price validation - only selling price is required
       // Stock validation removed - stock is auto-managed by inventory
 
+      // Validate image is required
+      if (!file) {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Validation Error',
+          text: 'Please upload a product image',
+          confirmButtonColor: '#000C50'
+        });
+        setLoading(false);
+        return;
+      }
+
       let finalImageUrl = null;
       
       // Handle image URL (already uploaded via ImageUpload component)
@@ -80,6 +102,18 @@ export default function AddProductForm() {
         finalImageUrl = file.url;
       } else if (file && typeof file === 'string') {
         finalImageUrl = file;
+      }
+
+      // Verify image URL was obtained
+      if (!finalImageUrl) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Image Error',
+          text: 'Failed to get image URL. Please upload the image again.',
+          confirmButtonColor: '#000C50'
+        });
+        setLoading(false);
+        return;
       }
 
       // Prepare sizes data
@@ -214,10 +248,11 @@ export default function AddProductForm() {
           </div>
 
           <div>
-            <label className="block text-sm mb-1">CATEGORY:</label>
+            <label className="block text-sm mb-1">CATEGORY: <span className="text-red-500">*</span></label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
+              required
               className="w-full border border-gray-400 px-3 py-2 rounded"
             >
               <option value="">Select category</option>
@@ -302,7 +337,22 @@ export default function AddProductForm() {
               onClick={() => document.getElementById('product-file-input')?.click()}
             >
               {previewUrl ? (
-                <div className="space-y-3">
+                <div className="space-y-3 relative">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFile(null);
+                      setPreviewUrl('');
+                      // Reset file input
+                      const fileInput = document.getElementById('product-file-input');
+                      if (fileInput) fileInput.value = '';
+                    }}
+                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-base hover:bg-red-600 transition-colors z-10"
+                    title="Remove image"
+                  >
+                    ×
+                  </button>
                   <img src={previewUrl} alt="Preview" className="w-32 h-32 object-cover rounded-lg mx-auto border-2 border-gray-200" />
                   <div>
                     <p className="text-sm font-medium text-gray-900">{file?.name}</p>

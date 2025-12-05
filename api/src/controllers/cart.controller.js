@@ -59,12 +59,25 @@ const processAddToCart = async (req, res, product_id, quantity, size_id, user_id
         SELECT ps.stock, ps.price, p.name, p.image 
         FROM product_sizes ps 
         JOIN products p ON ps.product_id = p.id 
-        WHERE ps.id = ? AND ps.product_id = ?
+        WHERE ps.id = ? AND ps.product_id = ? AND p.is_active = 1 AND ps.is_active = 1
       `;
       stockParams = [size_id, product_id];
     } else {
       // Check general product stock
-      stockQuery = 'SELECT stock, price, name, image FROM products WHERE id = ?';
+      // Check if deleted_at column exists before using it
+      let deletedAtCondition = '';
+      try {
+        const [columns] = await pool.query(`
+          SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'deleted_at'
+        `);
+        if (columns.length > 0) {
+          deletedAtCondition = 'AND deleted_at IS NULL';
+        }
+      } catch (err) {
+        // Column doesn't exist yet, continue without the condition
+      }
+      stockQuery = `SELECT stock, price, name, image FROM products WHERE id = ? AND is_active = 1 ${deletedAtCondition}`;
       stockParams = [product_id];
     }
 
@@ -174,7 +187,14 @@ const processAddToCart = async (req, res, product_id, quantity, size_id, user_id
       action: 'added'
     });
   } catch (err) {
-    console.error('Add to cart error:', err);
+    console.error('❌ Add to cart error:', err);
+    console.error('❌ Add to cart error stack:', err.stack);
+    console.error('❌ Add to cart error details:', {
+      message: err.message,
+      code: err.code,
+      sqlState: err.sqlState,
+      sqlMessage: err.sqlMessage
+    });
     
     // Handle specific database errors
     if (err.code === 'ER_NO_SUCH_TABLE') {
@@ -184,16 +204,29 @@ const processAddToCart = async (req, res, product_id, quantity, size_id, user_id
       });
     }
     
-    if (err.code === 'ER_BAD_DB_ERROR') {
+    if (err.code === 'ER_BAD_DB_ERROR' || err.code === 'ECONNREFUSED') {
       return res.status(500).json({ 
         error: 'Database connection error',
         message: 'Unable to connect to database. Please try again.'
       });
     }
     
+    // Handle validation errors
+    if (err.message && (
+      err.message.includes('Invalid') || 
+      err.message.includes('Missing') ||
+      err.message.includes('required')
+    )) {
+      return res.status(400).json({ 
+        error: 'Validation error',
+        message: err.message
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Server error',
-      message: 'Failed to add item to cart. Please try again.'
+      message: 'Failed to add item to cart. Please try again.',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 };
@@ -219,13 +252,24 @@ export const getCart = async (req, res) => {
         p.name as product_name, 
         p.image as product_image,
         p.price as product_price,
+        p.stock as product_stock,
         ps.id as size_id,
         ps.price as size_price,
-        COALESCE(ps.price, p.price) as final_price
+        ps.stock as size_stock,
+        COALESCE(ps.price, p.price) as final_price,
+        CASE 
+          WHEN ps.id IS NOT NULL AND ps.stock IS NOT NULL THEN ps.stock
+          WHEN c.size IS NULL OR c.size = '' THEN p.stock
+          ELSE p.stock
+        END as available_stock
       FROM cart_items c
-      JOIN products p ON c.product_id = p.id
+        JOIN products p ON c.product_id = p.id AND p.is_active = 1
       LEFT JOIN product_sizes ps ON c.product_id = ps.product_id 
-        AND (c.size = ps.size OR (c.size IS NULL AND ps.size IS NULL))
+        AND ps.is_active = 1
+        AND (
+          (c.size IS NOT NULL AND c.size != '' AND UPPER(TRIM(c.size)) = UPPER(TRIM(ps.size)))
+          OR (c.size IS NULL OR c.size = '') AND (ps.size IS NULL OR ps.size = 'NONE')
+        )
       WHERE c.user_id = ?
     `, [user_id]);
 
@@ -238,7 +282,8 @@ export const getCart = async (req, res) => {
       product_name: item.product_name,
       product_image: item.product_image,
       size: item.size,
-      price: item.final_price
+      price: item.final_price,
+      available_stock: item.available_stock || 0
     }));
 
     res.json({ 

@@ -2,40 +2,25 @@
 import Footer from '@/components/common/footer';
 import Navbar from '@/components/common/nav-bar';
 import { XMarkIcon, ShoppingCartIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNotifications } from '@/context/NotificationContext';
 import API from '@/lib/axios';
 import Swal from '@/lib/sweetalert-config';
 import { getImageUrl } from '@/utils/imageUtils';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
+import { useSocket } from '@/context/SocketContext';
+import { useAuth } from '@/context/auth-context';
 
 export default function CartPage() {
   const { updateCartCount } = useNotifications();
+  const { socket, isConnected, joinUserRoom } = useSocket();
+  const { user } = useAuth();
   const [cartItems, setCartItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Load cart from API
-  useEffect(() => {
-    fetchCart();
-  }, []);
-
-  // Refresh cart when returning from checkout
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        fetchCart();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
-  const fetchCart = async () => {
+  const fetchCart = useCallback(async () => {
     try {
       setLoading(true);
       const response = await API.get('/cart');
@@ -50,10 +35,50 @@ export default function CartPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Load cart from API
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
+
+  // Refresh cart when returning from checkout
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchCart();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchCart]);
 
   // Auto-refresh for cart
   useUserAutoRefresh(fetchCart, 'cart');
+
+  // Set up Socket.io listeners for real-time cart updates
+  useEffect(() => {
+    if (socket && isConnected && user?.id) {
+      // Join user room for real-time updates
+      joinUserRoom(user.id.toString());
+
+      // Listen for direct cart updates
+      const handleCartUpdate = (cartData) => {
+        console.log('🛒 Real-time cart update received on cart page:', cartData);
+        // Refresh cart immediately
+        fetchCart();
+      };
+
+      socket.on('cart-updated', handleCartUpdate);
+
+      return () => {
+        socket.off('cart-updated', handleCartUpdate);
+      };
+    }
+  }, [socket, isConnected, user?.id, joinUserRoom, fetchCart]);
 
   const handleRemove = async (id) => {
     try {
@@ -206,7 +231,28 @@ export default function CartPage() {
         ));
       }
     } catch (err) {
-      console.error('Error updating quantity:', err);
+      console.warn('Quantity update validation:', err?.response?.data?.error || err?.message);
+      
+      // Show a note instead of throwing an error
+      const errorMessage = err?.response?.data?.error || err?.response?.data?.message || 'Unable to update quantity. Please check available stock.';
+      
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Quantity Update',
+        text: errorMessage,
+        confirmButtonColor: '#000C50',
+        timer: 3000,
+        timerProgressBar: true,
+        showConfirmButton: true,
+        customClass: {
+          title: 'text-lg font-medium',
+          content: 'text-sm font-normal',
+          confirmButton: 'text-sm font-medium'
+        }
+      });
+      
+      // Refresh cart to get updated quantities
+      await fetchCart();
     }
   };
 
@@ -349,7 +395,12 @@ export default function CartPage() {
                           
                           <button
                             onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                            className="w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors text-gray-600"
+                            disabled={item.quantity >= (item.available_stock || 0)}
+                            className={`w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center transition-colors ${
+                              item.quantity >= (item.available_stock || 0)
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                : 'hover:bg-gray-50 text-gray-600'
+                            }`}
                           >
                             <span className="text-sm">+</span>
                           </button>

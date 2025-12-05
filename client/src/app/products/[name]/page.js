@@ -10,6 +10,7 @@ import Image from 'next/image';
 import Swal from '@/lib/sweetalert-config';
 import { getImageUrl } from '@/utils/imageUtils';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
+import { ArrowDownTrayIcon, PrinterIcon } from '@heroicons/react/24/outline';
 
 export default function ProductDetailPage() {
   const { name } = useParams();
@@ -58,6 +59,99 @@ export default function ProductDetailPage() {
 
   // Auto-refresh for product details
   useUserAutoRefresh(fetchProduct, 'products');
+
+  // Check if product category is 'tela' (case-insensitive)
+  const isTelaCategory = product && (
+    (product.category && product.category.toLowerCase() === 'tela') ||
+    (product.category_name && product.category_name.toLowerCase() === 'tela')
+  );
+
+  // Download product image
+  const handleDownloadImage = async () => {
+    try {
+      const imageUrl = getImageUrl(product.image) || '/images/polo.png';
+      
+      // Fetch the image
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary anchor element and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${product.name.replace(/\s+/g, '_')}_image.${blob.type.split('/')[1] || 'png'}`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading image:', error);
+    }
+  };
+
+  // Print product image
+  const handlePrintImage = () => {
+    try {
+      const imageUrl = getImageUrl(product.image) || '/images/polo.png';
+      
+      // Create a new window for printing
+      const printWindow = window.open('', '_blank');
+      
+      if (!printWindow) {
+        return;
+      }
+      
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${product.name} - Print</title>
+            <style>
+              @media print {
+                body {
+                  margin: 0;
+                  padding: 20px;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  min-height: 100vh;
+                }
+                img {
+                  max-width: 100%;
+                  max-height: 100vh;
+                  object-fit: contain;
+                }
+              }
+              body {
+                margin: 0;
+                padding: 20px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                background: white;
+              }
+              img {
+                max-width: 100%;
+                max-height: 100vh;
+                object-fit: contain;
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${imageUrl}" alt="${product.name}" onload="window.print(); window.onafterprint = function() { window.close(); }" />
+          </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+    } catch (error) {
+      console.error('Error printing image:', error);
+    }
+  };
 
   // Helper function to get max quantity for selected size
   const getMaxQuantityForSelectedSize = () => {
@@ -397,7 +491,7 @@ export default function ProductDetailPage() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
                 {/* Product Image */}
-                <div className="bg-white-100 p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+                <div className="bg-white-100 p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-center">
                   <div className="w-full max-w-sm">
                     <div className="aspect-square bg-white rounded-xl overflow-hidden">
                       <Image
@@ -412,6 +506,26 @@ export default function ProductDetailPage() {
                         }}
                       />
                     </div>
+                    
+                    {/* Download and Print buttons for 'tela' category */}
+                    {isTelaCategory && (
+                      <div className="mt-4 flex gap-3 justify-center">
+                        <button
+                          onClick={handleDownloadImage}
+                          className="p-2 bg-[#000C50] text-white rounded-lg hover:bg-gray-800 transition-colors"
+                          title="Download Image"
+                        >
+                          <ArrowDownTrayIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={handlePrintImage}
+                          className="p-2 bg-white text-[#000C50] border-2 border-[#000C50] rounded-lg hover:bg-gray-50 transition-colors"
+                          title="Print Image"
+                        >
+                          <PrinterIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -446,12 +560,16 @@ export default function ProductDetailPage() {
                         {product.sizes.map((size) => (
                           <button
                             key={size.id}
-                            onClick={() => setSelectedSize(size.size)}
-                            disabled={size.stock === 0}
+                            onClick={() => {
+                              if ((size.stock || 0) > 0) {
+                                setSelectedSize(size.size);
+                              }
+                            }}
+                            disabled={(size.stock || 0) === 0}
                             className={`px-3 py-1 text-sm font-medium rounded-md border transition-colors ${
                               selectedSize === size.size
                                 ? 'bg-gray-900 text-white border-gray-900'
-                                : size.stock === 0
+                                : (size.stock || 0) === 0
                                 ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
                                 : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
                             }`}

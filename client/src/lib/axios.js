@@ -62,15 +62,20 @@ API.interceptors.response.use(
     if (error.response?.status === 401 || error.response?.status === 403) {
       // Don't auto-logout for certain endpoints that might legitimately return auth errors
       const currentPath = window.location.pathname;
+      const requestUrl = error.config?.url || '';
+      const isLoginEndpoint = requestUrl.includes('/auth/signin') || requestUrl.includes('/auth/login');
       const isThankYouPage = currentPath.includes('/thank-you');
       const isPaymentPage = currentPath.includes('/payment');
       const isCheckoutPage = currentPath.includes('/checkout');
       const isDashboard = currentPath.includes('/dashboard');
       const isProfile = currentPath.includes('/user-profile');
       const isAdmin = currentPath.includes('/admin');
+      const isLoginPage = currentPath.includes('/auth/login');
       
-      // Only auto-logout if not on critical pages where auth errors might be expected
-      if (!isThankYouPage && !isPaymentPage && !isCheckoutPage && !isDashboard && !isProfile && !isAdmin) {
+      // Skip auto-logout for login endpoint or login page (invalid credentials are expected)
+      if (isLoginEndpoint || isLoginPage) {
+        console.log('🔍 Skipping auto-logout for login endpoint/page - invalid credentials are expected');
+      } else if (!isThankYouPage && !isPaymentPage && !isCheckoutPage && !isDashboard && !isProfile && !isAdmin) {
         console.log('🔍 Auto-logout triggered for path:', currentPath);
         // Clear token and redirect to login
         localStorage.removeItem('token');

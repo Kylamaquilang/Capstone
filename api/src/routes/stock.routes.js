@@ -8,7 +8,8 @@ import {
   getStockHistory,
   getStockItems,
   getMonthlyStockReport,
-  getLowStockAlerts
+  getLowStockAlerts,
+  getInventoryStockReport
 } from '../controllers/stock.controller.js';
 import { verifyToken, isAdmin } from '../middleware/auth.middleware.js';
 
@@ -31,6 +32,9 @@ router.get('/report/monthly', verifyToken, getMonthlyStockReport);
 
 // Get low stock alerts
 router.get('/alerts/low-stock', verifyToken, getLowStockAlerts);
+
+// Get inventory/stock report
+router.get('/report/inventory-stock', verifyToken, isAdmin, getInventoryStockReport);
 
 // Add stock in (Admin only)
 router.post('/in', verifyToken, isAdmin, addStockIn);

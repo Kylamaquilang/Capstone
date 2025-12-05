@@ -1,7 +1,7 @@
 'use client';
 import Navbar from '@/components/common/admin-navbar';
 import Sidebar from '@/components/common/side-bar';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import API from '@/lib/axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -26,6 +26,18 @@ export default function AdminReportsPage() {
   const [error, setError] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // Separate loading states for each tab to prevent glitch effect
+  const [tabLoading, setTabLoading] = useState({
+    inventory: false,
+    sales: false
+  });
+  
+  // Track if data has been loaded for each tab
+  const [dataLoaded, setDataLoaded] = useState({
+    inventory: false,
+    sales: false
+  });
+  
   // Date filters
   const [dateFilter, setDateFilter] = useState({
     startDate: '',
@@ -35,13 +47,30 @@ export default function AdminReportsPage() {
 
   // Report data states
   const [inventoryData, setInventoryData] = useState([]);
-  const [restockData, setRestockData] = useState([]);
   const [salesData, setSalesData] = useState({});
+  
+  // Sales report filters
+  const [salesFilters, setSalesFilters] = useState({
+    product_id: '',
+    size: '',
+    category_id: ''
+  });
+  const [availableProducts, setAvailableProducts] = useState([]); // All products from sales
+  const [allProducts, setAllProducts] = useState([]); // Full product list with category info
+  const [availableSizes, setAvailableSizes] = useState([]);
+  const [availableCategories, setAvailableCategories] = useState([]); // All categories (not just from sales)
+  const prevProductIdRef = useRef('');
+  const salesFetchInProgressRef = useRef(false);
 
   // Fetch inventory data
   const fetchInventoryData = async () => {
+    // Only show loading if data hasn't been loaded yet
+    const showLoading = !dataLoaded.inventory;
+    if (showLoading) {
+      setTabLoading(prev => ({ ...prev, inventory: true }));
+    }
+    
     try {
-      setLoading(true);
       setError('');
       
       console.log('Fetching inventory data for reports...');
@@ -54,12 +83,15 @@ export default function AdminReportsPage() {
         if (inventoryRows.length === 0) {
           console.log('No inventory data found');
           setInventoryData([]);
-          setError('No inventory data found. Add some products to see inventory data.');
+          if (showLoading) {
+            setError('No inventory data found. Add some products to see inventory data.');
+          }
           return;
         }
         
         console.log(`Found ${inventoryRows.length} inventory rows (including individual sizes)`);
         setInventoryData(inventoryRows);
+        setDataLoaded(prev => ({ ...prev, inventory: true }));
         
       } catch (inventoryErr) {
         console.error('Failed to fetch inventory data:', inventoryErr.message);
@@ -68,76 +100,187 @@ export default function AdminReportsPage() {
       
     } catch (err) {
       console.error('Inventory error:', err);
-      setError('Failed to fetch inventory data');
+      if (showLoading) {
+        setError('Failed to fetch inventory data');
+      }
       setInventoryData([]);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setTabLoading(prev => ({ ...prev, inventory: false }));
+      }
     }
   };
 
-  // Fetch restock data
-  const fetchRestockData = async () => {
+
+  // Fetch all categories (not just from sales)
+  const fetchAllCategories = useCallback(async () => {
     try {
-      setLoading(true);
-      setError('');
-      
-      // Fetch restock report from backend
-      const params = new URLSearchParams();
-      params.append('days', 30); // Default to last 30 days
-      
-      const response = await API.get(`/stock-movements/reports/restock?${params}`);
-      console.log('📦 Restock data received:', response.data);
-      setRestockData(response.data?.restocks || []);
+      const response = await API.get('/categories');
+      setAvailableCategories(response.data || []);
     } catch (err) {
-      console.error('Restock error:', err);
-      setError('Failed to fetch restock data');
-      setRestockData([]);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching categories:', err);
+      setAvailableCategories([]);
     }
-  };
+  }, []);
+
+  // Fetch products that have been sold
+  const fetchSoldProducts = useCallback(async () => {
+    try {
+      // Get all sales data to extract unique products with category info
+      const params = new URLSearchParams();
+      if (dateFilter.startDate) params.append('start_date', dateFilter.startDate);
+      if (dateFilter.endDate) params.append('end_date', dateFilter.endDate);
+      
+      const response = await API.get(`/orders/detailed-sales-report?${params}`);
+      if (response.data?.orderItems && Array.isArray(response.data.orderItems)) {
+        // Extract unique products from sales data with category information
+        const productMap = new Map();
+        
+        response.data.orderItems.forEach(item => {
+          if (item.product_id && !productMap.has(item.product_id)) {
+            productMap.set(item.product_id, {
+              id: item.product_id,
+              name: item.product_name,
+              category_id: item.category_id || null
+            });
+          }
+        });
+        
+        const productsList = Array.from(productMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+        setAllProducts(productsList); // Store full list
+        setAvailableProducts(productsList); // Initially show all products
+      } else {
+        setAllProducts([]);
+        setAvailableProducts([]);
+      }
+    } catch (err) {
+      console.error('Error fetching sold products:', err);
+      setAllProducts([]);
+      setAvailableProducts([]);
+    }
+  }, [dateFilter.startDate, dateFilter.endDate]);
+
+  // Filter products based on selected category
+  useEffect(() => {
+    if (salesFilters.category_id) {
+      // Filter products to show only those from the selected category
+      const filtered = allProducts.filter(product => 
+        product.category_id && parseInt(product.category_id) === parseInt(salesFilters.category_id)
+      );
+      setAvailableProducts(filtered);
+      
+      // Clear product and size filters if selected product doesn't belong to the new category
+      if (salesFilters.product_id) {
+        const selectedProduct = allProducts.find(p => p.id === parseInt(salesFilters.product_id));
+        if (!selectedProduct || selectedProduct.category_id !== parseInt(salesFilters.category_id)) {
+          setSalesFilters(prev => ({ ...prev, product_id: '', size: '' }));
+        }
+      }
+    } else {
+      // Show all products when no category is selected
+      setAvailableProducts(allProducts);
+    }
+  }, [salesFilters.category_id, allProducts]);
+
+  // Update available sizes when product is selected
+  useEffect(() => {
+    const currentProductId = salesFilters.product_id;
+    
+    // Only update if product_id actually changed
+    if (prevProductIdRef.current === currentProductId) {
+      return;
+    }
+    
+    prevProductIdRef.current = currentProductId;
+    
+    if (currentProductId && salesData.orderItems) {
+      const productId = parseInt(currentProductId);
+      
+      // Get unique sizes from sales data for the selected product
+      const sizesFromSales = salesData.orderItems
+        .filter(item => item.product_id === productId)
+        .map(item => item.size)
+        .filter(size => size && size !== null && size !== undefined && size !== 'NONE' && size !== 'N/A' && size !== '');
+      
+      const uniqueSizes = [...new Set(sizesFromSales)];
+      
+      if (uniqueSizes.length > 0) {
+        setAvailableSizes(uniqueSizes.sort());
+      } else {
+        setAvailableSizes([]);
+      }
+      
+      // Reset size filter when product changes
+      setSalesFilters(prev => ({ ...prev, size: '' }));
+    } else {
+      setAvailableSizes([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salesFilters.product_id, salesData.orderItems]);
 
   // Fetch sales data (detailed order items)
   const fetchSalesData = useCallback(async () => {
+    // Prevent duplicate concurrent fetches to avoid flickering
+    if (salesFetchInProgressRef.current) {
+      return;
+    }
+    
+    salesFetchInProgressRef.current = true;
+    
+    // Use a ref to track if this is the initial load to prevent flickering
+    const isInitialLoad = !dataLoaded.sales;
+    
+    // Only show full loading spinner on initial load
+    if (isInitialLoad) {
+      setTabLoading(prev => ({ ...prev, sales: true }));
+    }
+    
     try {
-      setLoading(true);
       setError('');
       
       // Fetch detailed order items for sales report
       const params = new URLSearchParams();
       if (dateFilter.startDate) params.append('start_date', dateFilter.startDate);
       if (dateFilter.endDate) params.append('end_date', dateFilter.endDate);
+      if (salesFilters.product_id) params.append('product_id', salesFilters.product_id);
+      if (salesFilters.size) params.append('size', salesFilters.size);
+      if (salesFilters.category_id) params.append('category_id', salesFilters.category_id);
       
       const response = await API.get(`/orders/detailed-sales-report?${params}`);
-      console.log('📊 Frontend - Sales report data received:', response.data);
-      if (response.data?.orderItems && response.data.orderItems.length > 0) {
-        console.log('📊 Frontend - First 3 items:');
-        response.data.orderItems.slice(0, 3).forEach((item, idx) => {
-          console.log(`   Item ${idx + 1}:`, {
-            product: item.product_name,
-            size: item.size,
-            hasSize: !!item.size,
-            sizeType: typeof item.size
-          });
-        });
-      }
-      setSalesData(response.data || {});
+      
+      // Update sales data smoothly without clearing existing data first
+      setSalesData(response.data || {
+        orderItems: [],
+        summary: {
+          total_orders: 0,
+          total_revenue: 0,
+          gcash_orders: 0,
+          cash_orders: 0,
+          gcash_revenue: 0,
+          cash_revenue: 0
+        }
+      });
+      
+      // Mark as loaded after successful fetch
+      setDataLoaded(prev => ({ ...prev, sales: true }));
     } catch (err) {
       console.error('Sales data error:', err);
       
       // Handle different error types gracefully
-      if (err.response?.status === 400) {
-        setError('Invalid date parameters for sales data');
-      } else if (err.response?.status === 401) {
-        setError('Authentication required to access sales data');
-      } else if (err.response?.status === 403) {
-        setError('Admin access required for sales data');
-      } else if (err.response?.status === 404) {
-        setError('Sales report endpoint not found');
-      } else if (err.response?.status >= 500) {
-        setError('Server error while fetching sales data');
-      } else {
-        setError('Failed to fetch sales data');
+      if (isInitialLoad) {
+        if (err.response?.status === 400) {
+          setError('Invalid date parameters for sales data');
+        } else if (err.response?.status === 401) {
+          setError('Authentication required to access sales data');
+        } else if (err.response?.status === 403) {
+          setError('Admin access required for sales data');
+        } else if (err.response?.status === 404) {
+          setError('Sales report endpoint not found');
+        } else if (err.response?.status >= 500) {
+          setError('Server error while fetching sales data');
+        } else {
+          setError('Failed to fetch sales data');
+        }
       }
       
       // Set fallback data structure for detailed report
@@ -153,9 +296,13 @@ export default function AdminReportsPage() {
         }
       });
     } finally {
-      setLoading(false);
+      // Only hide loading spinner if it was shown (initial load)
+      if (isInitialLoad) {
+        setTabLoading(prev => ({ ...prev, sales: false }));
+      }
+      salesFetchInProgressRef.current = false;
     }
-  }, [dateFilter]);
+  }, [dateFilter.startDate, dateFilter.endDate, salesFilters.product_id, salesFilters.size, salesFilters.category_id, dataLoaded.sales]);
 
 
 
@@ -165,9 +312,6 @@ export default function AdminReportsPage() {
       case 'inventory':
         fetchInventoryData();
         break;
-      case 'restock':
-        fetchRestockData();
-        break;
       case 'sales':
         fetchSalesData();
         break;
@@ -176,23 +320,33 @@ export default function AdminReportsPage() {
     }
   }, 'reports');
 
-  // Load data based on active tab
+  // Reset data loaded flag when filters change (so we refetch with new filters)
+  useEffect(() => {
+    if (dateFilter.startDate || dateFilter.endDate) {
+      setDataLoaded(prev => ({ ...prev, inventory: false, sales: false }));
+    }
+  }, [dateFilter.startDate, dateFilter.endDate]);
+
+  // Note: Sales data fetching is handled by the main useEffect below
+  // This prevents duplicate calls and flickering
+
+  // Load data based on active tab - only show loading on first load
   useEffect(() => {
     switch (activeTab) {
       case 'inventory':
         fetchInventoryData();
         break;
-      case 'restock':
-        fetchRestockData();
-        break;
       case 'sales':
-        // Fetch sales data without default date restrictions
+        // Fetch all categories, sold products, then sales data
+        fetchAllCategories();
+        fetchSoldProducts();
         fetchSalesData();
         break;
       default:
         break;
     }
-  }, [activeTab, dateFilter, fetchSalesData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, dateFilter.startDate, dateFilter.endDate, salesFilters.product_id, salesFilters.size, salesFilters.category_id]);
 
   // Set up real-time socket listeners
   useEffect(() => {
@@ -206,52 +360,32 @@ export default function AdminReportsPage() {
       // Listen for product updates (affects inventory reports)
       const handleProductUpdate = (productData) => {
         console.log('📦 Real-time product update received in reports:', productData);
-        if (isMounted && (activeTab === 'inventory' || activeTab === 'restock')) {
-          if (activeTab === 'inventory') {
-            fetchInventoryData();
-          }
-          if (activeTab === 'restock') {
-            fetchRestockData();
-          }
+        if (isMounted && activeTab === 'inventory') {
+          fetchInventoryData();
         }
       };
 
       // Listen for new products (affects inventory reports)
       const handleNewProduct = (productData) => {
         console.log('📦 Real-time new product received in reports:', productData);
-        if (isMounted && (activeTab === 'inventory' || activeTab === 'restock')) {
-          if (activeTab === 'inventory') {
-            fetchInventoryData();
-          }
-          if (activeTab === 'restock') {
-            fetchRestockData();
-          }
+        if (isMounted && activeTab === 'inventory') {
+          fetchInventoryData();
         }
       };
 
       // Listen for product deletions (affects inventory reports)
       const handleProductDelete = (productData) => {
         console.log('🗑️ Real-time product deletion received in reports:', productData);
-        if (isMounted && (activeTab === 'inventory' || activeTab === 'restock')) {
-          if (activeTab === 'inventory') {
-            fetchInventoryData();
-          }
-          if (activeTab === 'restock') {
-            fetchRestockData();
-          }
+        if (isMounted && activeTab === 'inventory') {
+          fetchInventoryData();
         }
       };
 
       // Listen for inventory updates (affects inventory reports)
       const handleInventoryUpdate = (inventoryData) => {
         console.log('📦 Real-time inventory update received in reports:', inventoryData);
-        if (isMounted && (activeTab === 'inventory' || activeTab === 'restock')) {
-          if (activeTab === 'inventory') {
-            fetchInventoryData();
-          }
-          if (activeTab === 'restock') {
-            fetchRestockData();
-          }
+        if (isMounted && activeTab === 'inventory') {
+          fetchInventoryData();
         }
       };
 
@@ -279,9 +413,6 @@ export default function AdminReportsPage() {
           switch (activeTab) {
             case 'inventory':
               fetchInventoryData();
-              break;
-            case 'restock':
-              fetchRestockData();
               break;
             case 'sales':
               fetchSalesData();
@@ -390,9 +521,6 @@ export default function AdminReportsPage() {
       case 'inventory':
         yPosition = generateInventoryPDF(pdf, reportData, yPosition);
         break;
-      case 'restock':
-        yPosition = generateRestockPDF(pdf, reportData, yPosition);
-        break;
       case 'sales':
         yPosition = generateSalesPDF(pdf, reportData, yPosition);
         break;
@@ -427,9 +555,6 @@ export default function AdminReportsPage() {
     switch (activeTab) {
       case 'inventory':
         content += generateInventoryDoc(reportData);
-        break;
-      case 'restock':
-        content += generateRestockDoc(reportData);
         break;
       case 'sales':
         content += generateSalesDoc(reportData);
@@ -597,7 +722,6 @@ export default function AdminReportsPage() {
   const getReportTitle = () => {
     switch (activeTab) {
       case 'inventory': return 'Inventory Report';
-      case 'restock': return 'Restock Report';
       case 'sales': return 'Sales Report';
       default: return 'Business Report';
     }
@@ -606,7 +730,6 @@ export default function AdminReportsPage() {
   const getReportDescription = () => {
     switch (activeTab) {
       case 'inventory': return 'Current stock levels of all products';
-      case 'restock': return 'History of restocked items';
       case 'sales': return `Sales performance by ${dateFilter.period}`;
       default: return 'Business analytics report';
     }
@@ -615,7 +738,6 @@ export default function AdminReportsPage() {
   const getReportData = () => {
     switch (activeTab) {
       case 'inventory': return inventoryData;
-      case 'restock': return restockData;
       case 'sales': return salesData;
       default: return {};
     }
@@ -625,8 +747,6 @@ export default function AdminReportsPage() {
     switch (activeTab) {
       case 'inventory':
         return generateInventoryHTML(data);
-      case 'restock':
-        return generateRestockHTML(data);
       case 'sales':
         return generateSalesHTML(data);
       default:
@@ -835,49 +955,6 @@ export default function AdminReportsPage() {
     return pdf.lastAutoTable.finalY + 20;
   };
 
-  const generateRestockPDF = (pdf, data, yPosition) => {
-    if (!Array.isArray(data) || data.length === 0) {
-      pdf.setFontSize(12);
-      pdf.text('No restock data found.', 20, yPosition);
-      return yPosition + 20;
-    }
-
-    // Add section title
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('Restock Report', 20, yPosition);
-    yPosition += 20;
-
-    // Prepare table data
-    const tableData = data.map(item => [
-      new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      item.product_name || 'N/A',
-      item.size || 'N/A',
-      `+${item.quantity}` || '0',
-      item.stock_before?.toString() || '0',
-      item.stock_after?.toString() || '0'
-    ]);
-
-    // Create table
-    autoTable(pdf, {
-      startY: yPosition,
-      head: [['Date', 'Product Name', 'Size', 'Qty Added', 'Before', 'After']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [0, 12, 80], fontSize: 7 },
-      styles: { fontSize: 7 },
-      columnStyles: {
-        0: { cellWidth: 28 },
-        1: { cellWidth: 55 },
-        2: { cellWidth: 22 },
-        3: { cellWidth: 22 },
-        4: { cellWidth: 22 },
-        5: { cellWidth: 22 }
-      }
-    });
-
-    return pdf.lastAutoTable.finalY + 20;
-  };
 
   const generateLowStockPDF = (pdf, data, yPosition) => {
     if (!data.products || !Array.isArray(data.products) || data.products.length === 0) {
@@ -1041,26 +1118,6 @@ export default function AdminReportsPage() {
     return content;
   };
 
-  const generateRestockDoc = (data) => {
-    if (!Array.isArray(data) || data.length === 0) {
-      return 'No restock data found.\n';
-    }
-
-    let content = 'RESTOCK REPORT\n';
-    content += '==============\n\n';
-    
-    data.forEach((item, index) => {
-      content += `${index + 1}. ${item.product_name}\n`;
-      content += `   Date: ${new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}\n`;
-      content += `   Time: ${new Date(item.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}\n`;
-      content += `   Size/Variant: ${item.size || 'No size specified'}\n`;
-      content += `   Quantity Added: +${item.quantity}\n`;
-      content += `   Stock Before: ${item.stock_before}\n`;
-      content += `   Stock After: ${item.stock_after}\n\n`;
-    });
-    
-    return content;
-  };
 
   const generateSalesDoc = (data) => {
     if (!data.orderItems || !Array.isArray(data.orderItems) || data.orderItems.length === 0) {
@@ -1111,7 +1168,6 @@ export default function AdminReportsPage() {
 
   const tabs = [
     { id: 'inventory', label: 'Inventory Report', icon: CubeIcon },
-    { id: 'restock', label: 'Restock Report', icon: ExclamationTriangleIcon },
     { id: 'sales', label: 'Sales Report', icon: ChartBarIcon }
   ];
 
@@ -1179,23 +1235,15 @@ export default function AdminReportsPage() {
               <div className="flex items-end">
                 <button
                   onClick={() => {
-                    switch (activeTab) {
-                      case 'inventory':
-                        fetchInventoryData();
-                        break;
-                      case 'restock':
-                        fetchRestockData();
-                        break;
-                      case 'sales':
-                        fetchSalesData();
-                        break;
-                      default:
-                        break;
-                    }
+                    setDateFilter({
+                      startDate: '',
+                      endDate: '',
+                      period: 'month'
+                    });
                   }}
-                  className="w-full px-3 py-2 bg-[#000C50] text-white rounded-md text-sm font-medium hover:bg-[#000C50]/90 transition-colors"
+                  className="w-full px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 transition-colors"
                 >
-                  Apply Filter
+                  Clear Filters
                 </button>
               </div>
             </div>
@@ -1227,9 +1275,10 @@ export default function AdminReportsPage() {
           </div>
 
           {/* Report Content */}
-          <div id="report-content" className="bg-white rounded-lg shadow-sm border border-gray-200">
-            {loading && (
-              <div className="flex items-center justify-center py-12">
+          <div id="report-content" className="bg-white rounded-lg shadow-sm border border-gray-200 relative">
+            {/* Subtle loading overlay - only shows if tab is loading and no data exists */}
+            {tabLoading[activeTab] && !dataLoaded[activeTab] && (
+              <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#000C50] mx-auto mb-4"></div>
                   <div className="text-sm text-gray-600">Loading report...</div>
@@ -1245,7 +1294,7 @@ export default function AdminReportsPage() {
               </div>
             )}
 
-            {!loading && !error && (
+            {!error && (
               <>
                 {/* Inventory Report */}
                 {activeTab === 'inventory' && (
@@ -1393,134 +1442,6 @@ export default function AdminReportsPage() {
                   </div>
                 )}
 
-                {/* Restock Report */}
-                {activeTab === 'restock' && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    {/* Header Section */}
-                    <div className="px-6 py-5  border-gray-100">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Restock Report</h3>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {/* Download Button */}
-                          <button
-                            onClick={handleDownload}
-                            className="px-4 py-2 text-sm bg-[#000C50] text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
-                          >
-                            <ArrowDownTrayIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Table */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead style={{ backgroundColor: '#F6F6F6' }}>
-                          <tr>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date & Time</th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Product Name</th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Size/Variant</th>
-                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Quantity Added</th>
-                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Stock Before</th>
-                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Stock After</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {Array.isArray(restockData) && restockData.length > 0 ? (
-                            restockData.map((item, index) => (
-                              <tr key={index} className={`hover:bg-orange-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : ''}`} style={index % 2 !== 0 ? { backgroundColor: '#F6F6F6' } : {}}>
-                                <td className="px-6 py-4">
-                                  <div className="text-xs text-gray-900">
-                                    {new Date(item.date).toLocaleDateString('en-US', { 
-                                      month: 'short', 
-                                      day: 'numeric', 
-                                      year: 'numeric' 
-                                    })}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    {new Date(item.date).toLocaleTimeString('en-US', { 
-                                      hour: '2-digit', 
-                                      minute: '2-digit' 
-                                    })}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="text-xs text-gray-900 uppercase">{item.product_name}</div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  {item.size ? (
-                                    <span className="inline-flex px-3 py-1.5 text-xs text-black uppercase">
-                                      {item.size}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-black italic">No size specified</span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                  <span className="text-xs text-black">
-                                    +{item.quantity}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-xs text-gray-600 text-center">{item.stock_before}</td>
-                                <td className="px-6 py-4 text-xs text-gray-900 text-center">{item.stock_after}</td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan="6" className="px-6 py-12 text-center">
-                                <div className="flex flex-col items-center gap-3">
-                                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                    </svg>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-gray-900">No restock data found</p>
-                                    <p className="text-xs text-gray-500">No restock history available for the selected period</p>
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Pagination */}
-                    <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <span className="text-sm text-gray-600">Rows per page:</span>
-                          <select className="text-sm border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-                            <option>10</option>
-                            <option>25</option>
-                            <option>50</option>
-                            <option>100</option>
-                          </select>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <span className="text-sm text-gray-600">
-                            {Array.isArray(restockData) && restockData.length > 0 ? `1-${Math.min(10, restockData.length)} of ${restockData.length}` : '0 of 0'}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                              </svg>
-                            </button>
-                            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Sales Report */}
                 {activeTab === 'sales' && (
@@ -1538,6 +1459,99 @@ export default function AdminReportsPage() {
                             className="px-4 py-2 text-sm bg-[#000C50] text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
                           >
                             <ArrowDownTrayIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-3">
+                        <div className="w-full sm:w-auto sm:min-w-[180px] sm:max-w-[250px]">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Filter by Category</label>
+                          <select
+                            value={salesFilters.category_id}
+                            onChange={(e) => {
+                              const newCategoryId = e.target.value;
+                              // Only clear product_id if the selected product doesn't belong to the new category
+                              const selectedProduct = allProducts.find(p => p.id === parseInt(salesFilters.product_id));
+                              const shouldClearProduct = newCategoryId && selectedProduct && selectedProduct.category_id !== parseInt(newCategoryId);
+                              
+                              setSalesFilters(prev => ({
+                                ...prev,
+                                category_id: newCategoryId,
+                                product_id: shouldClearProduct ? '' : prev.product_id,
+                                size: shouldClearProduct ? '' : prev.size
+                              }));
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">All Categories</option>
+                            {availableCategories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div className="w-full sm:w-auto sm:min-w-[180px] sm:max-w-[250px]">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Filter by Product Name</label>
+                          <select
+                            value={salesFilters.product_id}
+                            onChange={(e) => setSalesFilters({ ...salesFilters, product_id: e.target.value, size: '' })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">All Products</option>
+                            {availableProducts.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {salesFilters.product_id && (
+                          <div className="w-full sm:w-auto sm:min-w-[120px] sm:max-w-[180px]">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Filter by Size
+                              {availableSizes.length === 0 && (
+                                <span className="text-gray-400 text-xs ml-1">(No sizes available)</span>
+                              )}
+                            </label>
+                            {availableSizes.length > 0 ? (
+                              <select
+                                value={salesFilters.size}
+                                onChange={(e) => setSalesFilters({ ...salesFilters, size: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="">All Sizes</option>
+                                {availableSizes.map((size) => (
+                                  <option key={size} value={size}>
+                                    {size}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <select
+                                value=""
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-400 cursor-not-allowed"
+                                disabled
+                              >
+                                <option value="">No sizes available</option>
+                              </select>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-end">
+                          <button
+                            onClick={() => {
+                              setSalesFilters({ product_id: '', size: '', category_id: '' });
+                            }}
+                            className="w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium transition-colors whitespace-nowrap h-[38px]"
+                          >
+                            Clear Filters
                           </button>
                         </div>
                       </div>
@@ -1595,7 +1609,22 @@ export default function AdminReportsPage() {
                                     </span>
                                   </td>
                                   <td className="px-6 py-4">
-                                    <span className="text-xs text-gray-900">{formatCurrency(item.unit_price)}</span>
+                                    <div className="flex flex-col">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-900">{formatCurrency(item.unit_price)}</span>
+                                        {item.is_historical_price === 1 && item.current_price && Math.abs(item.unit_price - item.current_price) > 0.01 && (
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800" title={`Historical price (locked). Current price: ${formatCurrency(item.current_price)}`}>
+                                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                            </svg>
+                                            Locked
+                                          </span>
+                                        )}
+                                      </div>
+                                      {item.is_historical_price === 1 && item.current_price && Math.abs(item.unit_price - item.current_price) > 0.01 && (
+                                        <p className="text-xs text-blue-600 mt-1">Price at time of sale</p>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="px-6 py-4">
                                     <span className="text-xs text-gray-900">{formatCurrency(item.item_total)}</span>
@@ -1619,16 +1648,57 @@ export default function AdminReportsPage() {
 
                         {/* Summary Footer */}
                         <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600">
-                              Showing {salesData.orderItems.length} item{salesData.orderItems.length !== 1 ? 's' : ''} from {salesData.summary?.total_orders || 0} order{salesData.summary?.total_orders !== 1 ? 's' : ''}
-                            </span>
-                            <div className="flex items-center gap-4">
-                              <span className="text-gray-600">Total Revenue:</span>
-                              <span className="font-semibold text-green-600">
-                                {formatCurrency(salesData.summary?.total_revenue || 0)}
+                          <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-gray-600">
+                                Showing {salesData.orderItems.length} item{salesData.orderItems.length !== 1 ? 's' : ''} from {salesData.summary?.total_orders || 0} order{salesData.summary?.total_orders !== 1 ? 's' : ''}
                               </span>
+                              <div className="flex items-center gap-4">
+                                <span className="text-gray-600">Total Revenue:</span>
+                                <span className="font-semibold text-green-600">
+                                  {formatCurrency(salesData.summary?.total_revenue || 0)}
+                                </span>
+                              </div>
                             </div>
+                            
+                            {/* Price Breakdown */}
+                            {salesData.priceBreakdown && (
+                              <div className="pt-3 border-t border-gray-200">
+                                {/* Only show breakdown if there are historical prices */}
+                                {(salesData.priceBreakdown.revenue_from_historical_prices || 0) > 0.01 ? (
+                                  <>
+                                    <div className="text-xs font-medium text-gray-700 mb-2">Revenue Breakdown by Price Point:</div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                      <div className="bg-blue-50 p-3 rounded-lg">
+                                        <div className="text-xs text-gray-600 mb-1">Revenue from Historical Prices</div>
+                                        <div className="text-base font-semibold text-blue-700">
+                                          {formatCurrency(salesData.priceBreakdown.revenue_from_historical_prices || 0)}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {salesData.priceBreakdown.items_at_historical_price || 0} item{salesData.priceBreakdown.items_at_historical_price !== 1 ? 's' : ''} sold at previous prices
+                                        </div>
+                                      </div>
+                                      <div className="bg-green-50 p-3 rounded-lg">
+                                        <div className="text-xs text-gray-600 mb-1">Revenue from Current Price</div>
+                                        <div className="text-base font-semibold text-green-700">
+                                          {formatCurrency(salesData.priceBreakdown.revenue_from_current_price || 0)}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {salesData.priceBreakdown.items_at_current_price || 0} item{salesData.priceBreakdown.items_at_current_price !== 1 ? 's' : ''} sold at current price
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="mt-2 text-xs text-gray-500 italic">
+                                      * Historical prices are locked at the time of purchase and never change, even if product prices are updated later.
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="text-xs font-medium text-gray-700">
+                                    Total Revenue: {formatCurrency(salesData.summary?.total_revenue || 0)}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </>
