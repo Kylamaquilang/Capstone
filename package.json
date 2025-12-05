@@ -8,7 +8,7 @@
     "concurrently": "^9.2.1"
   },
   "scripts": {
-    "start": "concurrently \"npm run start:api\" \"npm run start:client\"",
+    "start": "npx concurrently \"npm run start:api\" \"npm run start:client\"",
     "start:api": "cd api && npm start",
     "start:client": "cd client && npm run start",
     "build": "cd client && npm install && npm run build && cd ../api && npm install"
