@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Navbar from '@/components/common/nav-bar';
 import Footer from '@/components/common/footer';
@@ -13,7 +13,7 @@ import { BanknotesIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outlin
 import { getImageUrl } from '@/utils/imageUtils';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 
-const CheckoutPage = () => {
+const CheckoutContent = () => {
   const { user } = useAuth();
   const { updateCartCount, fetchCounts } = useNotifications();
   const router = useRouter();
@@ -408,6 +408,22 @@ const CheckoutPage = () => {
         />
       )}
     </div>
+  );
+};
+
+const CheckoutPage = () => {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col min-h-screen">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-xl">Loading checkout...</div>
+        </main>
+        <Footer />
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
   );
 };
 
