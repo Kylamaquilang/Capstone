@@ -223,9 +223,9 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {notificationsArray.map((notification) => (
+            {notificationsArray.map((notification, index) => (
               <div
-                key={notification.id}
+                key={notification.id || `notification-${index}-${notification.created_at || notification.timestamp || Date.now()}`}
                 className={`px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-gray-50 transition-colors ${
                   !notification.read ? 'bg-blue-50' : ''
                 }`}
