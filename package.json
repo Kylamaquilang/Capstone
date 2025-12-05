@@ -4,9 +4,9 @@
   "engines": {
     "node": "20.x"
   },
-"dependencies": {
-  "concurrently": "^9.2.1"
-},
+  "dependencies": {
+    "concurrently": "^9.2.1"
+  },
   "scripts": {
     "start": "concurrently \"npm run start:api\" \"npm run start:client\"",
     "start:api": "cd api && npm start",
@@ -14,3 +14,4 @@
     "build": "cd client && npm install && npm run build && cd ../api && npm install"
   }
 }
+
