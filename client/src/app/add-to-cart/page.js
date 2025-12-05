@@ -9,11 +9,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getImageUrl } from '@/utils/imageUtils';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import Swal from '@/lib/sweetalert-config';
 import { ArrowDownTrayIcon, PrinterIcon } from '@heroicons/react/24/outline';
 
-export default function ProductPage() {
+const ProductPageContent = () => {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -518,5 +518,31 @@ export default function ProductPage() {
         <Footer />
       </div>
     </ProtectedRoute>
+  );
+};
+
+export default function ProductPage() {
+  return (
+    <Suspense fallback={
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gray-50 flex flex-col">
+          <Navbar />
+          <main className="flex-grow">
+            <div className="container mx-auto px-4 py-12">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12">
+                  <div className="flex justify-center items-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </main>
+          <Footer />
+        </div>
+      </ProtectedRoute>
+    }>
+      <ProductPageContent />
+    </Suspense>
   );
 }
