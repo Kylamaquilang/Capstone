@@ -7,7 +7,23 @@ import API from '@/lib/axios';
 const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [], onUpdateNotifications, triggerRef }) => {
   const [localNotifications, setLocalNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: '64px', right: '0.25rem' });
   const dropdownRef = useRef(null);
+
+  // Update dropdown position based on screen size
+  useEffect(() => {
+    const updatePosition = () => {
+      if (window.innerWidth >= 1024) {
+        setDropdownPosition({ top: '72px', right: '1rem' });
+      } else {
+        setDropdownPosition({ top: '64px', right: '0.25rem' });
+      }
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    return () => window.removeEventListener('resize', updatePosition);
+  }, []);
 
   // Use notifications from parent if provided, otherwise load locally
   useEffect(() => {
@@ -141,14 +157,26 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
     <>
       {/* Mobile/Small Screen Overlay - Below header */}
       <div 
-        className="lg:hidden fixed top-[56px] left-0 right-0 bottom-0 bg-black bg-opacity-25 z-40"
+        className="lg:hidden fixed inset-0 bg-black bg-opacity-25"
         onClick={onClose}
         aria-hidden="true"
+        style={{ 
+          top: '56px',
+          zIndex: 9998
+        }}
       />
 
       <div 
         ref={dropdownRef}
-        className="fixed lg:absolute right-1 sm:right-2 lg:right-0 top-[58px] lg:top-10 w-[calc(100vw-0.5rem)] sm:w-[calc(100vw-1rem)] max-w-sm lg:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[calc(100vh-70px)] lg:max-h-[500px] overflow-hidden"
+        className="fixed w-[calc(100vw-0.5rem)] sm:w-[calc(100vw-1rem)] max-w-sm lg:w-96 bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col"
+        style={{
+          position: 'fixed',
+          top: dropdownPosition.top,
+          right: dropdownPosition.right,
+          zIndex: 9999,
+          maxHeight: 'calc(100vh - 80px)',
+          overflow: 'hidden'
+        }}
       >
         {/* Header */}
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-white flex-shrink-0">
@@ -171,7 +199,13 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
     
 
       {/* Notifications List */}
-      <div className="max-h-[calc(100vh-180px)] lg:max-h-[350px] overflow-y-auto pb-16 sm:pb-20">
+      <div 
+        className="overflow-y-auto overflow-x-hidden flex-1"
+        style={{ 
+          maxHeight: 'calc(100vh - 220px)',
+          minHeight: 0
+        }}
+      >
         {loading ? (
           <div className="px-4 sm:px-6 py-6 sm:py-8 text-center text-gray-500">
             <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-500 mx-auto"></div>
@@ -264,7 +298,7 @@ const UserNotificationDropdown = ({ isOpen, onClose, userId, notifications = [],
       </div>
 
       {/* Footer - Fixed at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 px-3 sm:px-6 py-3 sm:py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+      <div className="px-3 sm:px-6 py-3 sm:py-4 border-t border-gray-200 bg-white flex-shrink-0 mt-auto">
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={() => {

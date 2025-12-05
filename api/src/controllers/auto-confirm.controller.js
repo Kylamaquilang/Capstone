@@ -10,7 +10,7 @@ export const autoConfirmClaimedOrders = async (io = null) => {
     // Find orders that have been claimed for 3+ days
     const [claimedOrders] = await pool.query(`
       SELECT o.id, o.user_id, o.total_amount, o.payment_method, o.created_at, o.updated_at,
-             u.name, u.email
+             u.name, u.email, u.degree, u.section
       FROM orders o
       JOIN users u ON o.user_id = u.id
       WHERE o.status = 'claimed' 
@@ -46,6 +46,12 @@ export const autoConfirmClaimedOrders = async (io = null) => {
           FROM order_items oi
           WHERE oi.order_id = ?
         `, [order.id]);
+        
+        // Map product_name for items
+        const itemsWithProductName = orderItems.map(item => ({
+          ...item,
+          product_name: item.product_name || 'Unknown Product'
+        }));
 
         // Create product summary for notifications
         let productSummary = '';
@@ -102,11 +108,14 @@ export const autoConfirmClaimedOrders = async (io = null) => {
         try {
           const orderData = {
             orderId: order.id,
-            items: orderItems,
+            items: itemsWithProductName,
             totalAmount: order.total_amount,
             paymentMethod: order.payment_method,
             createdAt: order.created_at,
-            status: 'completed'
+            status: 'completed',
+            userName: order.name,
+            degree: order.degree,
+            section: order.section
           };
 
           const emailResult = await sendOrderReceiptEmail(order.email, order.name, orderData);

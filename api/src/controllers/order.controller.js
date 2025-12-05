@@ -294,6 +294,8 @@ export const getOrderById = async (req, res) => {
         u.name AS user_name,
         u.student_id,
         u.email,
+        u.degree,
+        u.section,
         o.total_amount, 
         o.payment_method, 
         o.pay_at_counter,
@@ -1510,7 +1512,7 @@ export const userConfirmOrderReceipt = async (req, res) => {
     try {
       // Get user details and complete order information for email
       const [userDetails] = await pool.query(`
-        SELECT u.name, u.email, o.total_amount, o.payment_method, o.created_at, o.status
+        SELECT u.name, u.email, u.degree, u.section, o.total_amount, o.payment_method, o.created_at, o.status
         FROM users u
         JOIN orders o ON u.id = o.user_id
         WHERE o.id = ?
@@ -1533,7 +1535,10 @@ export const userConfirmOrderReceipt = async (req, res) => {
           totalAmount: user.total_amount,
           paymentMethod: user.payment_method,
           createdAt: user.created_at,
-          status: 'completed'
+          status: 'completed',
+          userName: user.name,
+          degree: user.degree,
+          section: user.section
         };
 
         const emailResult = await sendOrderReceiptEmail(user.email, user.name, orderData);

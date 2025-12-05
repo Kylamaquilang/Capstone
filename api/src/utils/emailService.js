@@ -199,71 +199,145 @@ export const sendOrderReceiptEmail = async (email, userName, orderData) => {
       return { success: false, message: 'Email service not configured' };
     }
     
-    const { orderId, items, totalAmount, paymentMethod, createdAt, status } = orderData;
+    const { orderId, items, totalAmount, paymentMethod, createdAt, status, userName: orderUserName, degree, section } = orderData;
     
-    // Generate order name from items (first product name + count if multiple products)
-    const uniqueProducts = [...new Set(items.map(item => item.product_name))];
-    const orderName = uniqueProducts.length > 1 
-      ? `${uniqueProducts[0]} +${uniqueProducts.length - 1}`
-      : uniqueProducts[0] || `Order #${orderId}`;
+    // Use orderUserName if provided, otherwise fall back to userName parameter
+    const studentName = (orderUserName || userName || 'N/A').toUpperCase();
     
-    // Format items for display
-    const itemsHtml = items.map(item => `
-      <tr style="border-bottom: 1px solid #eee; background-color: white;">
-        <td style="padding: 18px 15px; color: #333; font-size: 15px;">${item.quantity}x ${item.product_name}</td>
-        <td style="padding: 18px 15px; text-align: right; color: #333; font-size: 15px;">₱${Number(item.unit_price).toFixed(2)}</td>
-        <td style="padding: 18px 15px; text-align: right; color: #333; font-weight: bold; font-size: 15px;">₱${Number(item.total_price).toFixed(2)}</td>
-      </tr>
-    `).join('');
+    // Format course and section
+    const courseSection = degree && section 
+      ? `${degree} - ${section}`.toUpperCase()
+      : degree || section || '';
+    
+    // Format date
+    const formatDate = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
+    
+    // Calculate subtotal
+    const subtotal = items.reduce((sum, item) => sum + (Number(item.total_price) || 0), 0);
+    const total = Number(totalAmount) || subtotal;
+    
+    // Format items for display - matching receipt template
+    const itemsHtml = items.map(item => {
+      const itemName = (item.product_name || 'Unknown').toUpperCase();
+      const unitPrice = Number(item.unit_price || 0).toFixed(2);
+      const quantity = item.quantity || 0;
+      const itemTotal = Number(item.total_price || 0).toFixed(2);
+      
+      return `
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 12px 8px; color: #111827; font-size: 13px; text-transform: uppercase; word-break: break-word;">${itemName}</td>
+          <td style="padding: 12px 8px; text-align: right; color: #111827; font-size: 13px;">₱${unitPrice}</td>
+          <td style="padding: 12px 8px; text-align: right; color: #111827; font-size: 13px;">${quantity}</td>
+          <td style="padding: 12px 8px; text-align: right; color: #111827; font-size: 13px; font-weight: 600;">₱${itemTotal}</td>
+        </tr>
+      `;
+    }).join('');
     
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `CPC Essen - Order Receipt: ${orderName}`,
+      subject: `CPC Essen - Order Receipt #${orderId}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
-          <div style="background-color: #000C50; color: white; padding: 25px; text-align: center; border-radius: 15px 15px 0 0;">
-            <h1 style="margin: 0; font-size: 24px;">CPC Essen</h1>
-            <p style="margin: 5px 0 0 0; font-size: 16px;">Order Receipt</p>
-          </div>
-          
-          <div style="background-color: white; padding: 35px; border-radius: 0 0 15px 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-            <div style="background-color: #f8f9fa; padding: 25px; border-radius: 12px; margin: 25px 0; border-left: 5px solid #000C50; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-              <p style="margin: 8px 0; font-size: 16px;"><strong>Order Name:</strong> ${orderName}</p>
-              <p style="margin: 8px 0; font-size: 16px;"><strong>Order Date:</strong> ${new Date(createdAt).toLocaleDateString()}</p>
-              <p style="margin: 8px 0; font-size: 16px;"><strong>Confirmed Date:</strong> ${orderData.confirmedAt ? new Date(orderData.confirmedAt).toLocaleDateString() : new Date().toLocaleDateString()}</p>
-              <p style="margin: 8px 0; font-size: 16px;"><strong>Status:</strong> <span style="color: #28a745; font-weight: bold;">Completed</span></p>
-              <p style="margin: 8px 0; font-size: 16px;"><strong>Payment Method:</strong> ${paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}</p>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: 'Courier New', monospace; background-color: #ffffff;">
+          <div style="max-width: 400px; margin: 0 auto; padding: 30px 20px; background-color: #ffffff;">
+            
+            <!-- Thin line on top -->
+            <div style="border-top: 1px solid #000000; margin-bottom: 25px;"></div>
+            
+            <!-- Title aligned to right -->
+            <div style="text-align: right; margin-bottom: 25px;">
+              <div style="font-weight: bold; font-size: 16px; color: #000000; margin-bottom: 2px;">CPC ESSEN</div>
+              <div style="font-size: 12px; color: #000000; margin-bottom: 2px;">ONLINE</div>
+              <div style="font-size: 12px; color: #000000;">STORE</div>
             </div>
             
-            <h3 style="color: #333; margin-bottom: 20px; font-size: 20px; font-weight: 600; border-bottom: 2px solid #000C50; padding-bottom: 10px;">Order Details</h3>
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-              <thead>
-                <tr style="background-color: #000C50; color: white;">
-                  <th style="padding: 18px 15px; text-align: left; font-weight: bold; font-size: 16px;">Item</th>
-                  <th style="padding: 18px 15px; text-align: right; font-weight: bold; font-size: 16px;">Unit Price</th>
-                  <th style="padding: 18px 15px; text-align: right; font-weight: bold; font-size: 16px;">Total</th>
-                </tr>
-              </thead>
+            <!-- Separator line -->
+            <div style="border-top: 1px solid #000000; margin-bottom: 20px;"></div>
+            
+            <!-- ISSUED TO and DATE -->
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 11px;">
+              <div style="font-weight: bold; color: #000000;">ISSUED TO:</div>
+              <div style="font-weight: bold; color: #000000; text-align: right;">DATE: ${formatDate(createdAt)}</div>
+            </div>
+            
+            <!-- Student Name -->
+            <div style="margin-bottom: 6px; font-size: 13px; font-weight: bold; color: #000000; text-transform: uppercase;">
+              ${studentName}
+            </div>
+            
+            <!-- Course and Section -->
+            ${courseSection ? `
+            <div style="margin-bottom: 20px; font-size: 11px; color: #000000; text-transform: uppercase;">
+              ${courseSection}
+            </div>
+            ` : '<div style="margin-bottom: 20px;"></div>'}
+            
+            <!-- Table Header -->
+            <div style="margin-bottom: 10px; font-size: 10px; font-weight: bold; color: #000000;">
+              <div style="display: flex; justify-content: space-between;">
+                <div style="width: 40%;">DESCRIPTION</div>
+                <div style="width: 20%; text-align: right;">UNIT PRICE</div>
+                <div style="width: 10%; text-align: right;">QTY</div>
+                <div style="width: 30%; text-align: right;">TOTAL</div>
+              </div>
+            </div>
+            
+            <!-- Separator line -->
+            <div style="border-top: 1px solid #000000; margin-bottom: 12px;"></div>
+            
+            <!-- Items Table -->
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
               <tbody>
                 ${itemsHtml}
               </tbody>
             </table>
             
-            <div style="text-align: right; margin-top: 25px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border-left: 5px solid #000C50;">
-              <p style="font-size: 20px; font-weight: bold; color: #000C50; margin: 0;">
-                Total Amount: ₱${Number(totalAmount).toFixed(2)}
-              </p>
+            <!-- Separator line -->
+            <div style="border-top: 1px solid #000000; margin-top: 15px; margin-bottom: 15px;"></div>
+            
+            <!-- Subtotal and Total -->
+            <div style="font-size: 12px; margin-bottom: 8px; color: #000000;">
+              <div style="display: flex; justify-content: space-between;">
+                <div>SUBTOTAL:</div>
+                <div style="text-align: right;">₱${subtotal.toFixed(2)}</div>
+              </div>
             </div>
             
+            <div style="font-size: 13px; font-weight: bold; margin-bottom: 25px; color: #000000;">
+              <div style="display: flex; justify-content: space-between;">
+                <div>TOTAL:</div>
+                <div style="text-align: right;">₱${total.toFixed(2)}</div>
+              </div>
+            </div>
             
-            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-              <p style="color: #999; font-size: 12px; margin: 0;">
+            <!-- Thank You -->
+            <div style="text-align: center; font-size: 13px; font-weight: bold; margin-top: 25px; color: #000000;">
+              THANK YOU!
+            </div>
+            
+            <!-- Footer -->
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 10px; margin: 0; font-family: Arial, sans-serif;">
                 This is an automated receipt. Please do not reply to this email.
               </p>
             </div>
+            
           </div>
-        </div>
+        </body>
+        </html>
       `
     };
 

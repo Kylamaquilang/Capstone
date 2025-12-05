@@ -156,7 +156,8 @@ const DeductModal = ({ isOpen, onClose, product, onDeductSuccess }) => {
                 value={formData.size}
                 onChange={handleInputChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full min-w-0 max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{ width: '100%', maxWidth: '100%' }}
               >
                 <option value="">-- Select a size --</option>
                 {product.sizes.map((size, index) => (

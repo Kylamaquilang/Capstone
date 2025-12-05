@@ -37,7 +37,7 @@ export default function ActionMenu({ actions, className = '' }) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px]">
+        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[160px] max-w-[calc(100vw-2rem)] sm:max-w-none">
           <div className="py-1">
             {actions.map((action, index) => (
               <button
@@ -48,8 +48,8 @@ export default function ActionMenu({ actions, className = '' }) {
                 }`}
                 disabled={action.disabled}
               >
-                {action.icon && <action.icon className="w-4 h-4" />}
-                {action.label}
+                {action.icon && <action.icon className="w-4 h-4 flex-shrink-0" />}
+                <span className="truncate">{action.label}</span>
               </button>
             ))}
           </div>

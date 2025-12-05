@@ -903,7 +903,8 @@ const getLowStockAlerts = async (req, res) => {
 // Get comprehensive inventory/stock report
 const getInventoryStockReport = async (req, res) => {
   try {
-    const { start_date, end_date, product_id, category_id, size, status } = req.query;
+    const { start_date, end_date, product_id, category_id, size, status, page = 1, limit = 50 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
     
     // Build date filter
     let dateFilter = '';
@@ -1028,13 +1029,30 @@ const getInventoryStockReport = async (req, res) => {
       }
       
       // Get stock movements in the period
+      // Stock In includes: restocks (stock_in) and positive adjustments
+      // Stock Out includes: sales, returns, damages (stock_out) and negative adjustments
       let movementQuery = `
         SELECT 
-          SUM(CASE WHEN sm.movement_type = 'stock_in' THEN sm.quantity ELSE 0 END) as stock_in,
-          SUM(CASE WHEN sm.movement_type = 'stock_out' THEN sm.quantity ELSE 0 END) as stock_out,
-          SUM(CASE WHEN sm.movement_type = 'stock_adjustment' AND sm.quantity > 0 THEN sm.quantity ELSE 0 END) as adjustments_in,
-          SUM(CASE WHEN sm.movement_type = 'stock_adjustment' AND sm.quantity < 0 THEN ABS(sm.quantity) ELSE 0 END) as adjustments_out,
-          GROUP_CONCAT(DISTINCT sm.notes SEPARATOR '; ') as remarks
+          -- Stock In: restocks and positive adjustments
+          SUM(CASE 
+            WHEN sm.movement_type = 'stock_in' THEN sm.quantity 
+            WHEN sm.movement_type = 'stock_adjustment' AND sm.quantity > 0 THEN sm.quantity 
+            ELSE 0 
+          END) as stock_in,
+          -- Stock Out: sales, returns, damages, and negative adjustments
+          SUM(CASE 
+            WHEN sm.movement_type = 'stock_out' THEN sm.quantity 
+            WHEN sm.movement_type = 'stock_adjustment' AND sm.quantity < 0 THEN ABS(sm.quantity) 
+            ELSE 0 
+          END) as stock_out,
+          -- Breakdown by reason for reporting
+          SUM(CASE WHEN sm.movement_type = 'stock_in' AND (sm.reason LIKE '%restock%' OR sm.reason LIKE '%restock%' OR sm.reason = 'restock') THEN sm.quantity ELSE 0 END) as restocks,
+          SUM(CASE WHEN sm.movement_type = 'stock_out' AND (sm.reason LIKE '%sale%' OR sm.reason LIKE '%order%') THEN sm.quantity ELSE 0 END) as sales,
+          SUM(CASE WHEN sm.movement_type = 'stock_out' AND sm.reason LIKE '%return%' THEN sm.quantity ELSE 0 END) as returns,
+          SUM(CASE WHEN sm.movement_type = 'stock_out' AND sm.reason LIKE '%damage%' THEN sm.quantity ELSE 0 END) as damages,
+          SUM(CASE WHEN sm.movement_type = 'stock_adjustment' AND sm.quantity > 0 THEN sm.quantity ELSE 0 END) as positive_adjustments,
+          SUM(CASE WHEN sm.movement_type = 'stock_adjustment' AND sm.quantity < 0 THEN ABS(sm.quantity) ELSE 0 END) as negative_adjustments,
+          GROUP_CONCAT(DISTINCT CONCAT(sm.reason, ': ', COALESCE(sm.notes, '')) SEPARATOR '; ') as remarks
         FROM stock_movements sm
         WHERE sm.product_id = ?
           AND (sm.size_id = ? OR (sm.size_id IS NULL AND ? IS NULL))
@@ -1044,13 +1062,19 @@ const getInventoryStockReport = async (req, res) => {
       const movementParams = [product.product_id, sizeId, sizeId, ...dateParams];
       const [movements] = await pool.query(movementQuery, movementParams);
       
-      const stockIn = parseFloat(movements[0]?.stock_in || 0) + parseFloat(movements[0]?.adjustments_in || 0);
-      const stockOut = parseFloat(movements[0]?.stock_out || 0) + parseFloat(movements[0]?.adjustments_out || 0);
+      // Calculate totals
+      // Stock In = restocks + positive adjustments
+      const stockIn = parseFloat(movements[0]?.stock_in || 0);
+      // Stock Out = sales + returns + damages + negative adjustments
+      const stockOut = parseFloat(movements[0]?.stock_out || 0);
       const endingStock = beginningStock + stockIn - stockOut;
       
-      // Get unit price (size price if available, otherwise product price)
+      // Get unit price/cost (size price if available, otherwise product price)
+      // Try to get cost from original_price first, then price
+      const unitCost = product.size_price || product.original_price || product.price || 0;
       const unitPrice = product.size_price || product.price || 0;
-      const totalStockValue = endingStock * unitPrice;
+      // Total Stock Value = Ending Stock × Unit Cost (if cost available, otherwise use price)
+      const totalStockValue = endingStock * (unitCost || unitPrice);
       
       // Determine stock status
       const LOW_STOCK_THRESHOLD = 10;
@@ -1082,18 +1106,28 @@ const getInventoryStockReport = async (req, res) => {
           category_name: product.category_name,
           size: productSize,
           beginning_stock: Math.max(0, beginningStock),
-          stock_in: stockIn,
-          stock_out: stockOut,
-          ending_stock: Math.max(0, endingStock),
-          unit_price: unitPrice,
-          total_stock_value: totalStockValue,
+          stock_in: stockIn, // Total restocks and positive adjustments
+          stock_out: stockOut, // Total sales, returns, damages, and negative adjustments
+          ending_stock: Math.max(0, endingStock), // Beginning + In - Out
+          unit_cost: unitCost, // Unit cost (original_price or price)
+          unit_price: unitPrice, // Unit selling price
+          total_stock_value: totalStockValue, // Ending Stock × Unit Cost
           stock_status: stockStatus,
-          remarks: movements[0]?.remarks || ''
+          remarks: movements[0]?.remarks || '',
+          // Breakdown for reference (optional)
+          breakdown: {
+            restocks: parseFloat(movements[0]?.restocks || 0),
+            sales: parseFloat(movements[0]?.sales || 0),
+            returns: parseFloat(movements[0]?.returns || 0),
+            damages: parseFloat(movements[0]?.damages || 0),
+            positive_adjustments: parseFloat(movements[0]?.positive_adjustments || 0),
+            negative_adjustments: parseFloat(movements[0]?.negative_adjustments || 0)
+          }
         });
       }
     }
     
-    // Calculate summary
+    // Calculate summary (from all data, not just paginated)
     const summary = {
       total_products: new Set(reportData.map(r => r.product_id)).size,
       total_beginning_stock: reportData.reduce((sum, r) => sum + r.beginning_stock, 0),
@@ -1103,10 +1137,20 @@ const getInventoryStockReport = async (req, res) => {
       total_stock_value: reportData.reduce((sum, r) => sum + r.total_stock_value, 0)
     };
     
+    // Apply pagination
+    const totalRecords = reportData.length;
+    const paginatedData = reportData.slice(offset, offset + parseInt(limit));
+    
     res.json({
       success: true,
-      data: reportData,
-      summary
+      data: paginatedData,
+      summary,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalRecords,
+        pages: Math.ceil(totalRecords / parseInt(limit))
+      }
     });
   } catch (error) {
     console.error('Error fetching inventory stock report:', error);

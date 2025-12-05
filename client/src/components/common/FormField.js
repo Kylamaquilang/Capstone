@@ -73,7 +73,8 @@ export const FormField = ({
             onBlur={onBlur}
             required={required}
             disabled={disabled}
-            className={`${baseInputClasses} ${inputClassName}`}
+            className={`${baseInputClasses} min-w-0 max-w-full ${inputClassName}`}
+            style={{ width: '100%', maxWidth: '100%' }}
             {...props}
           >
             {props.children}

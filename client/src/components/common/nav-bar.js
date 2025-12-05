@@ -77,7 +77,7 @@ export default function Navbar() {
   return (
     <>
       {/* Desktop Navigation */}
-      <nav className={`hidden lg:flex bg-[#000C50] text-white p-4 items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg transition-transform duration-300 ease-in-out ${
+      <nav className={`hidden lg:flex bg-[#000C50] text-white p-4 items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg transition-transform duration-300 ease-in-out overflow-visible ${
         isVisible ? 'translate-y-0' : '-translate-y-full'
       }`}>
         <div className="flex items-center gap-4">
@@ -110,7 +110,7 @@ export default function Navbar() {
       </nav>
 
       {/* Mobile Navigation */}
-      <nav className={`lg:hidden bg-[#000C50] text-white px-3 py-2.5 flex items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg transition-transform duration-300 ease-in-out ${
+      <nav className={`lg:hidden bg-[#000C50] text-white px-3 py-2.5 flex items-center justify-between fixed top-0 left-0 right-0 z-50 shadow-lg transition-transform duration-300 ease-in-out overflow-visible ${
         isVisible ? 'translate-y-0' : '-translate-y-full'
       }`}>
         <div className="flex items-center gap-3">

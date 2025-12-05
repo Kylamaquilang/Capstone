@@ -225,7 +225,8 @@ export default function EditUserModal({ isOpen, onClose, onSuccess, user }) {
                   value={form.degree} 
                   onChange={handleChange} 
                   disabled={submitting}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full min-w-0 max-w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ width: '100%', maxWidth: '100%' }}
                 >
                   <option value="">Select Degree</option>
                   <option value="BSIT">BSIT - Bachelor of Science in Information Technology</option>

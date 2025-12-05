@@ -6,6 +6,7 @@ import Navbar from '@/components/common/admin-navbar';
 import API from '@/lib/axios';
 import { CubeIcon } from '@heroicons/react/24/outline';
 import Swal from '@/lib/sweetalert-config';
+import Receipt from '@/components/receipt/Receipt';
 
 export default function OrderDetailPage() {
   const [order, setOrder] = useState(null);
@@ -14,6 +15,7 @@ export default function OrderDetailPage() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusUpdate, setStatusUpdate] = useState({ status: '', notes: '' });
   const [updating, setUpdating] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
   const router = useRouter();
   const params = useParams();
   const orderId = params.id;
@@ -40,6 +42,8 @@ export default function OrderDetailPage() {
         user_name: orderData.user?.name || orderData.user_name,
         student_id: orderData.user?.student_id || orderData.student_id,
         email: orderData.user?.email || orderData.email,
+        degree: orderData.degree,
+        section: orderData.section,
       });
 
       setStatusUpdate({ status: orderData.status, notes: "" });
@@ -181,6 +185,12 @@ export default function OrderDetailPage() {
                   className="border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 transition"
                 >
                   Back to Orders
+                </button>
+                <button
+                  onClick={() => setShowReceipt(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+                >
+                  View Receipt
                 </button>
                 <button
                   onClick={() => setShowStatusModal(true)}
@@ -387,6 +397,11 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceipt && order && (
+        <Receipt order={order} onClose={() => setShowReceipt(false)} />
       )}
     </div>
   );

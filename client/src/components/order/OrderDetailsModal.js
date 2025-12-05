@@ -2,11 +2,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
+import Receipt from '@/components/receipt/Receipt';
 
 export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showReceipt, setShowReceipt] = useState(false);
 
   const loadOrder = useCallback(async () => {
     try {
@@ -39,6 +41,8 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
         student_id: orderData.user?.student_id || orderData.student_id,
         email: orderData.user?.email || orderData.email,
         student_email: orderData.user?.email || orderData.email,
+        degree: orderData.degree,
+        section: orderData.section,
       });
     } catch (err) {
       setError('Failed to load order details');
@@ -93,12 +97,22 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-xl font-medium text-gray-900">Order Details</h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <XMarkIcon className="h-6 w-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            {order && (
+              <button
+                onClick={() => setShowReceipt(true)}
+                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Receipt
+              </button>
+            )}
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -225,6 +239,11 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
           ) : null}
         </div>
       </div>
+
+      {/* Receipt Modal */}
+      {showReceipt && order && (
+        <Receipt order={order} onClose={() => setShowReceipt(false)} />
+      )}
     </div>
   );
 }

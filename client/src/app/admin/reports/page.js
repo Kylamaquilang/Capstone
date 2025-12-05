@@ -47,6 +47,26 @@ export default function AdminReportsPage() {
 
   // Report data states
   const [inventoryData, setInventoryData] = useState([]);
+  const [inventorySummary, setInventorySummary] = useState({
+    total_products: 0,
+    total_beginning_stock: 0,
+    total_stock_in: 0,
+    total_stock_out: 0,
+    total_ending_stock: 0,
+    total_stock_value: 0
+  });
+  const [inventoryPagination, setInventoryPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    pages: 1
+  });
+  const [inventoryFilters, setInventoryFilters] = useState({
+    product_id: '',
+    category_id: '',
+    size: '',
+    status: ''
+  });
   const [salesData, setSalesData] = useState({});
   
   // Sales report filters
@@ -59,10 +79,13 @@ export default function AdminReportsPage() {
   const [allProducts, setAllProducts] = useState([]); // Full product list with category info
   const [availableSizes, setAvailableSizes] = useState([]);
   const [availableCategories, setAvailableCategories] = useState([]); // All categories (not just from sales)
+  const [inventoryProducts, setInventoryProducts] = useState([]); // Products for inventory filters
+  const [inventoryCategories, setInventoryCategories] = useState([]); // Categories for inventory filters
+  const [inventorySizes, setInventorySizes] = useState([]); // Sizes for inventory filters
   const prevProductIdRef = useRef('');
   const salesFetchInProgressRef = useRef(false);
 
-  // Fetch inventory data
+  // Fetch inventory data - comprehensive stock report
   const fetchInventoryData = async () => {
     // Only show loading if data hasn't been loaded yet
     const showLoading = !dataLoaded.inventory;
@@ -73,43 +96,106 @@ export default function AdminReportsPage() {
     try {
       setError('');
       
-      console.log('Fetching inventory data for reports...');
+      console.log('Fetching comprehensive inventory stock report...');
       
-      // Get inventory report with individual size rows
+      // Get comprehensive inventory stock report with all features
+      const params = new URLSearchParams();
+      if (dateFilter.startDate) params.append('start_date', dateFilter.startDate);
+      if (dateFilter.endDate) params.append('end_date', dateFilter.endDate);
+      if (inventoryFilters.product_id) params.append('product_id', inventoryFilters.product_id);
+      if (inventoryFilters.category_id) params.append('category_id', inventoryFilters.category_id);
+      if (inventoryFilters.size) params.append('size', inventoryFilters.size);
+      if (inventoryFilters.status) params.append('status', inventoryFilters.status);
+      params.append('page', inventoryPagination.page);
+      params.append('limit', inventoryPagination.limit);
+      
       try {
-        const response = await API.get('/stock-movements/reports/current-inventory');
-        const inventoryRows = response.data.inventory || [];
+        const response = await API.get(`/stock/report/inventory-stock?${params}`);
+        const reportData = response.data.data || [];
+        const summary = response.data.summary || {
+          total_products: 0,
+          total_beginning_stock: 0,
+          total_stock_in: 0,
+          total_stock_out: 0,
+          total_ending_stock: 0,
+          total_stock_value: 0
+        };
+        const pagination = response.data.pagination || {
+          page: 1,
+          limit: 50,
+          total: 0,
+          pages: 1
+        };
         
-        if (inventoryRows.length === 0) {
+        if (reportData.length === 0 && showLoading) {
           console.log('No inventory data found');
           setInventoryData([]);
-          if (showLoading) {
-            setError('No inventory data found. Add some products to see inventory data.');
-          }
+          setInventorySummary(summary);
+          setInventoryPagination(pagination);
+          setError('No inventory data found for the selected period.');
           return;
         }
         
-        console.log(`Found ${inventoryRows.length} inventory rows (including individual sizes)`);
-        setInventoryData(inventoryRows);
+        console.log(`Found ${reportData.length} inventory stock report rows`);
+        setInventoryData(reportData);
+        setInventorySummary(summary);
+        setInventoryPagination(pagination);
         setDataLoaded(prev => ({ ...prev, inventory: true }));
         
       } catch (inventoryErr) {
-        console.error('Failed to fetch inventory data:', inventoryErr.message);
+        console.error('Failed to fetch inventory stock report:', inventoryErr.message);
         throw inventoryErr;
       }
       
     } catch (err) {
       console.error('Inventory error:', err);
       if (showLoading) {
-        setError('Failed to fetch inventory data');
+        setError('Failed to fetch inventory stock report');
       }
       setInventoryData([]);
+      setInventorySummary({
+        total_products: 0,
+        total_beginning_stock: 0,
+        total_stock_in: 0,
+        total_stock_out: 0,
+        total_ending_stock: 0,
+        total_stock_value: 0
+      });
     } finally {
       if (showLoading) {
         setTabLoading(prev => ({ ...prev, inventory: false }));
       }
     }
   };
+  
+  // Fetch products and categories for inventory filters
+  const fetchInventoryFilterData = useCallback(async () => {
+    try {
+      const [productsRes, categoriesRes] = await Promise.all([
+        API.get('/products'),
+        API.get('/categories')
+      ]);
+      
+      setInventoryProducts(productsRes.data || []);
+      setInventoryCategories(categoriesRes.data || []);
+    } catch (err) {
+      console.error('Failed to fetch inventory filter data:', err);
+    }
+  }, []);
+  
+  // Update available sizes when product is selected
+  useEffect(() => {
+    if (inventoryFilters.product_id) {
+      const product = inventoryProducts.find(p => p.id === parseInt(inventoryFilters.product_id));
+      if (product && product.sizes && product.sizes.length > 0) {
+        setInventorySizes(product.sizes.map(s => s.size));
+      } else {
+        setInventorySizes([]);
+      }
+    } else {
+      setInventorySizes([]);
+    }
+  }, [inventoryFilters.product_id, inventoryProducts]);
 
 
   // Fetch all categories (not just from sales)
@@ -122,6 +208,29 @@ export default function AdminReportsPage() {
       setAvailableCategories([]);
     }
   }, []);
+  
+  // Handle inventory filter changes
+  const handleInventoryFilterChange = (key, value) => {
+    setInventoryFilters(prev => ({ ...prev, [key]: value }));
+    setInventoryPagination(prev => ({ ...prev, page: 1 }));
+    
+    // Clear dependent filters
+    if (key === 'product_id') {
+      setInventoryFilters(prev => ({ ...prev, size: '' }));
+    }
+    if (key === 'category_id') {
+      setInventoryFilters(prev => ({ ...prev, product_id: '', size: '' }));
+    }
+  };
+  
+  // Handle inventory pagination
+  const handleInventoryPageChange = (newPage) => {
+    setInventoryPagination(prev => ({ ...prev, page: newPage }));
+  };
+  
+  const handleInventoryLimitChange = (newLimit) => {
+    setInventoryPagination(prev => ({ ...prev, limit: parseInt(newLimit), page: 1 }));
+  };
 
   // Fetch products that have been sold
   const fetchSoldProducts = useCallback(async () => {
@@ -330,6 +439,11 @@ export default function AdminReportsPage() {
   // Note: Sales data fetching is handled by the main useEffect below
   // This prevents duplicate calls and flickering
 
+  // Fetch inventory filter data on mount
+  useEffect(() => {
+    fetchInventoryFilterData();
+  }, [fetchInventoryFilterData]);
+
   // Load data based on active tab - only show loading on first load
   useEffect(() => {
     switch (activeTab) {
@@ -346,7 +460,7 @@ export default function AdminReportsPage() {
         break;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, dateFilter.startDate, dateFilter.endDate, salesFilters.product_id, salesFilters.size, salesFilters.category_id]);
+  }, [activeTab, dateFilter.startDate, dateFilter.endDate, inventoryFilters.product_id, inventoryFilters.category_id, inventoryFilters.size, inventoryFilters.status, inventoryPagination.page, inventoryPagination.limit, salesFilters.product_id, salesFilters.size, salesFilters.category_id]);
 
   // Set up real-time socket listeners
   useEffect(() => {
@@ -459,8 +573,508 @@ export default function AdminReportsPage() {
     printWindow.close();
   };
 
-  // Download function
+  // Export Inventory Report to CSV
+  const handleExportInventoryCSV = () => {
+    try {
+      if (!Array.isArray(inventoryData) || inventoryData.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No inventory data to export.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      // CSV Headers - matching exact table columns
+      const headers = [
+        'Product Name',
+        'Category',
+        'Size',
+        'Beginning Stock',
+        'Stock In',
+        'Stock Out',
+        'Ending Stock',
+        'Unit Cost',
+        'Unit Price',
+        'Total Stock Value',
+        'Status',
+        'Remarks'
+      ];
+      
+      // CSV Data rows - using exact data from table
+      const csvRows = [headers.join(',')];
+      
+      inventoryData.forEach(item => {
+        const unitCost = item.unit_cost || item.unit_price || 0;
+        const unitPrice = item.unit_price || 0;
+        const totalValue = item.total_stock_value || (item.ending_stock * unitCost);
+        const status = item.stock_status === 'IN_STOCK' ? 'In Stock' : 
+                      item.stock_status === 'LOW_STOCK' ? 'Low Stock' : 
+                      item.stock_status === 'OUT_OF_STOCK' ? 'Out of Stock' : 
+                      item.stock_status || 'N/A';
+        
+        const row = [
+          `"${(item.product_name || '').replace(/"/g, '""')}"`,
+          `"${(item.category_name || 'Uncategorized').replace(/"/g, '""')}"`,
+          `"${(item.size && item.size !== 'N/A' ? item.size : 'N/A').replace(/"/g, '""')}"`,
+          item.beginning_stock || 0,
+          item.stock_in || 0,
+          item.stock_out || 0,
+          item.ending_stock || 0,
+          unitCost,
+          unitPrice,
+          totalValue,
+          `"${status.replace(/"/g, '""')}"`,
+          `"${((item.remarks || '') || 'No remarks').replace(/"/g, '""')}"`
+        ];
+        csvRows.push(row.join(','));
+      });
+      
+      // Add summary row
+      csvRows.push('');
+      csvRows.push('Summary');
+      csvRows.push(`Total Products,${inventorySummary.total_products}`);
+      csvRows.push(`Total Beginning Stock,${inventorySummary.total_beginning_stock}`);
+      csvRows.push(`Total Stock In,${inventorySummary.total_stock_in}`);
+      csvRows.push(`Total Stock Out,${inventorySummary.total_stock_out}`);
+      csvRows.push(`Total Ending Stock,${inventorySummary.total_ending_stock}`);
+      csvRows.push(`Total Stock Value,${inventorySummary.total_stock_value}`);
+      
+      // Add filter information
+      csvRows.push('');
+      csvRows.push('Applied Filters');
+      if (dateFilter.startDate) csvRows.push(`Start Date,${dateFilter.startDate}`);
+      if (dateFilter.endDate) csvRows.push(`End Date,${dateFilter.endDate}`);
+      if (inventoryFilters.category_id) {
+        const category = inventoryCategories.find(c => c.id === parseInt(inventoryFilters.category_id));
+        csvRows.push(`Category,"${category?.name || inventoryFilters.category_id}"`);
+      }
+      if (inventoryFilters.product_id) {
+        const product = inventoryProducts.find(p => p.id === parseInt(inventoryFilters.product_id));
+        csvRows.push(`Product,"${product?.name || inventoryFilters.product_id}"`);
+      }
+      if (inventoryFilters.size) csvRows.push(`Size,"${inventoryFilters.size}"`);
+      if (inventoryFilters.status) {
+        const statusLabel = inventoryFilters.status === 'IN_STOCK' ? 'In Stock' : 
+                           inventoryFilters.status === 'LOW_STOCK' ? 'Low Stock' : 'Out of Stock';
+        csvRows.push(`Status,"${statusLabel}"`);
+      }
+      
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `inventory-stock-report-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting to CSV:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Export Error',
+        text: 'Error exporting to CSV. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Export Inventory Report to Excel (CSV format)
+  const handleExportInventoryExcel = () => {
+    handleExportInventoryCSV(); // Excel can open CSV files
+  };
+
+  // Export Inventory Report to PDF
+  const handleExportInventoryPDF = () => {
+    try {
+      if (!Array.isArray(inventoryData) || inventoryData.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No inventory data to export.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      const pdf = new jsPDF('landscape', 'mm', 'a4');
+      pdf.setFont('helvetica');
+      
+      // Add title
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Inventory / Stock Report', 20, 20);
+      
+      // Add generation date
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, 30);
+      
+      // Add summary
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Summary', 20, 45);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.text(`Total Products: ${inventorySummary.total_products}`, 20, 55);
+      pdf.text(`Total Beginning Stock: ${inventorySummary.total_beginning_stock}`, 20, 62);
+      pdf.text(`Total Stock In: ${inventorySummary.total_stock_in}`, 20, 69);
+      pdf.text(`Total Stock Out: ${inventorySummary.total_stock_out}`, 20, 76);
+      pdf.text(`Total Ending Stock: ${inventorySummary.total_ending_stock}`, 20, 83);
+      pdf.text(`Total Stock Value: ${formatCurrency(inventorySummary.total_stock_value)}`, 20, 90);
+      
+      // Add filter information
+      let yPos = 100;
+      const hasFilters = dateFilter.startDate || dateFilter.endDate || inventoryFilters.product_id || 
+                        inventoryFilters.category_id || inventoryFilters.size || inventoryFilters.status;
+      if (hasFilters) {
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Applied Filters:', 20, yPos);
+        yPos += 8;
+        pdf.setFont('helvetica', 'normal');
+        if (dateFilter.startDate) {
+          pdf.text(`Start Date: ${dateFilter.startDate}`, 20, yPos);
+          yPos += 8;
+        }
+        if (dateFilter.endDate) {
+          pdf.text(`End Date: ${dateFilter.endDate}`, 20, yPos);
+          yPos += 8;
+        }
+        if (inventoryFilters.category_id) {
+          const category = inventoryCategories.find(c => c.id === parseInt(inventoryFilters.category_id));
+          pdf.text(`Category: ${category?.name || inventoryFilters.category_id}`, 20, yPos);
+          yPos += 8;
+        }
+        if (inventoryFilters.product_id) {
+          const product = inventoryProducts.find(p => p.id === parseInt(inventoryFilters.product_id));
+          pdf.text(`Product: ${product?.name || inventoryFilters.product_id}`, 20, yPos);
+          yPos += 8;
+        }
+        if (inventoryFilters.size) {
+          pdf.text(`Size: ${inventoryFilters.size}`, 20, yPos);
+          yPos += 8;
+        }
+        if (inventoryFilters.status) {
+          const statusLabel = inventoryFilters.status === 'IN_STOCK' ? 'In Stock' : 
+                             inventoryFilters.status === 'LOW_STOCK' ? 'Low Stock' : 'Out of Stock';
+          pdf.text(`Status: ${statusLabel}`, 20, yPos);
+          yPos += 8;
+        }
+      }
+      
+      // Prepare table data - using exact data from table
+      const tableData = inventoryData.map(item => {
+        const unitCost = item.unit_cost || item.unit_price || 0;
+        const unitPrice = item.unit_price || 0;
+        const totalValue = item.total_stock_value || (item.ending_stock * unitCost);
+        const status = item.stock_status === 'IN_STOCK' ? 'In Stock' : 
+                      item.stock_status === 'LOW_STOCK' ? 'Low Stock' : 
+                      item.stock_status === 'OUT_OF_STOCK' ? 'Out of Stock' : 
+                      item.stock_status || 'N/A';
+        
+        return [
+          item.product_name || '',
+          item.category_name || 'Uncategorized',
+          item.size && item.size !== 'N/A' ? item.size : 'N/A',
+          (item.beginning_stock || 0).toString(),
+          (item.stock_in || 0).toString(),
+          (item.stock_out || 0).toString(),
+          (item.ending_stock || 0).toString(),
+          formatCurrency(unitCost),
+          formatCurrency(unitPrice),
+          formatCurrency(totalValue),
+          status,
+          (item.remarks || '').substring(0, 50) // Truncate long remarks
+        ];
+      });
+      
+      // Add table using autoTable
+      autoTable(pdf, {
+        head: [['Product Name', 'Category', 'Size', 'Beginning Stock', 'Stock In', 'Stock Out', 'Ending Stock', 'Unit Cost', 'Unit Price', 'Total Value', 'Status', 'Remarks']],
+        body: tableData,
+        startY: yPos + 10,
+        styles: {
+          fontSize: 7,
+          cellPadding: 2,
+        },
+        headStyles: {
+          fillColor: [0, 12, 80], // #000C50
+          textColor: 255,
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245],
+        },
+        columnStyles: {
+          0: { cellWidth: 40 }, // Product Name
+          1: { cellWidth: 25 }, // Category
+          2: { cellWidth: 15 }, // Size
+          3: { cellWidth: 18 }, // Beginning Stock
+          4: { cellWidth: 15 }, // Stock In
+          5: { cellWidth: 15 }, // Stock Out
+          6: { cellWidth: 18 }, // Ending Stock
+          7: { cellWidth: 18 }, // Unit Cost
+          8: { cellWidth: 18 }, // Unit Price
+          9: { cellWidth: 22 }, // Total Value
+          10: { cellWidth: 18 }, // Status
+          11: { cellWidth: 30 }, // Remarks
+        },
+        margin: { top: yPos + 10, left: 20, right: 20 },
+      });
+      
+      // Save the PDF
+      const fileName = `inventory-stock-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error('Error exporting to PDF:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Export Error',
+        text: 'Error exporting to PDF. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Print Inventory Report
+  const handlePrintInventory = () => {
+    try {
+      if (!Array.isArray(inventoryData) || inventoryData.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No inventory data to print.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      const printWindow = window.open('', '_blank');
+      const hasFilters = dateFilter.startDate || dateFilter.endDate || inventoryFilters.product_id || 
+                        inventoryFilters.category_id || inventoryFilters.size || inventoryFilters.status;
+      
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Inventory / Stock Report</title>
+            <style>
+              @media print {
+                @page {
+                  size: landscape;
+                  margin: 1cm;
+                }
+              }
+              body {
+                font-family: Arial, sans-serif;
+                font-size: 12px;
+                margin: 20px;
+              }
+              .header {
+                text-align: center;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 10px;
+              }
+              .header h1 {
+                margin: 0;
+                font-size: 24px;
+              }
+              .header p {
+                margin: 5px 0;
+                color: #666;
+              }
+              .summary {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 15px;
+                margin-bottom: 20px;
+                padding: 15px;
+                background: #f5f5f5;
+                border-radius: 5px;
+              }
+              .summary-item {
+                text-align: center;
+              }
+              .summary-item label {
+                display: block;
+                font-size: 10px;
+                color: #666;
+                margin-bottom: 5px;
+              }
+              .summary-item value {
+                display: block;
+                font-size: 18px;
+                font-weight: bold;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+              }
+              th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+              }
+              th {
+                background-color: #000C50;
+                color: white;
+                font-weight: bold;
+                font-size: 10px;
+              }
+              td {
+                font-size: 9px;
+              }
+              tr:nth-child(even) {
+                background-color: #f9f9f9;
+              }
+              .text-right {
+                text-align: right;
+              }
+              .text-center {
+                text-align: center;
+              }
+              .filters {
+                margin-bottom: 15px;
+                padding: 10px;
+                background: #f9f9f9;
+                border-radius: 5px;
+                font-size: 10px;
+              }
+              .filters h3 {
+                margin: 0 0 10px 0;
+                font-size: 12px;
+              }
+              .filters p {
+                margin: 3px 0;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Inventory / Stock Report</h1>
+              <p>Generated on: ${new Date().toLocaleString()}</p>
+              ${(dateFilter.startDate || dateFilter.endDate) ? `<p>Period: ${dateFilter.startDate || 'Start'} to ${dateFilter.endDate || 'End'}</p>` : ''}
+            </div>
+            
+            <div class="summary">
+              <div class="summary-item">
+                <label>Total Products</label>
+                <value>${inventorySummary.total_products}</value>
+              </div>
+              <div class="summary-item">
+                <label>Total Beginning Stock</label>
+                <value>${inventorySummary.total_beginning_stock}</value>
+              </div>
+              <div class="summary-item">
+                <label>Total Stock In</label>
+                <value>+${inventorySummary.total_stock_in}</value>
+              </div>
+              <div class="summary-item">
+                <label>Total Stock Out</label>
+                <value>-${inventorySummary.total_stock_out}</value>
+              </div>
+              <div class="summary-item">
+                <label>Total Ending Stock</label>
+                <value>${inventorySummary.total_ending_stock}</value>
+              </div>
+              <div class="summary-item">
+                <label>Total Stock Value</label>
+                <value>${formatCurrency(inventorySummary.total_stock_value)}</value>
+              </div>
+            </div>
+            
+            ${hasFilters ? `
+              <div class="filters">
+                <h3>Applied Filters:</h3>
+                ${dateFilter.startDate ? `<p>Start Date: ${dateFilter.startDate}</p>` : ''}
+                ${dateFilter.endDate ? `<p>End Date: ${dateFilter.endDate}</p>` : ''}
+                ${inventoryFilters.category_id ? `<p>Category: ${inventoryCategories.find(c => c.id === parseInt(inventoryFilters.category_id))?.name || inventoryFilters.category_id}</p>` : ''}
+                ${inventoryFilters.product_id ? `<p>Product: ${inventoryProducts.find(p => p.id === parseInt(inventoryFilters.product_id))?.name || inventoryFilters.product_id}</p>` : ''}
+                ${inventoryFilters.size ? `<p>Size: ${inventoryFilters.size}</p>` : ''}
+                ${inventoryFilters.status ? `<p>Status: ${inventoryFilters.status === 'IN_STOCK' ? 'In Stock' : inventoryFilters.status === 'LOW_STOCK' ? 'Low Stock' : 'Out of Stock'}</p>` : ''}
+              </div>
+            ` : ''}
+            
+            <table>
+              <thead>
+                <tr>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Size</th>
+                  <th>Beginning Stock</th>
+                  <th>Stock In</th>
+                  <th>Stock Out</th>
+                  <th>Ending Stock</th>
+                  <th>Unit Cost</th>
+                  <th>Unit Price</th>
+                  <th>Total Stock Value</th>
+                  <th>Status</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${inventoryData.map(item => {
+                  const unitCost = item.unit_cost || item.unit_price || 0;
+                  const unitPrice = item.unit_price || 0;
+                  const totalValue = item.total_stock_value || (item.ending_stock * unitCost);
+                  const status = item.stock_status === 'IN_STOCK' ? 'In Stock' : 
+                                item.stock_status === 'LOW_STOCK' ? 'Low Stock' : 
+                                item.stock_status === 'OUT_OF_STOCK' ? 'Out of Stock' : 
+                                item.stock_status || 'N/A';
+                  
+                  return `
+                    <tr>
+                      <td>${item.product_name || ''}</td>
+                      <td>${item.category_name || 'Uncategorized'}</td>
+                      <td>${item.size && item.size !== 'N/A' ? item.size : 'N/A'}</td>
+                      <td class="text-center">${item.beginning_stock || 0}</td>
+                      <td class="text-center">${item.stock_in || 0}</td>
+                      <td class="text-center">${item.stock_out || 0}</td>
+                      <td class="text-center"><strong>${item.ending_stock || 0}</strong></td>
+                      <td class="text-right">${formatCurrency(unitCost)}</td>
+                      <td class="text-right">${formatCurrency(unitPrice)}</td>
+                      <td class="text-right"><strong>${formatCurrency(totalValue)}</strong></td>
+                      <td>${status}</td>
+                      <td>${(item.remarks || '') || 'No remarks'}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `;
+      
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    } catch (error) {
+      console.error('Error printing report:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Print Error',
+        text: 'Error printing report. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Download function - route to appropriate export based on tab
   const handleDownload = async () => {
+    if (activeTab === 'inventory') {
+      handleExportInventoryPDF();
+    } else {
     try {
       const reportData = getReportData();
       const pdf = generatePDFDocument(reportData);
@@ -474,6 +1088,7 @@ export default function AdminReportsPage() {
         text: 'Error generating PDF. Please try again.',
         confirmButtonColor: '#000C50'
       });
+      }
     }
   };
 
@@ -1176,13 +1791,13 @@ export default function AdminReportsPage() {
       <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
       <div className="flex flex-1 pt-16 lg:pt-20">
         <Sidebar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
-        <div className="flex-1 flex flex-col bg-gray-50 p-3 sm:p-6 overflow-auto lg:ml-64 ml-0">
+        <div className="flex-1 flex flex-col bg-gray-50 p-2 sm:p-3 md:p-6 overflow-auto lg:ml-64 ml-0 max-w-full">
           {/* Header */}
           <div className="mb-4 sm:mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-                <p className="text-sm text-gray-600 mt-1">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 break-words">Reports</h1>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words">
                   Comprehensive business reports and analytics
                 </p>
               </div>
@@ -1190,49 +1805,52 @@ export default function AdminReportsPage() {
           </div>
 
           {/* Date Filters */}
-          <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <FunnelIcon className="h-5 w-5 text-gray-500" />
-              <h3 className="text-sm font-medium text-gray-900">Date Filters</h3>
+          <div className="mb-4 sm:mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4">
+            <div className="flex items-center space-x-2 mb-3 sm:mb-4">
+              <FunnelIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500" />
+              <h3 className="text-xs sm:text-sm font-medium text-gray-900">Date Filters</h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="w-full min-w-0">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                   Start Date
                 </label>
                 <input
                   type="date"
                   value={dateFilter.startDate}
                   onChange={(e) => setDateFilter(prev => ({ ...prev, startDate: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+                  className="w-full min-w-0 px-3 py-2.5 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent touch-manipulation"
+                  style={{ minHeight: '44px' }}
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+              <div className="w-full min-w-0">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                   End Date
                 </label>
                 <input
                   type="date"
                   value={dateFilter.endDate}
                   onChange={(e) => setDateFilter(prev => ({ ...prev, endDate: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+                  className="w-full min-w-0 px-3 py-2.5 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent touch-manipulation"
+                  style={{ minHeight: '44px' }}
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
+              <div className="w-full min-w-0">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
                   Period
                 </label>
                 <select
                   value={dateFilter.period}
                   onChange={(e) => setDateFilter(prev => ({ ...prev, period: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent"
+                  className="w-full min-w-0 px-3 py-2.5 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#000C50] focus:border-transparent touch-manipulation bg-white"
+                  style={{ minHeight: '44px' }}
                 >
                   <option value="day">Daily</option>
                   <option value="month">Monthly</option>
                   <option value="year">Yearly</option>
                 </select>
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end w-full min-w-0">
                 <button
                   onClick={() => {
                     setDateFilter({
@@ -1241,7 +1859,8 @@ export default function AdminReportsPage() {
                       period: 'month'
                     });
                   }}
-                  className="w-full px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300 transition-colors"
+                  className="w-full min-w-0 px-3 py-2.5 sm:py-2 bg-gray-200 text-gray-700 rounded-md text-sm sm:text-base font-medium hover:bg-gray-300 transition-colors touch-manipulation"
+                  style={{ minHeight: '44px' }}
                 >
                   Clear Filters
                 </button>
@@ -1250,23 +1869,24 @@ export default function AdminReportsPage() {
           </div>
 
           {/* Tabs */}
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <div className="border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8 overflow-x-auto">
+              <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto scrollbar-hide">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   return (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                      className={`flex items-center space-x-1.5 sm:space-x-2 py-2.5 sm:py-2 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap touch-manipulation min-w-[100px] sm:min-w-0 ${
                         activeTab === tab.id
                           ? 'border-[#000C50] text-[#000C50]'
                           : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }`}
+                      style={{ minHeight: '44px' }}
                     >
-                      <Icon className="h-4 w-4" />
-                      <span>{tab.label}</span>
+                      <Icon className="h-4 w-4 flex-shrink-0" />
+                      <span className="truncate">{tab.label}</span>
                     </button>
                   );
                 })}
@@ -1296,109 +1916,229 @@ export default function AdminReportsPage() {
 
             {!error && (
               <>
-                {/* Inventory Report */}
+                {/* Inventory Report - Comprehensive Stock Report */}
                 {activeTab === 'inventory' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     {/* Header Section */}
-                    <div className="px-6 py-5 bg-white border-b border-gray-100">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Inventory Report</h3>
+                    <div className="px-3 sm:px-6 py-4 sm:py-5 bg-white border-b border-gray-100">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Inventory / Stock Report</h3>
+                          <p className="text-xs sm:text-sm text-gray-500 mt-1">Comprehensive view of all stock movements over selected period</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          {/* Search Input */}
-                          <div className="relative">
-                            <input
-                              type="text"
-                              placeholder="Search products..."
-                              className="pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
-                            />
-                            <svg className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                          </div>
-                          {/* Download Button */}
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
-                            onClick={handleDownload}
-                            className="px-4 py-2 text-sm bg-[#000C50] text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                            onClick={handleExportInventoryPDF}
+                            className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 sm:gap-2 touch-manipulation"
+                            title="Export to PDF"
+                            style={{ minHeight: '44px' }}
                           >
                             <ArrowDownTrayIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">PDF</span>
                           </button>
+                          <button
+                            onClick={handleExportInventoryCSV}
+                            className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-1.5 sm:gap-2 touch-manipulation"
+                            title="Export to CSV"
+                            style={{ minHeight: '44px' }}
+                          >
+                            <ArrowDownTrayIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">CSV</span>
+                          </button>
+                          <button
+                            onClick={handleExportInventoryExcel}
+                            className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center gap-1.5 sm:gap-2 touch-manipulation"
+                            title="Export to Excel"
+                            style={{ minHeight: '44px' }}
+                          >
+                            <ArrowDownTrayIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">Excel</span>
+                          </button>
+                          <button
+                            onClick={handlePrintInventory}
+                            className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors flex items-center gap-1.5 sm:gap-2 touch-manipulation"
+                            title="Print Report"
+                            style={{ minHeight: '44px' }}
+                          >
+                            <PrinterIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">Print</span>
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4 mt-3 sm:mt-4">
+                        <div className="bg-gray-50 p-2.5 sm:p-3 rounded-lg min-w-0">
+                          <p className="text-xs text-gray-500 truncate">Total Products</p>
+                          <p className="text-xs sm:text-sm font-bold text-gray-900 break-words">{inventorySummary.total_products}</p>
+                        </div>
+                        <div className="bg-gray-50 p-2.5 sm:p-3 rounded-lg min-w-0">
+                          <p className="text-xs text-gray-500 truncate">Beginning Stock</p>
+                          <p className="text-xs sm:text-sm font-bold text-gray-900 break-words">{inventorySummary.total_beginning_stock}</p>
+                        </div>
+                        <div className="bg-green-50 p-2.5 sm:p-3 rounded-lg min-w-0">
+                          <p className="text-xs text-gray-500 truncate">Stock In</p>
+                          <p className="text-xs sm:text-sm font-bold text-green-600 break-words">+{inventorySummary.total_stock_in}</p>
+                        </div>
+                        <div className="bg-red-50 p-2.5 sm:p-3 rounded-lg min-w-0">
+                          <p className="text-xs text-gray-500 truncate">Stock Out</p>
+                          <p className="text-xs sm:text-sm font-bold text-red-600 break-words">-{inventorySummary.total_stock_out}</p>
+                        </div>
+                        <div className="bg-gray-50 p-2.5 sm:p-3 rounded-lg min-w-0">
+                          <p className="text-xs text-gray-500 truncate">Ending Stock</p>
+                          <p className="text-xs sm:text-sm font-bold text-gray-900 break-words">{inventorySummary.total_ending_stock}</p>
+                        </div>
+                        <div className="bg-blue-50 p-2.5 sm:p-3 rounded-lg min-w-0">
+                          <p className="text-xs text-gray-500 truncate">Total Value</p>
+                          <p className="text-xs sm:text-sm font-bold text-blue-600 break-words">
+                            {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(inventorySummary.total_stock_value || 0)}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Inventory Filters */}
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="w-full min-w-0">
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">Category</label>
+                          <select
+                            value={inventoryFilters.category_id}
+                            onChange={(e) => handleInventoryFilterChange('category_id', e.target.value)}
+                            className="w-full min-w-0 px-3 py-2.5 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation bg-white"
+                            style={{ minHeight: '44px' }}
+                          >
+                            <option value="">All Categories</option>
+                            {inventoryCategories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="w-full min-w-0">
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">Product</label>
+                          <select
+                            value={inventoryFilters.product_id}
+                            onChange={(e) => handleInventoryFilterChange('product_id', e.target.value)}
+                            className="w-full min-w-0 px-3 py-2.5 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            disabled={!inventoryFilters.category_id}
+                            style={{ minHeight: '44px' }}
+                          >
+                            <option value="">All Products</option>
+                            {inventoryProducts
+                              .filter(p => !inventoryFilters.category_id || p.category_id === parseInt(inventoryFilters.category_id))
+                              .map((product) => (
+                                <option key={product.id} value={product.id}>{product.name}</option>
+                              ))}
+                          </select>
+                        </div>
+                        <div className="w-full min-w-0">
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">Size</label>
+                          <select
+                            value={inventoryFilters.size}
+                            onChange={(e) => handleInventoryFilterChange('size', e.target.value)}
+                            className="w-full min-w-0 px-3 py-2.5 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            disabled={!inventoryFilters.product_id}
+                            style={{ minHeight: '44px' }}
+                          >
+                            <option value="">All Sizes</option>
+                            {inventorySizes.map((size) => (
+                              <option key={size} value={size}>{size}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="w-full min-w-0">
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">Status</label>
+                          <select
+                            value={inventoryFilters.status}
+                            onChange={(e) => handleInventoryFilterChange('status', e.target.value)}
+                            className="w-full min-w-0 px-3 py-2.5 sm:py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 touch-manipulation bg-white"
+                            style={{ minHeight: '44px' }}
+                          >
+                            <option value="">All Status</option>
+                            <option value="IN_STOCK">In Stock</option>
+                            <option value="LOW_STOCK">Low Stock</option>
+                            <option value="OUT_OF_STOCK">Out of Stock</option>
+                          </select>
                         </div>
                       </div>
                     </div>
 
                     {/* Table */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead style={{ backgroundColor: '#F6F6F6' }}>
-                          <tr>
-                            <th className="px-6 py-4 text-left">
-                              <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                            </th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Product Name</th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Category</th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Size/Variant</th>
-                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Base Stock</th>
-                            <th className="px-6 py-4 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Current Stock</th>
-                            <th className="px-6 py-4 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {Array.isArray(inventoryData) && inventoryData.length > 0 ? (
-                            inventoryData.map((item, index) => (
-                              <tr key={item.id || index} className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : ''}`} style={index % 2 !== 0 ? { backgroundColor: '#F6F6F6' } : {}}>
-                                <td className="px-6 py-4">
-                                  <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="text-xs text-gray-900 uppercase">{item.product_name}</div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className="inline-flex px-2.5 py-1 text-xs rounded-full uppercase" style={{ backgroundColor: '#A5D8FF', color: '#0464C5' }}>
-                                    {item.category_name || 'N/A'}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                  {item.size && item.size !== 'No sizes' ? (
-                                    <span className="inline-flex px-2.5 py-1 text-xs text-black uppercase">
-                                      {item.size}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-black">N/A</span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-xs text-gray-600 text-center">
-                                  {item.base_stock || 0}
-                                </td>
-                                <td className="px-6 py-4 text-xs text-gray-900 text-center">
-                                  {item.current_stock || 0}
-                                </td>
-                                <td className="px-6 py-4">
-                                  <span className="inline-flex px-2.5 py-1 text-xs rounded-full" style={
-                                    item.stock_status === 'Out of Stock'
-                                      ? { backgroundColor: '#FEF2F2', color: '#991B1B' }
-                                      : item.stock_status === 'Low Stock'
-                                      ? { backgroundColor: '#F8E194', color: '#E2821D' }
-                                      : { backgroundColor: '#ABE8BA', color: '#059C2B' }
-                                  }>
-                                    {item.stock_status}
-                                  </span>
-                                </td>
+                    <div className="overflow-x-auto -mx-3 sm:mx-0">
+                      <div className="inline-block min-w-full align-middle">
+                        <div className="overflow-hidden">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead style={{ backgroundColor: '#F6F6F6' }}>
+                              <tr>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap min-w-[120px]">Product Name</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap min-w-[100px]">Category</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Size</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Beg. Stock</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Stock In</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Stock Out</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">End. Stock</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Unit Cost</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Unit Price</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Total Value</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Status</th>
+                                <th className="px-2 sm:px-4 py-2.5 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider min-w-[120px]">Remarks</th>
                               </tr>
-                            ))
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {Array.isArray(inventoryData) && inventoryData.length > 0 ? (
+                                inventoryData.map((item, index) => {
+                                  const formatCurrency = (amount) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(amount || 0);
+                                  const unitCost = item.unit_cost || item.unit_price || 0;
+                                  const unitPrice = item.unit_price || 0;
+                                  const totalValue = item.total_stock_value || (item.ending_stock * unitCost);
+                                  
+                                  return (
+                                    <tr key={`${item.product_id}-${item.size}-${index}`} className={`hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : ''}`} style={index % 2 !== 0 ? { backgroundColor: '#F6F6F6' } : {}}>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-gray-900 font-medium min-w-[120px]">
+                                        <div className="break-words">{item.product_name}</div>
+                                      </td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-gray-600 min-w-[100px]">
+                                        <div className="break-words">{item.category_name || 'Uncategorized'}</div>
+                                      </td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-gray-600 whitespace-nowrap">
+                                        {item.size && item.size !== 'N/A' ? item.size : 'N/A'}
+                                      </td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-gray-900 text-center font-semibold whitespace-nowrap">{item.beginning_stock || 0}</td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-green-600 text-center font-semibold whitespace-nowrap">+{item.stock_in || 0}</td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-red-600 text-center font-semibold whitespace-nowrap">-{item.stock_out || 0}</td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-gray-900 text-center font-bold whitespace-nowrap">{item.ending_stock || 0}</td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-gray-700 text-center whitespace-nowrap">{formatCurrency(unitCost)}</td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-gray-700 text-center whitespace-nowrap">{formatCurrency(unitPrice)}</td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-gray-900 text-center font-semibold whitespace-nowrap">{formatCurrency(totalValue)}</td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 whitespace-nowrap">
+                                        <span className={`inline-flex px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs rounded-full ${
+                                          item.stock_status === 'OUT_OF_STOCK' || item.stock_status === 'Out of Stock'
+                                            ? 'bg-red-100 text-red-800'
+                                            : item.stock_status === 'LOW_STOCK' || item.stock_status === 'Low Stock'
+                                            ? 'bg-yellow-100 text-yellow-800'
+                                            : 'bg-green-100 text-green-800'
+                                        }`}>
+                                          {item.stock_status === 'IN_STOCK' ? 'In Stock' : item.stock_status === 'LOW_STOCK' ? 'Low Stock' : item.stock_status === 'OUT_OF_STOCK' ? 'Out of Stock' : item.stock_status}
+                                        </span>
+                                      </td>
+                                      <td className="px-2 sm:px-4 py-2.5 sm:py-3 text-xs text-gray-600 min-w-[120px]">
+                                        <div className="max-w-[150px] sm:max-w-[200px] truncate" title={item.remarks || 'No remarks'}>
+                                          {item.remarks || <span className="text-gray-400 italic">No remarks</span>}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
                           ) : (
                             <tr>
-                              <td colSpan="7" className="px-6 py-12 text-center">
+                              <td colSpan="12" className="px-4 sm:px-6 py-8 sm:py-12 text-center">
                                 <div className="flex flex-col items-center gap-3">
-                                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                     </svg>
                                   </div>
                                   <div>
-                                    <p className="text-sm font-medium text-gray-900">No inventory data found</p>
-                                    <p className="text-xs text-gray-500">No products available</p>
+                                    <p className="text-xs sm:text-sm font-medium text-gray-900">No inventory data found</p>
+                                    <p className="text-xs text-gray-500">Adjust filters or date range to see data</p>
                                   </div>
                                 </div>
                               </td>
@@ -1406,39 +2146,63 @@ export default function AdminReportsPage() {
                           )}
                         </tbody>
                       </table>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Pagination */}
-                    <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <span className="text-sm text-gray-600">Rows per page:</span>
-                          <select className="text-sm border border-gray-200 rounded-lg px-3 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                            <option>10</option>
-                            <option>25</option>
-                            <option>50</option>
-                            <option>100</option>
+                    {inventoryPagination.pages > 1 && (
+                      <div className="px-4 sm:px-6 py-4 bg-gray-50/50 border-t border-gray-100">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">Rows per page:</span>
+                              <select
+                                value={inventoryPagination.limit}
+                                onChange={(e) => handleInventoryLimitChange(e.target.value)}
+                                className="flex-1 sm:flex-none text-sm sm:text-base border border-gray-200 rounded-lg px-3 py-2 sm:py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent touch-manipulation bg-white"
+                                style={{ minHeight: '44px', minWidth: '80px' }}
+                              >
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
                           </select>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <span className="text-sm text-gray-600">
-                            {Array.isArray(inventoryData) && inventoryData.length > 0 ? `1-${Math.min(10, inventoryData.length)} of ${inventoryData.length}` : '0 of 0'}
+                            <span className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                              Showing {((inventoryPagination.page - 1) * inventoryPagination.limit) + 1} to {Math.min(inventoryPagination.page * inventoryPagination.limit, inventoryPagination.total)} of {inventoryPagination.total}
                           </span>
-                          <div className="flex items-center gap-1">
-                            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          </div>
+                          <div className="flex items-center justify-center sm:justify-end gap-2 sm:gap-3">
+                            <button
+                              onClick={() => handleInventoryPageChange(inventoryPagination.page - 1)}
+                              disabled={inventoryPagination.page === 1}
+                              className="p-2.5 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                              style={{ minHeight: '44px', minWidth: '44px' }}
+                              aria-label="Previous page"
+                            >
+                              <svg className="w-5 h-5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
                                   </button>
-                            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap px-2">
+                              Page {inventoryPagination.page} of {inventoryPagination.pages}
+                            </span>
+                            <button
+                              onClick={() => handleInventoryPageChange(inventoryPagination.page + 1)}
+                              disabled={inventoryPagination.page >= inventoryPagination.pages}
+                              className="p-2.5 sm:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                              style={{ minHeight: '44px', minWidth: '44px' }}
+                              aria-label="Next page"
+                            >
+                              <svg className="w-5 h-5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
                             </button>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
@@ -1447,18 +2211,20 @@ export default function AdminReportsPage() {
                 {activeTab === 'sales' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     {/* Header Section */}
-                    <div className="px-6 py-5 border-b border-gray-100">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="text-xl font-semibold text-gray-900">Sales Report</h3>
+                    <div className="px-3 sm:px-6 py-4 sm:py-5 border-b border-gray-100">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Sales Report</h3>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
                           {/* Download Button */}
                           <button
                             onClick={handleDownload}
-                            className="px-4 py-2 text-sm bg-[#000C50] text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+                            className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-[#000C50] text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm touch-manipulation"
+                            style={{ minHeight: '44px' }}
                           >
                             <ArrowDownTrayIcon className="h-4 w-4" />
+                            <span className="hidden sm:inline">Export</span>
                           </button>
                         </div>
                       </div>

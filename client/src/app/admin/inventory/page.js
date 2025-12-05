@@ -1791,7 +1791,7 @@ export default function AdminInventoryPage() {
       {/* Stock In Modal */}
       {showStockInModal && (
         <div className="fixed inset-0 overflow-y-auto h-full w-full z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
-          <div className="relative top-20 mx-auto p-5 border-2 border-gray-300 w-96 shadow-2xl rounded-md bg-white">
+          <div className="relative top-20 mx-auto p-4 sm:p-5 border-2 border-gray-300 w-full sm:w-96 max-w-[calc(100vw-2rem)] sm:max-w-md shadow-2xl rounded-md bg-white">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Add Stock
@@ -1808,9 +1808,10 @@ export default function AdminInventoryPage() {
                       value={stockInForm.productId}
                       onChange={(e) => handleProductSelect(e.target.value)}
                       disabled={selectedProduct !== null}
-                      className={`mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50] ${
+                      className={`mt-1 block w-full min-w-0 max-w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50] ${
                         selectedProduct !== null ? 'bg-gray-100 cursor-not-allowed' : ''
                       }`}
+                      style={{ width: '100%', maxWidth: '100%' }}
                     >
                       <option value="">-- Select a product --</option>
                       {allProducts.map((product) => (
@@ -1836,7 +1837,8 @@ export default function AdminInventoryPage() {
                       <select
                         value={stockInForm.size}
                         onChange={(e) => setStockInForm({ ...stockInForm, size: e.target.value })}
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                        className="mt-1 block w-full min-w-0 max-w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                        style={{ width: '100%', maxWidth: '100%' }}
                       >
                         <option value="">-- Select size (optional) --</option>
                         {productSizes.map((sizeObj) => (
@@ -2099,7 +2101,7 @@ export default function AdminInventoryPage() {
       {/* Stock Out Modal */}
       {showStockOutModal && (
         <div className="fixed inset-0 overflow-y-auto h-full w-full z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.03)' }}>
-          <div className="relative top-20 mx-auto p-5 border-2 border-gray-300 w-96 shadow-2xl rounded-md bg-white">
+          <div className="relative top-20 mx-auto p-4 sm:p-5 border-2 border-gray-300 w-full sm:w-96 max-w-[calc(100vw-2rem)] sm:max-w-md shadow-2xl rounded-md bg-white">
               <div className="mt-3">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
                   Stock Out (Remove Stock)
@@ -2115,7 +2117,8 @@ export default function AdminInventoryPage() {
                         required
                         value={stockOutForm.productId}
                         onChange={(e) => handleStockOutProductSelect(e.target.value)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                        className="mt-1 block w-full min-w-0 max-w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                        style={{ width: '100%', maxWidth: '100%' }}
                       >
                         <option value="">-- Select a product --</option>
                         {allProducts.map((product) => (
@@ -2137,7 +2140,8 @@ export default function AdminInventoryPage() {
                           required
                           value={stockOutForm.size}
                           onChange={(e) => setStockOutForm({ ...stockOutForm, size: e.target.value })}
-                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                          className="mt-1 block w-full min-w-0 max-w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#000C50]"
+                          style={{ width: '100%', maxWidth: '100%' }}
                         >
                           <option value="">-- Select size --</option>
                           {stockOutProductSizes.map((sizeObj) => (
