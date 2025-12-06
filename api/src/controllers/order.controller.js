@@ -383,6 +383,22 @@ export const updateOrderStatus = async (req, res) => {
     const paymentMethod = currentOrder[0].payment_method
     const paymentStatus = currentOrder[0].payment_status
 
+    // Prevent any status changes if order is cancelled
+    if (oldStatus === 'cancelled') {
+      return res.status(400).json({ 
+        error: 'Cannot change status of cancelled order',
+        message: 'Cancelled orders cannot have their status changed. The order has been permanently cancelled.'
+      })
+    }
+
+    // Prevent changing completed orders to anything except refunded
+    if (oldStatus === 'completed' && status !== 'refunded') {
+      return res.status(400).json({ 
+        error: 'Cannot change status of completed order',
+        message: 'Completed orders can only be changed to "Refunded" status. They cannot be moved to any other status.'
+      })
+    }
+
     // Update order status
     const [result] = await pool.query(
       `UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?`,

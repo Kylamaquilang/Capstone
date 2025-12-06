@@ -164,7 +164,7 @@ export default function AdminInventoryPage() {
   };
 
   // Export alerts to PDF
-  const handleExportAlerts = () => {
+  const handleExportAlertsPDF = () => {
     try {
       const filtered = getFilteredAlerts();
       
@@ -261,6 +261,542 @@ export default function AdminInventoryPage() {
         icon: 'error',
         title: 'Export Failed',
         text: 'An error occurred while exporting the report. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Export alerts to CSV
+  const handleExportAlertsCSV = () => {
+    try {
+      const filtered = getFilteredAlerts();
+      if (filtered.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No alerts to export.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      const headers = ['Product Name', 'Category', 'Size/Variation', 'Current Quantity', 'Min Stock Threshold', 'Status'];
+      const csvRows = [headers.join(',')];
+
+      filtered.forEach(alert => {
+        const sizes = alert.sizes && alert.sizes.length > 0 
+          ? alert.sizes.map(s => s.size).join(', ')
+          : 'N/A';
+        const status = (alert.current_stock || 0) === 0 ? 'Out of Stock' : 'Low Stock';
+        
+        csvRows.push([
+          `"${(alert.product_name || '').replace(/"/g, '""')}"`,
+          `"${(alert.category_name || 'Uncategorized').replace(/"/g, '""')}"`,
+          `"${sizes.replace(/"/g, '""')}"`,
+          alert.current_stock || 0,
+          alert.reorder_level || 10,
+          `"${status.replace(/"/g, '""')}"`
+        ].join(','));
+      });
+
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `stock-alerts-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting alerts to CSV:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Export Failed',
+        text: 'An error occurred while exporting. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Export alerts to Excel
+  const handleExportAlertsExcel = () => {
+    handleExportAlertsCSV(); // Excel can open CSV files
+  };
+
+  // Export Current Stock to PDF
+  const handleExportCurrentStockPDF = () => {
+    try {
+      if (!currentStock || currentStock.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No current stock data to export.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      const pdf = new jsPDF('landscape', 'mm', 'a4');
+      pdf.setFont('helvetica');
+      
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Current Stock Report', 20, 20);
+      
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, 30);
+      pdf.text(`Total Products: ${currentStock.length}`, 20, 37);
+
+      // Prepare table data
+      const tableData = [];
+      currentStock.forEach(product => {
+        if (product.sizes && product.sizes.length > 0) {
+          product.sizes.forEach(size => {
+            const sizeStock = size.stock || 0;
+            const sizePrice = size.price || product.price || 0;
+            const totalValue = sizeStock * sizePrice;
+            const status = sizeStock <= 0 ? 'Out of Stock' : (sizeStock <= (product.reorder_point || 10) ? 'Low Stock' : 'In Stock');
+            
+            tableData.push([
+              product.name || '',
+              product.category_name || 'Uncategorized',
+              size.size || 'N/A',
+              sizeStock.toString(),
+              (product.reorder_point || 10).toString(),
+              status,
+              formatCurrency(sizePrice),
+              formatCurrency(totalValue)
+            ]);
+          });
+        } else {
+          const currentStockValue = product.current_stock || 0;
+          const productPrice = product.price || 0;
+          const totalValue = currentStockValue * productPrice;
+          const status = currentStockValue <= 0 ? 'Out of Stock' : (currentStockValue <= (product.reorder_point || 10) ? 'Low Stock' : 'In Stock');
+          
+          tableData.push([
+            product.name || '',
+            product.category_name || 'Uncategorized',
+            'No sizes',
+            currentStockValue.toString(),
+            (product.reorder_point || 10).toString(),
+            status,
+            formatCurrency(productPrice),
+            formatCurrency(totalValue)
+          ]);
+        }
+      });
+
+      autoTable(pdf, {
+        head: [['Product Name', 'Category', 'Size/Variation', 'Current Quantity', 'Min Stock Level', 'Status', 'Unit Price', 'Total Stock Value']],
+        body: tableData,
+        startY: 50,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [0, 12, 80], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] }
+      });
+
+      pdf.save(`current-stock-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error('Error exporting current stock to PDF:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Export Failed',
+        text: 'An error occurred while exporting. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Export Current Stock to CSV
+  const handleExportCurrentStockCSV = () => {
+    try {
+      if (!currentStock || currentStock.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No current stock data to export.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      const headers = ['Product Name', 'Category', 'Size/Variation', 'Current Quantity', 'Min Stock Level', 'Status', 'Unit Price', 'Total Stock Value'];
+      const csvRows = [headers.join(',')];
+
+      currentStock.forEach(product => {
+        if (product.sizes && product.sizes.length > 0) {
+          product.sizes.forEach(size => {
+            const sizeStock = size.stock || 0;
+            const sizePrice = size.price || product.price || 0;
+            const totalValue = sizeStock * sizePrice;
+            const status = sizeStock <= 0 ? 'Out of Stock' : (sizeStock <= (product.reorder_point || 10) ? 'Low Stock' : 'In Stock');
+            
+            csvRows.push([
+              `"${(product.name || '').replace(/"/g, '""')}"`,
+              `"${(product.category_name || 'Uncategorized').replace(/"/g, '""')}"`,
+              `"${(size.size || 'N/A').replace(/"/g, '""')}"`,
+              sizeStock,
+              product.reorder_point || 10,
+              `"${status.replace(/"/g, '""')}"`,
+              sizePrice,
+              totalValue
+            ].join(','));
+          });
+        } else {
+          const currentStockValue = product.current_stock || 0;
+          const productPrice = product.price || 0;
+          const totalValue = currentStockValue * productPrice;
+          const status = currentStockValue <= 0 ? 'Out of Stock' : (currentStockValue <= (product.reorder_point || 10) ? 'Low Stock' : 'In Stock');
+          
+          csvRows.push([
+            `"${(product.name || '').replace(/"/g, '""')}"`,
+            `"${(product.category_name || 'Uncategorized').replace(/"/g, '""')}"`,
+            '"No sizes"',
+            currentStockValue,
+            product.reorder_point || 10,
+            `"${status.replace(/"/g, '""')}"`,
+            productPrice,
+            totalValue
+          ].join(','));
+        }
+      });
+
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `current-stock-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting current stock to CSV:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Export Failed',
+        text: 'An error occurred while exporting. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Export Current Stock to Excel
+  const handleExportCurrentStockExcel = () => {
+    handleExportCurrentStockCSV(); // Excel can open CSV files
+  };
+
+  // Print Current Stock
+  const handlePrintCurrentStock = () => {
+    try {
+      if (!currentStock || currentStock.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No current stock data to print.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      const printWindow = window.open('', '_blank');
+      let tableRows = '';
+      
+      currentStock.forEach(product => {
+        if (product.sizes && product.sizes.length > 0) {
+          product.sizes.forEach(size => {
+            const sizeStock = size.stock || 0;
+            const sizePrice = size.price || product.price || 0;
+            const totalValue = sizeStock * sizePrice;
+            const status = sizeStock <= 0 ? 'Out of Stock' : (sizeStock <= (product.reorder_point || 10) ? 'Low Stock' : 'In Stock');
+            const statusClass = sizeStock <= 0 ? 'out-of-stock' : (sizeStock <= (product.reorder_point || 10) ? 'low-stock' : '');
+            
+            tableRows += `
+              <tr class="${statusClass}">
+                <td>${product.name || ''}</td>
+                <td>${product.category_name || 'Uncategorized'}</td>
+                <td>${size.size || 'N/A'}</td>
+                <td>${sizeStock}</td>
+                <td>${product.reorder_point || 10}</td>
+                <td>${status}</td>
+                <td>${formatCurrency(sizePrice)}</td>
+                <td>${formatCurrency(totalValue)}</td>
+              </tr>
+            `;
+          });
+        } else {
+          const currentStockValue = product.current_stock || 0;
+          const productPrice = product.price || 0;
+          const totalValue = currentStockValue * productPrice;
+          const status = currentStockValue <= 0 ? 'Out of Stock' : (currentStockValue <= (product.reorder_point || 10) ? 'Low Stock' : 'In Stock');
+          const statusClass = currentStockValue <= 0 ? 'out-of-stock' : (currentStockValue <= (product.reorder_point || 10) ? 'low-stock' : '');
+          
+          tableRows += `
+            <tr class="${statusClass}">
+              <td>${product.name || ''}</td>
+              <td>${product.category_name || 'Uncategorized'}</td>
+              <td>No sizes</td>
+              <td>${currentStockValue}</td>
+              <td>${product.reorder_point || 10}</td>
+              <td>${status}</td>
+              <td>${formatCurrency(productPrice)}</td>
+              <td>${formatCurrency(totalValue)}</td>
+            </tr>
+          `;
+        }
+      });
+
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Current Stock Report</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              h1 { color: #333; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f2f2f2; font-weight: bold; }
+              tr:nth-child(even) { background-color: #f9f9f9; }
+              .out-of-stock { color: red; font-weight: bold; }
+              .low-stock { color: orange; font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <h1>Current Stock Report</h1>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+            <p>Total Products: ${currentStock.length}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Size/Variation</th>
+                  <th>Current Quantity</th>
+                  <th>Min Stock Level</th>
+                  <th>Status</th>
+                  <th>Unit Price</th>
+                  <th>Total Stock Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `;
+      
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    } catch (error) {
+      console.error('Error printing current stock:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Print Failed',
+        text: 'An error occurred while printing. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Export Stock History to PDF
+  const handleExportHistoryPDF = () => {
+    try {
+      if (!stockHistory || stockHistory.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No stock history data to export.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      const pdf = new jsPDF('landscape', 'mm', 'a4');
+      pdf.setFont('helvetica');
+      
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Stock Transaction History', 20, 20);
+      
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, 30);
+      pdf.text(`Total Transactions: ${stockHistory.length}`, 20, 37);
+
+      const tableData = stockHistory.map(transaction => [
+        transaction.product_name || '',
+        transaction.transaction_type || '',
+        (transaction.quantity || 0).toString(),
+        transaction.previous_stock ? transaction.previous_stock.toString() : 'N/A',
+        transaction.new_stock ? transaction.new_stock.toString() : 'N/A',
+        transaction.reference_no || transaction.source || 'N/A',
+        transaction.note || transaction.reason || '',
+        transaction.created_by_name || 'System',
+        new Date(transaction.created_at).toLocaleString()
+      ]);
+
+      autoTable(pdf, {
+        head: [['Product Name', 'Type', 'Quantity', 'Previous Stock', 'New Stock', 'Reference', 'Note', 'Created By', 'Date']],
+        body: tableData,
+        startY: 50,
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: [0, 12, 80], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] }
+      });
+
+      pdf.save(`stock-history-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error('Error exporting history to PDF:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Export Failed',
+        text: 'An error occurred while exporting. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Export Stock History to CSV
+  const handleExportHistoryCSV = () => {
+    try {
+      if (!stockHistory || stockHistory.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No stock history data to export.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      const headers = ['Product Name', 'Type', 'Quantity', 'Previous Stock', 'New Stock', 'Reference', 'Note', 'Created By', 'Date'];
+      const csvRows = [headers.join(',')];
+
+      stockHistory.forEach(transaction => {
+        csvRows.push([
+          `"${(transaction.product_name || '').replace(/"/g, '""')}"`,
+          `"${(transaction.transaction_type || '').replace(/"/g, '""')}"`,
+          transaction.quantity || 0,
+          transaction.previous_stock || 'N/A',
+          transaction.new_stock || 'N/A',
+          `"${((transaction.reference_no || transaction.source || 'N/A')).replace(/"/g, '""')}"`,
+          `"${((transaction.note || transaction.reason || '')).replace(/"/g, '""')}"`,
+          `"${((transaction.created_by_name || 'System')).replace(/"/g, '""')}"`,
+          `"${new Date(transaction.created_at).toLocaleString()}"`
+        ].join(','));
+      });
+
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `stock-history-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting history to CSV:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Export Failed',
+        text: 'An error occurred while exporting. Please try again.',
+        confirmButtonColor: '#000C50'
+      });
+    }
+  };
+
+  // Export Stock History to Excel
+  const handleExportHistoryExcel = () => {
+    handleExportHistoryCSV(); // Excel can open CSV files
+  };
+
+  // Print Stock History
+  const handlePrintHistory = () => {
+    try {
+      if (!stockHistory || stockHistory.length === 0) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'No Data',
+          text: 'No stock history data to print.',
+          confirmButtonColor: '#000C50'
+        });
+        return;
+      }
+
+      const printWindow = window.open('', '_blank');
+      const tableRows = stockHistory.map(transaction => `
+        <tr>
+          <td>${transaction.product_name || ''}</td>
+          <td>${transaction.transaction_type || ''}</td>
+          <td>${transaction.quantity || 0}</td>
+          <td>${transaction.previous_stock || 'N/A'}</td>
+          <td>${transaction.new_stock || 'N/A'}</td>
+          <td>${transaction.reference_no || transaction.source || 'N/A'}</td>
+          <td>${transaction.note || transaction.reason || ''}</td>
+          <td>${transaction.created_by_name || 'System'}</td>
+          <td>${new Date(transaction.created_at).toLocaleString()}</td>
+        </tr>
+      `).join('');
+
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Stock Transaction History</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              h1 { color: #333; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f2f2f2; font-weight: bold; }
+              tr:nth-child(even) { background-color: #f9f9f9; }
+            </style>
+          </head>
+          <body>
+            <h1>Stock Transaction History</h1>
+            <p>Generated: ${new Date().toLocaleString()}</p>
+            <p>Total Transactions: ${stockHistory.length}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Product Name</th>
+                  <th>Type</th>
+                  <th>Quantity</th>
+                  <th>Previous Stock</th>
+                  <th>New Stock</th>
+                  <th>Reference</th>
+                  <th>Note</th>
+                  <th>Created By</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `;
+      
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+    } catch (error) {
+      console.error('Error printing history:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Print Failed',
+        text: 'An error occurred while printing. Please try again.',
         confirmButtonColor: '#000C50'
       });
     }
@@ -1141,15 +1677,49 @@ export default function AdminInventoryPage() {
               <div className="px-4 py-5 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
                   <h3 className="text-lg font-medium text-gray-900">Current Stock</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
-                    onClick={() => fetchCurrentStock()}
-                    className="px-3 py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
+                      onClick={() => fetchCurrentStock()}
+                      className="px-3 py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh
                     </button>
+                    <button
+                      onClick={handleExportCurrentStockPDF}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Export to PDF"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">PDF</span>
+                    </button>
+                    <button
+                      onClick={handleExportCurrentStockCSV}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Export to CSV"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">CSV</span>
+                    </button>
+                    <button
+                      onClick={handleExportCurrentStockExcel}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Export to Excel"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">Excel</span>
+                    </button>
+                    <button
+                      onClick={handlePrintCurrentStock}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Print Report"
+                    >
+                      <PrinterIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">Print</span>
+                    </button>
+                  </div>
                </div>
                 
                 {currentStock.length === 0 ? (
@@ -1334,15 +1904,49 @@ export default function AdminInventoryPage() {
               <div className="px-4 py-5 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
                   <h3 className="text-lg font-medium text-gray-900">Transaction History</h3>
-                  <button
-                    onClick={() => fetchStockHistory()}
-                    className="px-3 py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => fetchStockHistory()}
+                      className="px-3 py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh
+                    </button>
+                    <button
+                      onClick={handleExportHistoryPDF}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Export to PDF"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">PDF</span>
+                    </button>
+                    <button
+                      onClick={handleExportHistoryCSV}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Export to CSV"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">CSV</span>
+                    </button>
+                    <button
+                      onClick={handleExportHistoryExcel}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Export to Excel"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">Excel</span>
+                    </button>
+                    <button
+                      onClick={handlePrintHistory}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Print Report"
+                    >
+                      <PrinterIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">Print</span>
+                    </button>
+                  </div>
                 </div>
                 
                 {stockHistory.length === 0 ? (
@@ -1444,7 +2048,11 @@ export default function AdminInventoryPage() {
                                       className="truncate cursor-help" 
                                       title={transaction.note || transaction.source || 'No remarks'}
                                     >
-                                      {transaction.note || transaction.source || <span className="text-gray-400 italic">No remarks</span>}
+                                      {transaction.note || transaction.source ? (
+                                        transaction.note || transaction.source
+                                      ) : (
+                                        <span className="text-gray-400 italic">No remarks</span>
+                                      )}
                                     </div>
                                   </div>
                           </td>
@@ -1455,37 +2063,37 @@ export default function AdminInventoryPage() {
                    </div>
                    </div>
                </div>
-          )}
+                )}
 
-                   {/* Pagination Controls */}
-                   {stockHistoryPagination.total > 0 && (
-                     <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-                       <div className="text-sm text-gray-700">
-                         Showing {((stockHistoryPagination.page - 1) * stockHistoryPagination.limit) + 1} to {Math.min(stockHistoryPagination.page * stockHistoryPagination.limit, stockHistoryPagination.total)} of {stockHistoryPagination.total} results
-                       </div>
-                       <div className="flex gap-2">
-                         <button
-                           onClick={() => fetchStockHistory(stockHistoryPagination.page - 1)}
-                           disabled={stockHistoryPagination.page === 1}
-                           className="px-3 py-1 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                         >
-                           Previous
-                         </button>
-                         <span className="px-3 py-1 text-sm text-gray-700">
-                           Page {stockHistoryPagination.page} of {stockHistoryPagination.pages || 1}
-                         </span>
-                         <button
-                           onClick={() => fetchStockHistory(stockHistoryPagination.page + 1)}
-                           disabled={stockHistoryPagination.page >= (stockHistoryPagination.pages || 1)}
-                           className="px-3 py-1 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                         >
-                           Next
-                         </button>
-                       </div>
-                     </div>
-                   )}
-                   </div>
-               </div>
+                {/* Pagination Controls */}
+                {stockHistoryPagination.total > 0 && (
+                  <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+                    <div className="text-sm text-gray-700">
+                      Showing {((stockHistoryPagination.page - 1) * stockHistoryPagination.limit) + 1} to {Math.min(stockHistoryPagination.page * stockHistoryPagination.limit, stockHistoryPagination.total)} of {stockHistoryPagination.total} results
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => fetchStockHistory(stockHistoryPagination.page - 1)}
+                        disabled={stockHistoryPagination.page === 1}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      >
+                        Previous
+                      </button>
+                      <span className="px-3 py-1 text-sm text-gray-700">
+                        Page {stockHistoryPagination.page} of {stockHistoryPagination.pages || 1}
+                      </span>
+                      <button
+                        onClick={() => fetchStockHistory(stockHistoryPagination.page + 1)}
+                        disabled={stockHistoryPagination.page >= (stockHistoryPagination.pages || 1)}
+                        className="px-3 py-1 text-sm border border-gray-300 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {/* Stock Alerts Tab - Combined Low Stock and Out of Stock */}
@@ -1497,18 +2105,34 @@ export default function AdminInventoryPage() {
                     <h3 className="text-lg font-medium text-gray-900">Stock Alerts</h3>
                     <p className="text-xs text-gray-500 mt-1">Low Stock and Out of Stock items requiring attention</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={handleExportAlerts}
-                      className="px-3 py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2"
+                      onClick={handleExportAlertsPDF}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Export to PDF"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">PDF</span>
+                    </button>
+                    <button
+                      onClick={handleExportAlertsCSV}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-1.5 sm:gap-2"
                       title="Export to CSV"
                     >
                       <ArrowDownTrayIcon className="h-4 w-4" />
-                      <span className="hidden sm:inline">Export</span>
+                      <span className="hidden sm:inline">CSV</span>
+                    </button>
+                    <button
+                      onClick={handleExportAlertsExcel}
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center gap-1.5 sm:gap-2"
+                      title="Export to Excel"
+                    >
+                      <ArrowDownTrayIcon className="h-4 w-4" />
+                      <span className="hidden sm:inline">Excel</span>
                     </button>
                     <button
                       onClick={handlePrintAlerts}
-                      className="px-3 py-1.5 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2"
+                      className="px-2.5 sm:px-3 py-2 text-xs sm:text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors flex items-center gap-1.5 sm:gap-2"
                       title="Print Report"
                     >
                       <PrinterIcon className="h-4 w-4" />
@@ -1729,13 +2353,12 @@ export default function AdminInventoryPage() {
                         Next
                       </button>
                     </div>
-                     </div>
+                  </div>
                 )}
               </div>
-                 </div>
-               )}
-             </div>
-           </div>
+            </div>
+          )}
+        </div>
 
       {/* Stock In Modal */}
       {showStockInModal && (
@@ -2218,6 +2841,7 @@ export default function AdminInventoryPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

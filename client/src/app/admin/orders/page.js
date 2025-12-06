@@ -173,6 +173,16 @@ export default function AdminOrdersPage() {
   const handleStatusChange = (e) => {
     const newStatus = e.target.value;
     
+    // Prevent any status changes if order is cancelled
+    if (selectedOrder?.status === 'cancelled') {
+      return; // Don't allow any status changes for cancelled orders
+    }
+    
+    // Prevent changing completed orders to anything except refunded
+    if (selectedOrder?.status === 'completed' && newStatus !== 'refunded') {
+      return; // Don't allow changing completed orders to any status except refunded
+    }
+    
     // Prevent selecting disabled options for ready_for_pickup
     if (selectedOrder?.status === 'ready_for_pickup' && 
         (newStatus === 'pending' || newStatus === 'processing' || newStatus === 'cancelled')) {
@@ -190,6 +200,28 @@ export default function AdminOrdersPage() {
 
   const updateOrderStatus = async () => {
     if (!selectedOrder || !statusUpdate.status) return;
+    
+    // Prevent any status changes if order is cancelled
+    if (selectedOrder.status === 'cancelled') {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Cannot Change Status',
+        text: 'Cancelled orders cannot have their status changed. The order has been permanently cancelled.',
+        confirmButtonColor: '#000C50'
+      });
+      return;
+    }
+    
+    // Prevent changing completed orders to anything except refunded
+    if (selectedOrder.status === 'completed' && statusUpdate.status !== 'refunded') {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid Status Change',
+        text: 'Completed orders can only be changed to "Refunded" status. They cannot be moved to any other status.',
+        confirmButtonColor: '#000C50'
+      });
+      return;
+    }
     
     // Validate status change restrictions
     if (selectedOrder.status === 'ready_for_pickup' && 
@@ -1155,34 +1187,63 @@ export default function AdminOrdersPage() {
               <select
                 value={statusUpdate.status}
                 onChange={handleStatusChange}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={selectedOrder?.status === 'cancelled'}
+                className={`w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  selectedOrder?.status === 'cancelled' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+                }`}
               >
                 <option 
                   value="pending" 
-                  disabled={selectedOrder?.status === 'ready_for_pickup' || selectedOrder?.status === 'claimed'}
+                  disabled={
+                    selectedOrder?.status === 'ready_for_pickup' || 
+                    selectedOrder?.status === 'claimed' || 
+                    selectedOrder?.status === 'completed'
+                  }
                 >
                   Pending
                 </option>
                 <option 
                   value="processing" 
-                  disabled={selectedOrder?.status === 'ready_for_pickup' || selectedOrder?.status === 'claimed'}
+                  disabled={
+                    selectedOrder?.status === 'ready_for_pickup' || 
+                    selectedOrder?.status === 'claimed' || 
+                    selectedOrder?.status === 'completed'
+                  }
                 >
                   Processing
                 </option>
                 <option 
                   value="ready_for_pickup" 
-                  disabled={selectedOrder?.status === 'claimed'}
+                  disabled={
+                    selectedOrder?.status === 'claimed' || 
+                    selectedOrder?.status === 'completed'
+                  }
                 >
                   For Pickup
                 </option>
-                <option value="claimed">Claimed</option>
+                <option 
+                  value="claimed"
+                  disabled={selectedOrder?.status === 'completed'}
+                >
+                  Claimed
+                </option>
                 <option 
                   value="cancelled" 
-                  disabled={selectedOrder?.status === 'ready_for_pickup' || selectedOrder?.status === 'claimed'}
+                  disabled={
+                    selectedOrder?.status === 'ready_for_pickup' || 
+                    selectedOrder?.status === 'claimed' || 
+                    selectedOrder?.status === 'completed'
+                  }
                 >
                   Cancelled
                 </option>
                 <option value="refunded">Refunded</option>
+                <option 
+                  value="completed"
+                  disabled={selectedOrder?.status === 'completed'}
+                >
+                  Completed
+                </option>
               </select>
               
               {/* Show restriction message for ready_for_pickup status */}
@@ -1204,6 +1265,30 @@ export default function AdminOrdersPage() {
                     <span className="text-red-600 mr-2">🚫</span>
                     <div className="text-sm text-red-800">
                       <strong>Status Restriction:</strong> Claimed orders cannot be moved back to pending, processing, ready for pickup, or cancelled status.
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Show restriction message for cancelled status */}
+              {selectedOrder?.status === 'cancelled' && (
+                <div className="mt-2 p-2 bg-gray-100 border border-gray-300 rounded-md">
+                  <div className="flex items-center">
+                    <span className="text-gray-600 mr-2">🔒</span>
+                    <div className="text-sm text-gray-800">
+                      <strong>Status Locked:</strong> This order has been cancelled and cannot have its status changed. Cancelled orders are permanent.
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Show restriction message for completed status */}
+              {selectedOrder?.status === 'completed' && (
+                <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                  <div className="flex items-center">
+                    <span className="text-blue-600 mr-2">ℹ️</span>
+                    <div className="text-sm text-blue-800">
+                      <strong>Status Restriction:</strong> Completed orders can only be changed to "Refunded" status. They cannot be moved to any other status.
                     </div>
                   </div>
                 </div>
@@ -1249,10 +1334,10 @@ export default function AdminOrdersPage() {
               </button>
               <button
                 onClick={updateOrderStatus}
-                disabled={updating}
-                className="flex-1 px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                disabled={updating || selectedOrder?.status === 'cancelled'}
+                className="flex-1 px-4 py-2 bg-[#000C50] text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {updating ? 'Updating...' : 'Update Status'}
+                {updating ? 'Updating...' : selectedOrder?.status === 'cancelled' ? 'Status Locked' : 'Update Status'}
               </button>
             </div>
           </div>

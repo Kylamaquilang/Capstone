@@ -7,7 +7,7 @@ import {
   CubeIcon, ClipboardDocumentListIcon, BanknotesIcon, 
   UserCircleIcon, ArrowLeftOnRectangleIcon, 
   ArchiveBoxIcon, TagIcon, Bars3Icon, XMarkIcon,
-  BellIcon, ChartBarIcon
+  BellIcon
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
@@ -73,7 +73,6 @@ export default function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             <SidebarItem href="/admin/inventory" icon={ArchiveBoxIcon} label="Inventory" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/orders" icon={ClipboardDocumentListIcon} label="Orders" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/sales" icon={BanknotesIcon} label="Sales" onClick={toggleMobileMenu} pathname={pathname} />
-            <SidebarItem href="/admin/reports" icon={ChartBarIcon} label="Reports" onClick={toggleMobileMenu} pathname={pathname} />
             <SidebarItem href="/admin/users" icon={UserCircleIcon} label="Users" onClick={toggleMobileMenu} pathname={pathname} />
           </div>
         </nav>

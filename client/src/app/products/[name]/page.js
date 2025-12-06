@@ -11,6 +11,7 @@ import Swal from '@/lib/sweetalert-config';
 import { getImageUrl } from '@/utils/imageUtils';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 import { ArrowDownTrayIcon, PrinterIcon } from '@heroicons/react/24/outline';
+import ProductImageCarousel from '@/components/product/ProductImageCarousel';
 
 export default function ProductDetailPage() {
   const { name } = useParams();
@@ -33,11 +34,23 @@ export default function ProductDetailPage() {
       );
       
       if (foundProduct) {
-        // Use the grouped product data which includes all sizes
-        setProduct(foundProduct);
+        // Fetch full product details including images
+        try {
+          const { data: fullProduct } = await API.get(`/products/${foundProduct.id}`);
+          // Merge full product data (with images) with found product data
+          setProduct({
+            ...foundProduct,
+            images: fullProduct.images || (foundProduct.image ? [{ url: foundProduct.image, is_primary: true }] : [])
+          });
+        } catch (detailError) {
+          // If detail fetch fails, use the basic product data
+          console.log('Could not fetch product details, using basic data:', detailError.message);
+          setProduct(foundProduct);
+        }
         
         // Auto-select "NONE" size if it's the only option
-        if (foundProduct.sizes && foundProduct.sizes.length === 1 && foundProduct.sizes[0].size === 'NONE') {
+        const productToUse = foundProduct;
+        if (productToUse.sizes && productToUse.sizes.length === 1 && productToUse.sizes[0].size === 'NONE') {
           setSelectedSize('NONE');
         }
       } else {
@@ -60,36 +73,38 @@ export default function ProductDetailPage() {
   // Auto-refresh for product details
   useUserAutoRefresh(fetchProduct, 'products');
 
-  // Check if product category is 'tela' (case-insensitive)
-  const isTelaCategory = product && (
-    (product.category && product.category.toLowerCase() === 'tela') ||
-    (product.category_name && product.category_name.toLowerCase() === 'tela')
-  );
 
-  // Download product image
-  const handleDownloadImage = async () => {
+  // Download image from carousel
+  const handleDownloadCarouselImage = async (imageUrl) => {
     try {
-      const imageUrl = getImageUrl(product.image) || '/images/polo.png';
+      const url = typeof imageUrl === 'string' ? getImageUrl(imageUrl) : getImageUrl(imageUrl.url || imageUrl.image_url);
       
       // Fetch the image
-      const response = await fetch(imageUrl);
+      const response = await fetch(url);
       const blob = await response.blob();
       
       // Create a temporary URL for the blob
-      const url = window.URL.createObjectURL(blob);
+      const downloadUrl = window.URL.createObjectURL(blob);
       
       // Create a temporary anchor element and trigger download
       const link = document.createElement('a');
-      link.href = url;
-      link.download = `${product.name.replace(/\s+/g, '_')}_image.${blob.type.split('/')[1] || 'png'}`;
+      link.href = downloadUrl;
+      const imageName = `${product.name.replace(/\s+/g, '_')}_image.${blob.type.split('/')[1] || 'png'}`;
+      link.download = imageName;
       document.body.appendChild(link);
       link.click();
       
       // Clean up
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(downloadUrl);
     } catch (error) {
-      console.error('Error downloading image:', error);
+      console.error('Error downloading carousel image:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Download Failed',
+        text: 'Failed to download image. Please try again.',
+        confirmButtonColor: '#000C50',
+      });
     }
   };
 
@@ -159,9 +174,9 @@ export default function ProductDetailPage() {
       return product?.stock || 0;
     }
     
-    // If only NONE size or no sizes, use product stock
+    // If only NONE size, use the NONE size's stock (current stock), not base_stock
     if (product.sizes.length === 1 && product.sizes[0].size === 'NONE') {
-      return product.stock || 0;
+      return product.sizes[0].stock || 0;
     }
     
     // If no size selected, return 0
@@ -494,38 +509,30 @@ export default function ProductDetailPage() {
                 <div className="bg-white-100 p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-center">
                   <div className="w-full max-w-sm">
                     <div className="aspect-square bg-white rounded-xl overflow-hidden">
-                      <Image
-                        src={getImageUrl(product.image) || '/images/polo.png'}
-                        alt={product.name}
-                        width={400}
-                        height={400}
-                        className="object-contain w-full h-full p-4"
-                        onError={(e) => {
-                          console.log('Image failed to load, using fallback');
-                          e.target.src = '/images/polo.png';
-                        }}
-                      />
+                      {product.images && product.images.length > 0 ? (
+                        <ProductImageCarousel
+                          images={product.images.map(img => 
+                            typeof img === 'string' ? getImageUrl(img) : getImageUrl(img.url || img.image_url)
+                          )}
+                          productName={product.name}
+                          className="w-full h-full"
+                          onDownload={handleDownloadCarouselImage}
+                          category={product.category || product.category_name || ''}
+                        />
+                      ) : (
+                        <Image
+                          src={getImageUrl(product.image) || '/images/polo.png'}
+                          alt={product.name}
+                          width={400}
+                          height={400}
+                          className="object-contain w-full h-full p-4"
+                          onError={(e) => {
+                            console.log('Image failed to load, using fallback');
+                            e.target.src = '/images/polo.png';
+                          }}
+                        />
+                      )}
                     </div>
-                    
-                    {/* Download and Print buttons for 'tela' category */}
-                    {isTelaCategory && (
-                      <div className="mt-4 flex gap-3 justify-center">
-                        <button
-                          onClick={handleDownloadImage}
-                          className="p-2 bg-[#000C50] text-white rounded-lg hover:bg-gray-800 transition-colors"
-                          title="Download Image"
-                        >
-                          <ArrowDownTrayIcon className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={handlePrintImage}
-                          className="p-2 bg-white text-[#000C50] border-2 border-[#000C50] rounded-lg hover:bg-gray-50 transition-colors"
-                          title="Print Image"
-                        >
-                          <PrinterIcon className="h-5 w-5" />
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -647,7 +654,7 @@ export default function ProductDetailPage() {
                   <div className="text-xs text-gray-500">
                     {selectedSize ? 
                       `${getMaxQuantityForSelectedSize()} available in ${selectedSize} size` : 
-                      `${product.stock} available in stock`
+                      `${getMaxQuantityForSelectedSize()} available in stock`
                     }
                   </div>
                 </div>

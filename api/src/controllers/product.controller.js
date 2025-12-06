@@ -9,7 +9,7 @@ import {
     validateStock
 } from '../utils/validation.js';
 import { emitAdminDataRefresh, emitDataRefresh } from '../utils/socket-helper.js';
-import { ensureDeletedAtColumn, getDeletedAtConditionSafe } from '../utils/migration-helper.js';
+import { ensureDeletedAtColumn, getDeletedAtConditionSafe, ensureProductImagesTable } from '../utils/migration-helper.js';
 import { 
   AppError, 
   ValidationError, 
@@ -75,6 +75,7 @@ export const getAllProductsSimple = async (req, res) => {
         p.image,
         p.created_at,
         p.last_restock_date,
+        p.category_id,
         c.name as category_name,
         c.name as category
       FROM products p
@@ -127,6 +128,7 @@ export const getAllProductsSimple = async (req, res) => {
             updated_by: 'N/A',
             created_at: product.created_at,
             last_restock_date: product.last_restock_date,
+            category_id: product.category_id || null,
             category_name: product.category_name,
             category: product.category || product.category_name || 'Other',
             sizes: sizes.map(size => ({
@@ -204,7 +206,7 @@ export const getAllProductsSimple = async (req, res) => {
 // ✅ Create Product
 export const createProduct = async (req, res) => {
   try {
-    const { name, description, price, original_price, stock, sizes, category_id, image } = req.body;
+    const { name, description, price, original_price, stock, sizes, category_id, image, images } = req.body;
     
     console.log('🔍 Received product data:', { name, description, price, original_price, stock, sizes, category_id, image });
 
@@ -330,6 +332,26 @@ export const createProduct = async (req, res) => {
       );
 
       const productId = productResult.insertId;
+
+      // Store multiple images if provided
+      if (images && Array.isArray(images) && images.length > 0) {
+        // Ensure product_images table exists
+        await ensureProductImagesTable();
+        
+        for (let i = 0; i < images.length; i++) {
+          try {
+            await connection.query(
+              `INSERT INTO product_images (product_id, image_url, display_order, is_primary, created_at) 
+               VALUES (?, ?, ?, ?, NOW())`,
+              [productId, images[i], i, i === 0] // First image is primary
+            );
+          } catch (imageError) {
+            // If product_images table doesn't exist, just log and continue
+            console.log('Product images table not available, skipping multiple images:', imageError.message);
+            break;
+          }
+        }
+      }
 
       // If initial stock is provided, create initial stock transaction
       if (parseInt(stock) > 0) {
@@ -671,6 +693,30 @@ export const getProductById = asyncHandler(async (req, res) => {
       product.sizes = [];
     }
 
+    // Try to get product images if the table exists
+    try {
+      // Ensure product_images table exists
+      await ensureProductImagesTable();
+      
+      const [images] = await pool.query(
+        `SELECT id, image_url, display_order, is_primary 
+         FROM product_images 
+         WHERE product_id = ? 
+         ORDER BY is_primary DESC, display_order ASC, id ASC`,
+        [validatedId]
+      );
+      product.images = images.map(img => ({
+        id: img.id,
+        url: img.image_url,
+        is_primary: img.is_primary === 1 || img.is_primary === true,
+        display_order: img.display_order || 0
+      }));
+    } catch (imageError) {
+      // If product_images table doesn't exist, use single image field
+      logger.debug('Product images table not available, using single image field');
+      product.images = product.image ? [{ id: 'primary', url: product.image, is_primary: true }] : [];
+    }
+
     logger.info('Product retrieved successfully', { productId: validatedId });
     res.json(product);
   } catch (error) {
@@ -924,6 +970,141 @@ export const updateProduct = async (req, res) => {
           `UPDATE products SET ${updateFields.join(', ')} WHERE id = ?`,
           updateValues
         );
+      }
+
+      // Handle multiple images if provided
+      if (req.body.images && typeof req.body.images === 'object') {
+        try {
+          // Ensure product_images table exists
+          const tableExists = await ensureProductImagesTable();
+          if (!tableExists) {
+            console.warn('⚠️ product_images table does not exist, skipping image updates');
+          } else {
+            const { add = [], remove = [], existing = [] } = req.body.images;
+            
+            // Remove images (only if remove array has valid IDs)
+            if (remove && Array.isArray(remove) && remove.length > 0) {
+              // Filter out invalid IDs (non-numeric or string 'primary')
+              const validRemoveIds = remove.filter(id => {
+                // Allow numeric IDs or convert string numbers
+                const numId = typeof id === 'string' && id !== 'primary' ? parseInt(id) : id;
+                return !isNaN(numId) && numId > 0;
+              });
+              
+              if (validRemoveIds.length > 0) {
+                await connection.query(
+                  'DELETE FROM product_images WHERE id IN (?) AND product_id = ?',
+                  [validRemoveIds, id]
+                );
+                console.log(`✅ Removed ${validRemoveIds.length} images for product ${id}`);
+              }
+            }
+            
+            // Add new images
+            if (add && Array.isArray(add) && add.length > 0) {
+              // Get current max display_order for this product
+              const [maxOrderResult] = await connection.query(
+                'SELECT COALESCE(MAX(display_order), -1) as max_order FROM product_images WHERE product_id = ?',
+                [id]
+              );
+              const maxOrder = maxOrderResult[0]?.max_order || -1;
+              
+              // Check if there are any existing images (to determine if first new image should be primary)
+              const [existingCount] = await connection.query(
+                'SELECT COUNT(*) as count FROM product_images WHERE product_id = ?',
+                [id]
+              );
+              const hasExistingImages = existingCount[0]?.count > 0;
+              
+              for (let i = 0; i < add.length; i++) {
+                const imageUrl = typeof add[i] === 'string' ? add[i] : add[i].url || add[i];
+                if (!imageUrl || !imageUrl.trim()) {
+                  console.warn(`⚠️ Skipping invalid image URL at index ${i}`);
+                  continue;
+                }
+                
+                const displayOrder = maxOrder + 1 + i;
+                const isPrimary = i === 0 && !hasExistingImages && existing.length === 0;
+                
+                await connection.query(
+                  `INSERT INTO product_images (product_id, image_url, display_order, is_primary, created_at) 
+                   VALUES (?, ?, ?, ?, NOW())`,
+                  [id, imageUrl.trim(), displayOrder, isPrimary ? 1 : 0]
+                );
+              }
+              console.log(`✅ Added ${add.length} new images for product ${id}`);
+            }
+            
+            // Update existing images (set primary)
+            if (existing && Array.isArray(existing) && existing.length > 0) {
+              // First, unset all primary flags for this product
+              await connection.query(
+                'UPDATE product_images SET is_primary = FALSE WHERE product_id = ?',
+                [id]
+              );
+              
+              // Set primary for specified images
+              let primarySet = false;
+              for (const img of existing) {
+                if (img && img.is_primary) {
+                  // Handle both numeric IDs and string IDs (including 'primary')
+                  let imgId = img.id;
+                  if (imgId === 'primary' || imgId === undefined) {
+                    // If ID is 'primary' or undefined, find the first existing image
+                    const [firstImg] = await connection.query(
+                      'SELECT id FROM product_images WHERE product_id = ? ORDER BY display_order ASC LIMIT 1',
+                      [id]
+                    );
+                    if (firstImg.length > 0) {
+                      imgId = firstImg[0].id;
+                    } else {
+                      continue; // No images to set as primary
+                    }
+                  } else {
+                    // Convert string ID to number if needed
+                    imgId = typeof imgId === 'string' ? parseInt(imgId) : imgId;
+                    if (isNaN(imgId) || imgId <= 0) {
+                      console.warn(`⚠️ Invalid image ID: ${img.id}`);
+                      continue;
+                    }
+                  }
+                  
+                  await connection.query(
+                    'UPDATE product_images SET is_primary = TRUE WHERE id = ? AND product_id = ?',
+                    [imgId, id]
+                  );
+                  primarySet = true;
+                  console.log(`✅ Set image ${imgId} as primary for product ${id}`);
+                  break; // Only one primary image
+                }
+              }
+              
+              // If no primary was set but there are existing images, set the first one as primary
+              if (!primarySet) {
+                const [firstImg] = await connection.query(
+                  'SELECT id FROM product_images WHERE product_id = ? ORDER BY display_order ASC LIMIT 1',
+                  [id]
+                );
+                if (firstImg.length > 0) {
+                  await connection.query(
+                    'UPDATE product_images SET is_primary = TRUE WHERE id = ? AND product_id = ?',
+                    [firstImg[0].id, id]
+                  );
+                  console.log(`✅ Auto-set first image as primary for product ${id}`);
+                }
+              }
+            }
+          }
+        } catch (imageError) {
+          console.error('❌ Error handling product images:', imageError);
+          console.error('Image error details:', {
+            message: imageError.message,
+            stack: imageError.stack,
+            body: req.body.images
+          });
+          // Don't fail the whole update if image handling fails, but log the error
+          // The product update will still succeed
+        }
       }
 
       // Update product sizes if provided

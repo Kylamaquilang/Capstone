@@ -62,6 +62,28 @@ export default function OrderDetailPage() {
   const updateOrderStatus = async () => {
     if (!order || !statusUpdate.status) return;
     
+    // Prevent any status changes if order is cancelled
+    if (order.status === 'cancelled') {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Cannot Change Status',
+        text: 'Cancelled orders cannot have their status changed. The order has been permanently cancelled.',
+        confirmButtonColor: '#000C50'
+      });
+      return;
+    }
+    
+    // Prevent changing completed orders to anything except refunded
+    if (order.status === 'completed' && statusUpdate.status !== 'refunded') {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid Status Change',
+        text: 'Completed orders can only be changed to "Refunded" status. They cannot be moved to any other status.',
+        confirmButtonColor: '#000C50'
+      });
+      return;
+    }
+    
     try {
       setUpdating(true);
       await API.patch(`/orders/${orderId}/status`, statusUpdate);
@@ -353,16 +375,58 @@ export default function OrderDetailPage() {
               </label>
               <select
                 value={statusUpdate.status}
-                onChange={(e) => setStatusUpdate({ ...statusUpdate, status: e.target.value })}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={(e) => {
+                  if (order?.status === 'cancelled') return; // Prevent changes for cancelled orders
+                  if (order?.status === 'completed' && e.target.value !== 'refunded') return; // Only allow refunded for completed orders
+                  setStatusUpdate({ ...statusUpdate, status: e.target.value });
+                }}
+                disabled={order?.status === 'cancelled'}
+                className={`w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  order?.status === 'cancelled' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+                }`}
               >
-                <option value="pending">Pending</option>
-                <option value="processing">Processing</option>
-                <option value="ready_for_pickup">Ready for Pickup</option>
-                <option value="claimed">Claimed</option>
-                <option value="completed">Completed</option>
-                <option value="delivered">Delivered</option>
-                <option value="cancelled">Cancelled</option>
+                <option 
+                  value="pending"
+                  disabled={order?.status === 'completed'}
+                >
+                  Pending
+                </option>
+                <option 
+                  value="processing"
+                  disabled={order?.status === 'completed'}
+                >
+                  Processing
+                </option>
+                <option 
+                  value="ready_for_pickup"
+                  disabled={order?.status === 'completed'}
+                >
+                  Ready for Pickup
+                </option>
+                <option 
+                  value="claimed"
+                  disabled={order?.status === 'completed'}
+                >
+                  Claimed
+                </option>
+                <option 
+                  value="completed"
+                  disabled={order?.status === 'completed'}
+                >
+                  Completed
+                </option>
+                <option 
+                  value="delivered"
+                  disabled={order?.status === 'completed'}
+                >
+                  Delivered
+                </option>
+                <option 
+                  value="cancelled"
+                  disabled={order?.status === 'completed'}
+                >
+                  Cancelled
+                </option>
                 <option value="refunded">Refunded</option>
               </select>
             </div>
@@ -375,10 +439,37 @@ export default function OrderDetailPage() {
                 value={statusUpdate.notes}
                 onChange={(e) => setStatusUpdate({ ...statusUpdate, notes: e.target.value })}
                 placeholder="Add any notes about this status change..."
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={order?.status === 'cancelled'}
+                className={`w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  order?.status === 'cancelled' ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''
+                }`}
                 rows="3"
               />
             </div>
+
+            {/* Show restriction message for cancelled status */}
+            {order?.status === 'cancelled' && (
+              <div className="mb-4 p-2 bg-gray-100 border border-gray-300 rounded-md">
+                <div className="flex items-center">
+                  <span className="text-gray-600 mr-2">🔒</span>
+                  <div className="text-sm text-gray-800">
+                    <strong>Status Locked:</strong> This order has been cancelled and cannot have its status changed. Cancelled orders are permanent.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Show restriction message for completed status */}
+            {order?.status === 'completed' && (
+              <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex items-center">
+                  <span className="text-blue-600 mr-2">ℹ️</span>
+                  <div className="text-sm text-blue-800">
+                    <strong>Status Restriction:</strong> Completed orders can only be changed to "Refunded" status. They cannot be moved to any other status.
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex space-x-3">
               <button
@@ -389,10 +480,10 @@ export default function OrderDetailPage() {
               </button>
               <button
                 onClick={updateOrderStatus}
-                disabled={updating}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                disabled={updating || order?.status === 'cancelled'}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {updating ? 'Updating...' : 'Update Status'}
+                {updating ? 'Updating...' : order?.status === 'cancelled' ? 'Status Locked' : 'Update Status'}
               </button>
             </div>
           </div>
