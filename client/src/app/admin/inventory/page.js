@@ -375,42 +375,17 @@ export default function AdminInventoryPage() {
   const handleStockIn = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      
-      const response = await fetch(`${apiUrl}/api/stock-movements`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          product_id: parseInt(stockInForm.productId),
-          movement_type: 'stock_in',
-          quantity: parseInt(stockInForm.quantity),
-          reason: 'restock', // Optional - backend will use default if not provided
-          supplier: null,
-          notes: stockInForm.note || null,
-          size: stockInForm.size || null
-        })
+      const response = await API.post('/stock-movements', {
+        product_id: parseInt(stockInForm.productId),
+        movement_type: 'stock_in',
+        quantity: parseInt(stockInForm.quantity),
+        reason: 'restock', // Optional - backend will use default if not provided
+        supplier: null,
+        notes: stockInForm.note || null,
+        size: stockInForm.size || null
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = errorData.error || 'Failed to add stock';
-        console.warn('Stock addition validation:', errorMessage);
-        
-        // Show a note instead of throwing an error
-        await Swal.fire({
-          icon: 'warning',
-          title: 'Validation Required',
-          text: errorMessage,
-          confirmButtonColor: '#000C50'
-        });
-        return; // Exit early without throwing
-      }
-
-      const data = await response.json();
+      const data = response.data;
       console.log('✅ Stock added successfully:', data);
       console.log('📦 Full response data:', JSON.stringify(data, null, 2));
 
@@ -543,15 +518,22 @@ export default function AdminInventoryPage() {
       }
     } catch (error) {
       console.error('Error adding stock:', error);
-      // Only show error for unexpected errors (network, etc.), not validation errors
-      if (!error.message || (!error.message.includes('Product ID') && !error.message.includes('movement type') && !error.message.includes('quantity') && !error.message.includes('reason'))) {
-        await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.message || 'Error adding stock. Please try again.',
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Error adding stock. Please try again.';
+      
+      // Show validation errors as warnings, other errors as errors
+      const isValidationError = errorMessage.includes('Product ID') || 
+                                errorMessage.includes('movement type') || 
+                                errorMessage.includes('quantity') || 
+                                errorMessage.includes('reason') ||
+                                errorMessage.includes('validation') ||
+                                error.response?.status === 400;
+      
+      await Swal.fire({
+        icon: isValidationError ? 'warning' : 'error',
+        title: isValidationError ? 'Validation Required' : 'Error',
+        text: errorMessage,
         confirmButtonColor: '#000C50'
       });
-      }
     }
   };
 
@@ -648,41 +630,16 @@ export default function AdminInventoryPage() {
   const handleStockOut = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      
-      const response = await fetch(`${apiUrl}/api/stock-movements`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          product_id: parseInt(stockOutForm.productId),
-          movement_type: 'stock_out',
-          quantity: parseInt(stockOutForm.quantity),
-          reason: stockOutForm.reason || 'deduction',
-          notes: stockOutForm.note || null,
-          size: stockOutForm.size || null
-        })
+      const response = await API.post('/stock-movements', {
+        product_id: parseInt(stockOutForm.productId),
+        movement_type: 'stock_out',
+        quantity: parseInt(stockOutForm.quantity),
+        reason: stockOutForm.reason || 'deduction',
+        notes: stockOutForm.note || null,
+        size: stockOutForm.size || null
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = errorData.error || 'Failed to remove stock';
-        console.warn('Stock removal validation:', errorMessage);
-        
-        // Show a note instead of throwing an error
-        await Swal.fire({
-          icon: 'warning',
-          title: 'Validation Required',
-          text: errorMessage,
-          confirmButtonColor: '#000C50'
-        });
-        return; // Exit early without throwing
-      }
-
-      const data = await response.json();
+      const data = response.data;
       console.log('✅ Stock removed successfully:', data);
 
       handleStockActionSuccess();
@@ -703,15 +660,22 @@ export default function AdminInventoryPage() {
       });
     } catch (error) {
       console.error('Error removing stock:', error);
-      // Only show error for unexpected errors (network, etc.), not validation errors
-      if (!error.message || !error.message.includes('Product ID') && !error.message.includes('movement type') && !error.message.includes('quantity') && !error.message.includes('reason')) {
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Error removing stock. Please try again.';
+      
+      // Show validation errors as warnings, other errors as errors
+      const isValidationError = errorMessage.includes('Product ID') || 
+                                errorMessage.includes('movement type') || 
+                                errorMessage.includes('quantity') || 
+                                errorMessage.includes('reason') ||
+                                errorMessage.includes('validation') ||
+                                error.response?.status === 400;
+      
       await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.message || 'Error removing stock. Please try again.',
+        icon: isValidationError ? 'warning' : 'error',
+        title: isValidationError ? 'Validation Required' : 'Error',
+        text: errorMessage,
         confirmButtonColor: '#000C50'
       });
-      }
     }
   };
 
@@ -719,41 +683,16 @@ export default function AdminInventoryPage() {
   const handleAdjustStock = async (e) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      
-      const response = await fetch(`${apiUrl}/api/stock-movements`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          product_id: parseInt(adjustForm.productId),
-          movement_type: 'stock_adjustment',
-          quantity: parseInt(adjustForm.physicalCount),
-          reason: adjustForm.reason || 'adjustment',
-          notes: adjustForm.note || null,
-          size: adjustForm.size || null
-        })
+      const response = await API.post('/stock-movements', {
+        product_id: parseInt(adjustForm.productId),
+        movement_type: 'stock_adjustment',
+        quantity: parseInt(adjustForm.physicalCount),
+        reason: adjustForm.reason || 'adjustment',
+        notes: adjustForm.note || null,
+        size: adjustForm.size || null
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = errorData.error || 'Failed to adjust stock';
-        console.warn('Stock adjustment validation:', errorMessage);
-        
-        // Show a note instead of throwing an error
-        await Swal.fire({
-          icon: 'warning',
-          title: 'Validation Required',
-          text: errorMessage,
-          confirmButtonColor: '#000C50'
-        });
-        return; // Exit early without throwing
-      }
-
-      const data = await response.json();
+      const data = response.data;
       console.log('✅ Stock adjusted successfully:', data);
 
       // Reset form
@@ -792,15 +731,22 @@ export default function AdminInventoryPage() {
       }, 1500);
     } catch (error) {
       console.error('Error adjusting stock:', error);
-      // Only show error for unexpected errors (network, etc.), not validation errors
-      if (!error.message || (!error.message.includes('Product ID') && !error.message.includes('movement type') && !error.message.includes('quantity') && !error.message.includes('reason'))) {
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Error adjusting stock. Please try again.';
+      
+      // Show validation errors as warnings, other errors as errors
+      const isValidationError = errorMessage.includes('Product ID') || 
+                                errorMessage.includes('movement type') || 
+                                errorMessage.includes('quantity') || 
+                                errorMessage.includes('reason') ||
+                                errorMessage.includes('validation') ||
+                                error.response?.status === 400;
+      
       await Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.message || 'Error adjusting stock. Please try again.',
+        icon: isValidationError ? 'warning' : 'error',
+        title: isValidationError ? 'Validation Required' : 'Error',
+        text: errorMessage,
         confirmButtonColor: '#000C50'
       });
-      }
     }
   };
 
