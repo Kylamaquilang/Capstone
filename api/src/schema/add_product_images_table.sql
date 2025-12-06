@@ -21,3 +21,4 @@ CREATE TABLE IF NOT EXISTS product_images (
 SELECT 'product_images table created successfully!' AS message;
 
 
+

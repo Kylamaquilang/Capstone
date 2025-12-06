@@ -13,7 +13,12 @@ export default function LoginPage() {
   });
 
   const handleChange = (e) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    let value = e.target.value;
+    
+    // Remove spaces and dots at the beginning
+    value = value.replace(/^[\s.]+/, '');
+    
+    setFormData((prev) => ({ ...prev, [e.target.name]: value }));
   };
 
   const handleSubmit = async (e) => {
