@@ -2,6 +2,10 @@ DROP DATABASE IF EXISTS capstone;
 CREATE DATABASE capstone CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE capstone;
 
+-- ============================================================
+-- USERS TABLE
+-- ============================================================
+
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -31,6 +35,10 @@ CREATE TABLE users (
     INDEX idx_status (status)
 );
 
+-- ============================================================
+-- CATEGORIES
+-- ============================================================
+
 CREATE TABLE categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
@@ -39,6 +47,10 @@ CREATE TABLE categories (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+-- ============================================================
+-- PRODUCTS
+-- ============================================================
 
 CREATE TABLE products (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -66,6 +78,10 @@ CREATE TABLE products (
     INDEX idx_deleted_at (deleted_at)
 );
 
+-- ============================================================
+-- PRODUCT SIZES
+-- ============================================================
+
 CREATE TABLE product_sizes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
@@ -81,6 +97,10 @@ CREATE TABLE product_sizes (
     INDEX idx_product_id (product_id),
     INDEX idx_size (size)
 );
+
+-- ============================================================
+-- STOCK TRANSACTIONS
+-- ============================================================
 
 CREATE TABLE stock_transactions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -102,12 +122,20 @@ CREATE TABLE stock_transactions (
     INDEX idx_reference_no (reference_no)
 );
 
+-- ============================================================
+-- STOCK BALANCE
+-- ============================================================
+
 CREATE TABLE stock_balance (
     product_id INT PRIMARY KEY,
     qty INT NOT NULL DEFAULT 0,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
+
+-- ============================================================
+-- STOCK ITEMS
+-- ============================================================
 
 CREATE TABLE stock_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -123,6 +151,10 @@ CREATE TABLE stock_items (
     INDEX idx_expiry (expiry_date),
     INDEX idx_remaining_qty (remaining_quantity)
 );
+
+-- ============================================================
+-- STOCK MOVEMENTS
+-- ============================================================
 
 CREATE TABLE stock_movements (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -148,6 +180,10 @@ CREATE TABLE stock_movements (
     INDEX idx_stock_movements_date (created_at)
 );
 
+-- ============================================================
+-- CART ITEMS
+-- ============================================================
+
 CREATE TABLE cart_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -162,6 +198,10 @@ CREATE TABLE cart_items (
     INDEX idx_user_id (user_id),
     INDEX idx_product_id (product_id)
 );
+
+-- ============================================================
+-- ORDERS
+-- ============================================================
 
 CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -185,6 +225,10 @@ CREATE TABLE orders (
     INDEX idx_orders_created_at (created_at)
 );
 
+-- ============================================================
+-- ORDER ITEMS
+-- ============================================================
+
 CREATE TABLE order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
@@ -206,6 +250,10 @@ CREATE TABLE order_items (
     INDEX idx_order_items_order_product (order_id, product_id)
 );
 
+-- ============================================================
+-- ORDER STATUS LOGS
+-- ============================================================
+
 CREATE TABLE order_status_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL,
@@ -220,6 +268,10 @@ CREATE TABLE order_status_logs (
     INDEX idx_order_id (order_id),
     INDEX idx_created_at (created_at)
 );
+
+-- ============================================================
+-- PAYMENT TRANSACTIONS
+-- ============================================================
 
 CREATE TABLE payment_transactions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -238,6 +290,10 @@ CREATE TABLE payment_transactions (
     INDEX idx_status (status)
 );
 
+-- ============================================================
+-- INVENTORY MOVEMENTS
+-- ============================================================
+
 CREATE TABLE inventory_movements (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
@@ -253,6 +309,10 @@ CREATE TABLE inventory_movements (
     INDEX idx_movement_type (movement_type),
     INDEX idx_created_at (created_at)
 );
+
+-- ============================================================
+-- NOTIFICATIONS
+-- ============================================================
 
 CREATE TABLE notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -272,6 +332,10 @@ CREATE TABLE notifications (
     INDEX idx_notifications_user_read (user_id, is_read)
 );
 
+-- ============================================================
+-- PASSWORD RESET CODES
+-- ============================================================
+
 CREATE TABLE password_reset_codes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -286,6 +350,10 @@ CREATE TABLE password_reset_codes (
     INDEX idx_expires_at (expires_at),
     INDEX idx_verified (verified)
 );
+
+-- ============================================================
+-- DEGREE SHIFTS
+-- ============================================================
 
 CREATE TABLE IF NOT EXISTS degree_shifts (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -304,21 +372,22 @@ CREATE TABLE IF NOT EXISTS degree_shifts (
     INDEX idx_user_id (user_id),
     INDEX idx_shift_date (shift_date),
     INDEX idx_new_degree (new_degree)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+);
+
+-- ============================================================
+-- DEFAULT INDEXES
+-- ============================================================
 
 CREATE INDEX idx_stock_transactions_product_type ON stock_transactions(product_id, transaction_type);
 CREATE INDEX idx_stock_transactions_created_at ON stock_transactions(created_at);
 CREATE INDEX idx_cart_items_user_product ON cart_items(user_id, product_id);
 
-INSERT INTO users (
-  name,
-  email, 
-  password, 
-  role, 
-  first_name, 
-  last_name,
-  created_at
-) VALUES (
+-- ============================================================
+-- INSERT DEFAULT ADMIN
+-- ============================================================
+
+INSERT INTO users (name, email, password, role, first_name, last_name, created_at)
+VALUES (
   'accounting office',
   'acounting.office.cpc@gmail.com',
   '$2b$10$q5TO2hXTQ/wm5qd6klvA6uJ/ZnY..BSd67XYfXIgIYI/zF9pKVa1m',
@@ -328,18 +397,22 @@ INSERT INTO users (
   NOW()
 );
 
+-- ============================================================
+-- VIEWS
+-- ============================================================
+
 CREATE VIEW v_order_summary AS
 SELECT 
     o.id,
     o.order_number,
     o.user_id,
-    u.name as user_name,
+    u.name AS user_name,
     u.student_id,
     o.total_amount,
     o.status,
     o.payment_status,
     o.created_at,
-    COUNT(oi.id) as item_count
+    COUNT(oi.id) AS item_count
 FROM orders o
 JOIN users u ON o.user_id = u.id
 LEFT JOIN order_items oi ON o.id = oi.order_id
@@ -350,26 +423,26 @@ SELECT
     p.id,
     p.name,
     p.category_id,
-    c.name as category_name,
-    COALESCE(sb.qty, p.stock, 0) as current_stock,
+    c.name AS category_name,
+    COALESCE(sb.qty, p.stock, 0) AS current_stock,
     p.reorder_point,
     p.max_stock,
     CASE 
         WHEN COALESCE(sb.qty, p.stock, 0) <= p.reorder_point THEN 'LOW'
         WHEN COALESCE(sb.qty, p.stock, 0) <= (p.reorder_point * 2) THEN 'MEDIUM'
         ELSE 'GOOD'
-    END as stock_status
+    END AS stock_status
 FROM products p
 LEFT JOIN categories c ON p.category_id = c.id
 LEFT JOIN stock_balance sb ON p.id = sb.product_id
-WHERE p.is_active = TRUE AND (p.deleted_at IS NULL);
+WHERE p.is_active = TRUE AND p.deleted_at IS NULL;
 
 CREATE VIEW v_sales_summary AS
 SELECT 
-    DATE(o.created_at) as sale_date,
-    COUNT(*) as total_orders,
-    SUM(o.total_amount) as total_revenue,
-    AVG(o.total_amount) as average_order_value
+    DATE(o.created_at) AS sale_date,
+    COUNT(*) AS total_orders,
+    SUM(o.total_amount) AS total_revenue,
+    AVG(o.total_amount) AS average_order_value
 FROM orders o
 WHERE o.status IN ('completed', 'claimed')
 GROUP BY DATE(o.created_at)
@@ -380,44 +453,44 @@ SELECT
     p.id,
     p.name,
     p.category_id,
-    c.name as category_name,
-    COALESCE(sb.qty, p.stock, 0) as current_stock,
+    c.name AS category_name,
+    COALESCE(sb.qty, p.stock, 0) AS current_stock,
     p.reorder_point,
     p.max_stock,
     CASE 
         WHEN COALESCE(sb.qty, p.stock, 0) = 0 THEN 'CRITICAL'
         WHEN COALESCE(sb.qty, p.stock, 0) <= p.reorder_point THEN 'LOW'
         ELSE 'GOOD'
-    END as stock_status
+    END AS stock_status
 FROM products p
 LEFT JOIN categories c ON p.category_id = c.id
 LEFT JOIN stock_balance sb ON p.id = sb.product_id
-WHERE p.is_active = TRUE AND (p.deleted_at IS NULL);
+WHERE p.is_active = TRUE AND p.deleted_at IS NULL;
 
 CREATE VIEW v_low_stock_products AS
 SELECT 
     p.id,
     p.name,
-    c.name as category_name,
-    COALESCE(sb.qty, p.stock, 0) as current_stock,
+    c.name AS category_name,
+    COALESCE(sb.qty, p.stock, 0) AS current_stock,
     p.reorder_point,
     CASE 
         WHEN COALESCE(sb.qty, p.stock, 0) = 0 THEN 'CRITICAL'
         WHEN COALESCE(sb.qty, p.stock, 0) <= p.reorder_point THEN 'LOW'
         ELSE 'GOOD'
-    END as alert_level
+    END AS alert_level
 FROM products p
 LEFT JOIN categories c ON p.category_id = c.id
 LEFT JOIN stock_balance sb ON p.id = sb.product_id
 WHERE p.is_active = TRUE 
-  AND (p.deleted_at IS NULL)
+  AND p.deleted_at IS NULL
   AND COALESCE(sb.qty, p.stock, 0) <= p.reorder_point;
 
 CREATE VIEW v_stock_history AS
 SELECT 
     st.id,
     st.product_id,
-    p.name as product_name,
+    p.name AS product_name,
     st.transaction_type,
     st.quantity,
     st.reference_no,
@@ -426,13 +499,36 @@ SELECT
     st.source,
     st.note,
     st.created_at,
-    u.name as created_by_name
+    u.name AS created_by_name
 FROM stock_transactions st
 LEFT JOIN products p ON st.product_id = p.id
 LEFT JOIN users u ON st.created_by = u.id
 ORDER BY st.created_at DESC;
 
-SELECT 'CPC ESSEN DATABASE SCHEMA CREATED SUCCESSFULLY!' as message;
-SELECT 'Tables created: users, categories, products, product_sizes, stock_transactions, stock_balance, stock_items, stock_movements, cart_items, orders, order_items, order_status_logs, payment_transactions, inventory_movements, notifications, password_reset_codes, degree_shifts' as tables;
-SELECT 'Views: v_order_summary, v_product_inventory, v_sales_summary, v_current_stock, v_low_stock_products, v_stock_history' as views;
-SELECT 'Default admin account created - Email: acounting.office.cpc@gmail.com' as admin_account;
+-- ============================================================
+-- STORED PROCEDURE (NO DELIMITER REQUIRED)
+-- ============================================================
+
+DROP PROCEDURE IF EXISTS GenerateOrderNumber;
+
+CREATE PROCEDURE GenerateOrderNumber()
+BEGIN
+    DECLARE order_num VARCHAR(50);
+
+    SELECT CONCAT(
+        'ORD-',
+        DATE_FORMAT(NOW(), '%Y%m%d'),
+        '-',
+        LPAD(FLOOR(RAND() * 9999), 4, '0')
+    ) INTO order_num;
+
+    SELECT order_num;
+END;
+
+-- ============================================================
+-- CONFIRMATION
+-- ============================================================
+
+SELECT 'CPC ESSEN DATABASE SCHEMA CREATED SUCCESSFULLY!' AS message;
+SELECT 'Default admin created: acounting.office.cpc@gmail.com' AS admin_info;
+SELECT 'Stored Procedure Created: GenerateOrderNumber()' AS procedure_info;
