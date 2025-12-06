@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
-    FOREIGN FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL,
+    FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL,
     INDEX idx_order_id (order_id),
     INDEX idx_product_id (product_id),
     INDEX idx_size_id (size_id),
