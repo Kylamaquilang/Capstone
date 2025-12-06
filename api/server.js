@@ -51,14 +51,22 @@ import {
 dotenv.config();
 const app = express();
 const server = createServer(app);
+// CORS origins - support both localhost and Railway frontend URL
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001'
+];
+
+// Add Railway frontend URL if provided
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 const io = new Server(server, {
   cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001', 
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001'
-    ],
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     allowedHeaders: ['Authorization', 'Content-Type'],
     credentials: true
@@ -79,13 +87,21 @@ app.use('/uploads', (req, res, next) => {
 }, express.static(path.join(__dirname, 'uploads')));
 
 // CORS configuration - Must come BEFORE rate limiting to handle preflight requests
+// Support both localhost and Railway frontend URL
+const corsOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001', 
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001'
+];
+
+// Add Railway frontend URL if provided
+if (process.env.FRONTEND_URL) {
+  corsOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001', 
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001'
-  ],
+  origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'X-Requested-With'],
@@ -156,7 +172,7 @@ app.use('/api/auto-confirm', autoConfirmRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Socket.io authentication middleware

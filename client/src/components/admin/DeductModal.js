@@ -74,7 +74,8 @@ const DeductModal = ({ isOpen, onClose, product, onDeductSuccess }) => {
         size: formData.size && formData.size.trim() !== '' ? formData.size.trim() : null
       };
 
-      const response = await fetch('http://localhost:5000/api/stock-movements', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/stock-movements`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

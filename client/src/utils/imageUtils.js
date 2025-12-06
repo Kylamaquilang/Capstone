@@ -2,6 +2,11 @@
 
 // Get API base URL from environment or default
 const getApiBaseUrl = () => {
+  // Use environment variable if available (for Railway/production)
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
   // In production, this should be your actual API URL
   if (typeof window !== 'undefined') {
     // Client-side: use the same host but different port
@@ -9,7 +14,7 @@ const getApiBaseUrl = () => {
     const isLocalhost = host === 'localhost' || host === '127.0.0.1';
     return isLocalhost ? 'http://localhost:5000' : `https://${host}:5000`;
   }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  return 'http://localhost:5000';
 };
 
 /**

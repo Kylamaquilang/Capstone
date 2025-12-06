@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import API from '@/lib/axios';
 import Receipt from '@/components/receipt/Receipt';
+import { getImageUrl } from '@/utils/imageUtils';
 
 export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
   const [order, setOrder] = useState(null);
@@ -200,7 +201,7 @@ export default function OrderDetailsModal({ isOpen, onClose, orderId }) {
                               <div className="flex items-center">
                                 {item.image && (
                                   <img
-                                    src={`http://localhost:5000/${item.image}`}
+                                    src={getImageUrl(item.image)}
                                     alt={item.product_name || item.name}
                                     className="w-12 h-12 object-cover rounded mr-3"
                                     onError={(e) => {
