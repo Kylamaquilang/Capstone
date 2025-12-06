@@ -167,15 +167,15 @@ CREATE TABLE IF NOT EXISTS stock_movements (
     previous_stock INT,
     new_stock INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT chk_movement_quantity CHECK (quantity > 0),
     INDEX idx_stock_movements_product (product_id),
     INDEX idx_stock_movements_size (size_id),
     INDEX idx_stock_movements_user (user_id),
     INDEX idx_stock_movements_type (movement_type),
-    INDEX idx_stock_movements_date (created_at)
+    INDEX idx_stock_movements_date (created_at),
+    CONSTRAINT fk_stock_movements_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    CONSTRAINT fk_stock_movements_size FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL,
+    CONSTRAINT fk_stock_movements_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -239,13 +239,13 @@ CREATE TABLE IF NOT EXISTS order_items (
     unit_cost DECIMAL(10,2) DEFAULT 0,
     total_price DECIMAL(10,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
-    FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL,
     INDEX idx_order_id (order_id),
     INDEX idx_product_id (product_id),
     INDEX idx_size_id (size_id),
-    INDEX idx_order_items_order_product (order_id, product_id)
+    INDEX idx_order_items_order_product (order_id, product_id),
+    CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+    CONSTRAINT fk_order_items_size FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL
 );
 
 -- ============================================================
