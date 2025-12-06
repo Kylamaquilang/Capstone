@@ -376,9 +376,6 @@ CREATE TABLE IF NOT EXISTS degree_shifts (
 -- DEFAULT INDEXES
 -- ============================================================
 
--- Note: If indexes already exist, these will fail - that's expected for idempotent runs
--- You can ignore "Duplicate key name" errors if running multiple times
-
 CREATE INDEX idx_stock_transactions_product_type ON stock_transactions(product_id, transaction_type);
 CREATE INDEX idx_stock_transactions_created_at ON stock_transactions(created_at);
 CREATE INDEX idx_cart_items_user_product ON cart_items(user_id, product_id);
