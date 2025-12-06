@@ -1,10 +1,14 @@
 // src/utils/imageUtils.js
 
 // Get API base URL from environment or default
+// IMPORTANT: This returns the base URL WITHOUT /api (e.g., http://localhost:5000)
 const getApiBaseUrl = () => {
   // Use environment variable if available (for Railway/production)
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+    let apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    // Remove trailing slashes and /api if accidentally included
+    apiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
+    return apiUrl;
   }
   
   // In production, this should be your actual API URL

@@ -19,7 +19,9 @@ export function SocketProvider({ children }) {
     if (token) {
       console.log('🔄 Reconnecting socket with fresh token');
       // Use environment variable for socket URL, fallback to localhost for development
-      const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      // IMPORTANT: Socket.io doesn't use /api path, so strip it if present
+      let socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      socketUrl = socketUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
       const socketInstance = io(socketUrl, {
         auth: {
           token: `Bearer ${token}`
@@ -64,7 +66,9 @@ export function SocketProvider({ children }) {
     
     // Initialize Socket.io connection with auth token
     // Use environment variable for socket URL, fallback to localhost for development
-    const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    // IMPORTANT: Socket.io doesn't use /api path, so strip it if present
+    let socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    socketUrl = socketUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
     const socketInstance = io(socketUrl, {
       auth: {
         token: `Bearer ${token}`

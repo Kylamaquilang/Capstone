@@ -16,7 +16,10 @@ export default function ServerStatusBanner() {
         const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
         
         // Use environment variable for API URL, fallback to localhost for development
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        // IMPORTANT: NEXT_PUBLIC_API_URL should be the base URL WITHOUT /api
+        let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        // Remove trailing slashes and /api if accidentally included
+        apiUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
         const response = await fetch(`${apiUrl}/api/health`, {
           method: 'GET',
           headers: {

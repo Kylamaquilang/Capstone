@@ -2,7 +2,12 @@
 import axios from 'axios';
 
 // Use environment variable for API URL, fallback to localhost for development
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+// IMPORTANT: NEXT_PUBLIC_API_URL should be the base URL WITHOUT /api (e.g., http://localhost:5000)
+// The /api prefix is added here automatically
+let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+// Remove trailing slashes and /api if accidentally included
+API_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
 
 const API = axios.create({
   baseURL: `${API_BASE_URL}/api`,
