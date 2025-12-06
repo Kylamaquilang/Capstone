@@ -8,7 +8,7 @@ const publicRoutes = [
   '/api/health',
   '/favicon.ico',
   '/api/auth/login',
-  '/api/auth/register'
+  //'/api/auth/register'
 ];
 
 // Middleware: Verify JWT token
