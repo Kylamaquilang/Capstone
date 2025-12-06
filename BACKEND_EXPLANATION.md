@@ -498,3 +498,4 @@ CLOUDINARY_API_SECRET=...
 This backend provides a robust, secure, and scalable API for the e-commerce system with real-time capabilities, comprehensive security, and efficient database management.
 
 
+

@@ -543,10 +543,155 @@ BEGIN
     SELECT order_num;
 END;
 
+DROP PROCEDURE IF EXISTS sp_stock_in;
+
+CREATE PROCEDURE sp_stock_in(
+    IN p_product_id INT,
+    IN p_quantity INT,
+    IN p_reference_no VARCHAR(100),
+    IN p_batch_no VARCHAR(100),
+    IN p_expiry_date DATE,
+    IN p_source VARCHAR(100),
+    IN p_note TEXT,
+    IN p_user_id INT
+)
+BEGIN
+    DECLARE current_stock INT DEFAULT 0;
+    
+    -- Get current stock
+    SELECT stock INTO current_stock FROM products WHERE id = p_product_id;
+    
+    -- Update product stock
+    UPDATE products 
+    SET stock = stock + p_quantity,
+        updated_at = NOW()
+    WHERE id = p_product_id;
+    
+    -- Insert stock transaction record
+    INSERT INTO stock_transactions (
+        product_id,
+        transaction_type,
+        quantity,
+        reference_no,
+        batch_no,
+        expiry_date,
+        source,
+        note,
+        created_by
+    ) VALUES (
+        p_product_id,
+        'IN',
+        p_quantity,
+        p_reference_no,
+        p_batch_no,
+        p_expiry_date,
+        p_source,
+        p_note,
+        p_user_id
+    );
+END;
+
+DROP PROCEDURE IF EXISTS sp_stock_out;
+
+CREATE PROCEDURE sp_stock_out(
+    IN p_product_id INT,
+    IN p_quantity INT,
+    IN p_reference_no VARCHAR(100),
+    IN p_source VARCHAR(100),
+    IN p_note TEXT,
+    IN p_user_id INT
+)
+BEGIN
+    DECLARE current_stock INT DEFAULT 0;
+    
+    -- Get current stock
+    SELECT stock INTO current_stock FROM products WHERE id = p_product_id;
+    
+    -- Check if sufficient stock is available
+    IF current_stock < p_quantity THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Insufficient stock available';
+    END IF;
+    
+    -- Update product stock
+    UPDATE products 
+    SET stock = stock - p_quantity,
+        updated_at = NOW()
+    WHERE id = p_product_id;
+    
+    -- Insert stock transaction record
+    INSERT INTO stock_transactions (
+        product_id,
+        transaction_type,
+        quantity,
+        reference_no,
+        source,
+        note,
+        created_by
+    ) VALUES (
+        p_product_id,
+        'OUT',
+        p_quantity,
+        p_reference_no,
+        p_source,
+        p_note,
+        p_user_id
+    );
+END;
+
+DROP PROCEDURE IF EXISTS sp_stock_adjustment;
+
+CREATE PROCEDURE sp_stock_adjustment(
+    IN p_product_id INT,
+    IN p_physical_count INT,
+    IN p_reason VARCHAR(255),
+    IN p_note TEXT,
+    IN p_user_id INT
+)
+BEGIN
+    DECLARE current_stock INT DEFAULT 0;
+    DECLARE adjustment_quantity INT DEFAULT 0;
+    
+    -- Get current stock
+    SELECT stock INTO current_stock FROM products WHERE id = p_product_id;
+    
+    -- Calculate adjustment quantity (difference between physical count and current stock)
+    SET adjustment_quantity = p_physical_count - current_stock;
+    
+    -- Update product stock to physical count
+    UPDATE products 
+    SET stock = p_physical_count,
+        updated_at = NOW()
+    WHERE id = p_product_id;
+    
+    -- Insert stock transaction record (quantity is the absolute difference)
+    INSERT INTO stock_transactions (
+        product_id,
+        transaction_type,
+        quantity,
+        reference_no,
+        source,
+        note,
+        created_by
+    ) VALUES (
+        p_product_id,
+        'ADJUSTMENT',
+        ABS(adjustment_quantity),
+        CONCAT('ADJ-', p_product_id, '-', DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')),
+        p_reason,
+        p_note,
+        p_user_id
+    );
+END;
+
 -- ============================================================
 -- CONFIRMATION
 -- ============================================================
 
 SELECT 'CPC ESSEN DATABASE SCHEMA CREATED SUCCESSFULLY!' AS message;
 SELECT 'Default admin created: acounting.office.cpc@gmail.com' AS admin_info;
-SELECT 'Stored Procedure Created: GenerateOrderNumber()' AS procedure_info;
+SELECT 'Stored Procedures Created:' AS procedure_info;
+SELECT '  - GenerateOrderNumber()' AS procedure_list;
+SELECT '  - sp_stock_in()' AS procedure_list;
+SELECT '  - sp_stock_out()' AS procedure_list;
+SELECT '  - sp_stock_adjustment()' AS procedure_list;
