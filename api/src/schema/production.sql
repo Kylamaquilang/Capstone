@@ -376,13 +376,13 @@ CREATE TABLE IF NOT EXISTS degree_shifts (
 -- DEFAULT INDEXES
 -- ============================================================
 
-CREATE INDEX IF NOT EXISTS idx_stock_transactions_product_type 
+CREATE INDEX idx_stock_transactions_product_type 
     ON stock_transactions(product_id, transaction_type);
 
-CREATE INDEX IF NOT EXISTS idx_stock_transactions_created_at 
+CREATE INDEX idx_stock_transactions_created_at 
     ON stock_transactions(created_at);
 
-CREATE INDEX IF NOT EXISTS idx_cart_items_user_product 
+CREATE INDEX idx_cart_items_user_product 
     ON cart_items(user_id, product_id);
 
 -- ============================================================
