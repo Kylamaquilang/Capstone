@@ -376,14 +376,12 @@ CREATE TABLE IF NOT EXISTS degree_shifts (
 -- DEFAULT INDEXES
 -- ============================================================
 
-CREATE INDEX idx_stock_transactions_product_type 
-    ON stock_transactions(product_id, transaction_type);
+-- Note: If indexes already exist, these will fail - that's expected for idempotent runs
+-- You can ignore "Duplicate key name" errors if running multiple times
 
-CREATE INDEX idx_stock_transactions_created_at 
-    ON stock_transactions(created_at);
-
-CREATE INDEX idx_cart_items_user_product 
-    ON cart_items(user_id, product_id);
+CREATE INDEX idx_stock_transactions_product_type ON stock_transactions(product_id, transaction_type);
+CREATE INDEX idx_stock_transactions_created_at ON stock_transactions(created_at);
+CREATE INDEX idx_cart_items_user_product ON cart_items(user_id, product_id);
 
 -- ============================================================
 -- INSERT DEFAULT ADMIN
@@ -513,20 +511,6 @@ ORDER BY st.created_at DESC;
 -- ============================================================
 
 DROP PROCEDURE IF EXISTS GenerateOrderNumber;
-
-CREATE PROCEDURE GenerateOrderNumber()
-BEGIN
-    DECLARE order_num VARCHAR(50);
-
-    SELECT CONCAT(
-        'ORD-',
-        DATE_FORMAT(NOW(), '%Y%m%d'),
-        '-',
-        LPAD(FLOOR(RAND() * 9999), 4, '0')
-    ) INTO order_num;
-
-    SELECT order_num;
-END;
 
 -- ============================================================
 -- CONFIRMATION
