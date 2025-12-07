@@ -1460,13 +1460,20 @@ export default function AdminInventoryPage() {
   // Calculate summary statistics
   const getSummaryStats = () => {
     const totalProducts = currentStock.length;
+    const LOW_STOCK_THRESHOLD = 10; // Use same threshold as alerts
     
     // Calculate total stock and value
     let totalStock = 0;
     let totalValue = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
     
     currentStock.forEach(product => {
+      // Calculate actual current stock (same logic as alerts)
+      let actualCurrentStock = 0;
       if (product.sizes && product.sizes.length > 0) {
+        // Product has sizes - sum of all size stocks
+        actualCurrentStock = product.sizes.reduce((sum, size) => sum + (parseInt(size.stock) || 0), 0);
         // Product has sizes - sum up each size's stock and value
         product.sizes.forEach(size => {
           const sizeStock = size.stock || 0;
@@ -1475,16 +1482,21 @@ export default function AdminInventoryPage() {
           totalValue += sizeStock * sizePrice;
         });
       } else {
-        // Product without sizes - use main stock and price
+        // Product without sizes - use base stock
+        actualCurrentStock = parseInt(product.current_stock) || 0;
         const stock = product.current_stock || 0;
         const price = product.price || 0;
         totalStock += stock;
         totalValue += stock * price;
       }
+      
+      // Count low stock and out of stock using same logic as alerts
+      if (actualCurrentStock <= 0) {
+        outOfStockCount++;
+      } else if (actualCurrentStock <= LOW_STOCK_THRESHOLD) {
+        lowStockCount++;
+      }
     });
-    
-    const lowStockCount = lowStockAlerts.length;
-    const outOfStockCount = currentStock.filter(p => (p.current_stock || 0) === 0).length;
 
     return {
       total_products: totalProducts,
@@ -2273,9 +2285,7 @@ export default function AdminInventoryPage() {
                                 onClick={async () => {
                                   setSelectedProduct(product);
                                           
-                                          // Pre-populate with suggested reorder quantity
-                                          const suggestedQty = product.suggested_reorder_quantity || 0;
-                                          
+                                          // Leave quantity blank - let admin input the number
                                           // Determine pre-selected size (first low stock size from alert)
                                           let preSelectedSize = '';
                                           if (product.sizes && product.sizes.length > 0) {
@@ -2284,10 +2294,10 @@ export default function AdminInventoryPage() {
                                             preSelectedSize = lowStockSize ? lowStockSize.size : product.sizes[0].size || '';
                                           }
                                           
-                                          // Pre-populate form with product data from alert
+                                          // Pre-populate form with product data from alert (quantity left blank)
                                   setStockInForm({ 
                                     productId: product.id.toString(), 
-                                            quantity: suggestedQty > 0 ? suggestedQty.toString() : '', 
+                                            quantity: '', // Leave quantity blank for admin to input
                                             size: preSelectedSize,
                                             note: `Restock from alert - ${getAlertStatusText(product)}` 
                                           });

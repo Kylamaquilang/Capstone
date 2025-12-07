@@ -43,6 +43,20 @@ export default function ProductTable({ category = '', subcategory = '', category
         const { data } = await API.get(url);
         let products = (data && data.products) ? data.products : [];
         
+        // Log first product with sizes for debugging
+        if (products.length > 0 && products[0].sizes) {
+          console.log('🔍 Sample product data:', {
+            id: products[0].id,
+            name: products[0].name,
+            basePrice: products[0].price,
+            sizes: products[0].sizes.map(s => ({
+              size: s.size,
+              price: s.price,
+              stock: s.stock
+            }))
+          });
+        }
+        
         // The detailed endpoint now returns sizes directly
         setProducts(products);
         setError('');
@@ -114,16 +128,57 @@ export default function ProductTable({ category = '', subcategory = '', category
         ));
       };
 
+      // Listen for size price updates
+      const handleSizeUpdate = (sizeData) => {
+        console.log('📦 Real-time size update received:', sizeData);
+        console.log('📦 Size update data:', {
+          sizeId: sizeData.sizeId,
+          productId: sizeData.productId,
+          size: sizeData.size,
+          newPrice: sizeData.newPrice
+        });
+        
+        setProducts(prev => prev.map(product => {
+          if (product.id === sizeData.productId || product.id === parseInt(sizeData.productId)) {
+            // Update the specific size's price in the sizes array
+            const updatedSizes = product.sizes?.map(size => {
+              // Match by sizeId (the unique ID) - handle both string and number
+              const sizeIdMatch = size.id === sizeData.sizeId || 
+                                 size.id === parseInt(sizeData.sizeId) ||
+                                 String(size.id) === String(sizeData.sizeId);
+              
+              if (sizeIdMatch) {
+                console.log(`✅ Updating size ${size.size} (ID: ${size.id}) price from ${size.price} to ${sizeData.newPrice}`);
+                return { ...size, price: sizeData.newPrice };
+              }
+              return size;
+            }) || [];
+            
+            console.log(`✅ Updated product ${product.id} sizes:`, updatedSizes);
+            return { ...product, sizes: updatedSizes };
+          }
+          return product;
+        }));
+        
+        // Also trigger a full refresh to ensure data consistency
+        setTimeout(() => {
+          console.log('🔄 Refreshing products list after size update');
+          fetchProducts();
+        }, 500);
+      };
+
       socket.on('product-updated', handleProductUpdate);
       socket.on('new-product', handleNewProduct);
       socket.on('product-deleted', handleProductDelete);
       socket.on('inventory-updated', handleInventoryUpdate);
+      socket.on('size-updated', handleSizeUpdate);
 
       return () => {
         socket.off('product-updated', handleProductUpdate);
         socket.off('new-product', handleNewProduct);
         socket.off('product-deleted', handleProductDelete);
         socket.off('inventory-updated', handleInventoryUpdate);
+        socket.off('size-updated', handleSizeUpdate);
       };
     }
   }, [category, subcategory, socket, isConnected, joinAdminRoom, fetchProducts]);
@@ -236,6 +291,18 @@ export default function ProductTable({ category = '', subcategory = '', category
   };
 
   const handleEdit = (productId) => {
+    // Validate productId before opening modal
+    if (!productId || isNaN(productId)) {
+      console.error('Invalid product ID:', productId);
+      Swal.fire({
+        title: 'Error',
+        text: 'Invalid product ID',
+        icon: 'error',
+        confirmButtonColor: '#000C50'
+      });
+      return;
+    }
+    console.log(`🔍 Opening edit modal for product ID: ${productId}`);
     setSelectedProductId(productId);
     setEditModalOpen(true);
   };
@@ -243,10 +310,17 @@ export default function ProductTable({ category = '', subcategory = '', category
   const handleEditSuccess = useCallback(() => {
     // Reset pagination to first page to ensure updated product is visible
     setCurrentPage(1);
-    // Refresh the products list to get latest data
+    // Refresh the products list to get latest data (including updated size prices)
     fetchProducts();
     // Show success message
     console.log('Product updated successfully - table refreshed');
+  }, [fetchProducts]);
+  
+  // Handle size price updates - refresh table when size price is updated
+  const handleSizePriceUpdate = useCallback(() => {
+    // Refresh the products list to get latest size prices
+    fetchProducts();
+    console.log('Size price updated - table refreshed');
   }, [fetchProducts]);
 
   const handleToggleVisibility = async (id, name, currentStatus) => {
@@ -546,12 +620,14 @@ export default function ProductTable({ category = '', subcategory = '', category
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-xs font-medium text-gray-900">
-                    ₱{Number(row.price).toFixed(2)}
+                    {row.isSizeRow && row.size && row.size.price !== undefined && row.size.price !== null
+                      ? `₱${Number(row.size.price).toFixed(2)}`
+                      : `₱${Number(row.price || 0).toFixed(2)}`}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                    {row.stock || 0}
+                    {row.isSizeRow ? (row.size?.base_stock || row.stock || 0) : (row.stock || 0)}
                       </span>
                     </td>
                     <td className="px-4 py-3">

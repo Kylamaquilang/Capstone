@@ -220,19 +220,17 @@ export default function AddProductForm() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm mb-1">PRICE:</label>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="w-full border border-gray-400 px-3 py-2 rounded"
-              placeholder="Enter selling price"
-              min="0"
-              step="0.01"
-              required
-            />
-          </div>
+           <div>
+             <label className="block text-sm mb-1">PRICE:</label>
+             <input
+               type="text"
+               value={price}
+               onChange={(e) => setPrice(e.target.value)}
+               className="w-full border border-gray-400 px-3 py-2 rounded"
+               placeholder="Enter selling price"
+               required
+             />
+           </div>
 
           {/* Stock Display */}
           <div className="bg-gray-50 p-3 rounded border border-gray-200">

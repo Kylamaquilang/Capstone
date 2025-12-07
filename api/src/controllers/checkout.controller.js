@@ -309,13 +309,27 @@ export const checkout = async (req, res) => {
         // Process stock deduction directly (optimized for speed)
         console.log(`📦 Processing stock deduction for Product ID ${item.product_id}, Quantity ${item.quantity}`);
         
+        // Get current stock before deduction for transaction record
+        let currentStock = 0;
         if (item.size_id) {
+          const [sizeStock] = await connection.query(
+            `SELECT stock FROM product_sizes WHERE id = ?`,
+            [item.size_id]
+          );
+          currentStock = sizeStock[0]?.stock || 0;
+          
           // Deduct from size-specific stock
           await connection.query(
             `UPDATE product_sizes SET stock = stock - ? WHERE id = ? AND stock >= ?`,
             [item.quantity, item.size_id, item.quantity]
           );
         } else {
+          const [productStock] = await connection.query(
+            `SELECT stock FROM products WHERE id = ?`,
+            [item.product_id]
+          );
+          currentStock = productStock[0]?.stock || 0;
+          
           // Deduct from general product stock
           await connection.query(
             `UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`,
@@ -323,7 +337,92 @@ export const checkout = async (req, res) => {
           );
         }
         
-        console.log(`✅ Stock deduction completed for Product ID ${item.product_id}`)
+        // Calculate new stock after deduction
+        const newStock = Math.max(0, currentStock - item.quantity);
+        
+        // Create stock transaction record for inventory history
+        const transactionNote = `Order #${orderNumber} - ${productName}${sizeName ? ` (Size: ${sizeName})` : ''}`;
+        
+        // Dynamic source based on payment method
+        const transactionSource = payment_method 
+          ? `sale_${payment_method}` 
+          : 'sale';
+        
+        // Check if previous_stock and new_stock columns exist
+        let hasStockColumns = false;
+        try {
+          const [columns] = await connection.query(`
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'stock_transactions' 
+            AND COLUMN_NAME IN ('previous_stock', 'new_stock')
+          `);
+          hasStockColumns = columns.length === 2;
+          
+          // Add missing columns if they don't exist
+          if (!hasStockColumns) {
+            if (!columns.find(c => c.COLUMN_NAME === 'previous_stock')) {
+              await connection.query('ALTER TABLE stock_transactions ADD COLUMN previous_stock INT NULL AFTER quantity');
+            }
+            if (!columns.find(c => c.COLUMN_NAME === 'new_stock')) {
+              await connection.query('ALTER TABLE stock_transactions ADD COLUMN new_stock INT NULL AFTER previous_stock');
+            }
+            hasStockColumns = true;
+          }
+        } catch (columnError) {
+          console.log('⚠️ Error checking/adding stock columns:', columnError.message);
+          // Continue without stock columns if there's an error
+        }
+        
+        // Insert stock transaction record with user_id (student) as created_by
+        if (hasStockColumns) {
+          await connection.query(
+            `INSERT INTO stock_transactions (
+              product_id,
+              transaction_type,
+              quantity,
+              previous_stock,
+              new_stock,
+              reference_no,
+              source,
+              note,
+              created_by
+            ) VALUES (?, 'OUT', ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              item.product_id,
+              item.quantity,
+              currentStock,
+              newStock,
+              orderNumber,
+              transactionSource,
+              transactionNote,
+              user_id // Set created_by to the student's user_id
+            ]
+          );
+        } else {
+          // Fallback: insert without stock columns
+          await connection.query(
+            `INSERT INTO stock_transactions (
+              product_id,
+              transaction_type,
+              quantity,
+              reference_no,
+              source,
+              note,
+              created_by
+            ) VALUES (?, 'OUT', ?, ?, ?, ?, ?)`,
+            [
+              item.product_id,
+              item.quantity,
+              orderNumber,
+              transactionSource,
+              transactionNote,
+              user_id // Set created_by to the student's user_id
+            ]
+          );
+        }
+        
+        console.log(`✅ Stock deduction and transaction record completed for Product ID ${item.product_id}`)
       }
 
       // Only delete cart items if we processed cart items (not direct products)

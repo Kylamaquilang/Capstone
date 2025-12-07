@@ -354,33 +354,29 @@ export default function AddProductModal({ onClose, onSuccess }) {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
-                  <input
-                    type=""
-                    value={costPrice}
-                    onChange={(e) => setCostPrice(e.target.value)}
-                    className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter cost price"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Cost Price</label>
+                   <input
+                     type="text"
+                     value={costPrice}
+                     onChange={(e) => setCostPrice(e.target.value)}
+                     className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                     placeholder="Enter cost price"
+                     required
+                   />
+                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price</label>
-                  <input
-                    type=""
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter selling price"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Selling Price</label>
+                   <input
+                     type="text"
+                     value={price}
+                     onChange={(e) => setPrice(e.target.value)}
+                     className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                     placeholder="Enter selling price"
+                     required
+                   />
+                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Base Stock</label>

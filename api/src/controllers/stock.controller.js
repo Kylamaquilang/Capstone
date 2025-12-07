@@ -52,11 +52,6 @@ const getCurrentStock = async (req, res) => {
         p.original_price,
         COALESCE(p.reorder_point, 10) as reorder_point,
         p.max_stock,
-        CASE 
-          WHEN p.stock <= 0 THEN 'OUT_OF_STOCK'
-          WHEN p.stock <= COALESCE(p.reorder_point, 10) THEN 'LOW'
-          ELSE 'IN_STOCK'
-        END as stock_status,
         p.updated_at as last_updated
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
@@ -67,7 +62,10 @@ const getCurrentStock = async (req, res) => {
     
     const [products] = await pool.query(query, [parseInt(limit), offset]);
     
-    // Get sizes for each product
+    // Use consistent threshold matching low stock alerts logic
+    const LOW_STOCK_THRESHOLD = 10;
+    
+    // Get sizes for each product and calculate actual stock status
     const productsWithSizes = await Promise.all(
       products.map(async (product) => {
         try {
@@ -89,15 +87,44 @@ const getCurrentStock = async (req, res) => {
             [product.id]
           );
           
+          // Calculate actual current stock (same logic as low stock alerts)
+          let actualCurrentStock = 0;
+          if (sizes.length > 0) {
+            // Product has sizes - use sum of all size stocks as current stock
+            actualCurrentStock = sizes.reduce((sum, size) => sum + (parseInt(size.stock) || 0), 0);
+          } else {
+            // Product without sizes - use base stock
+            actualCurrentStock = parseInt(product.current_stock) || 0;
+          }
+          
+          // Determine stock status using same logic as low stock alerts
+          let stock_status = 'IN_STOCK';
+          if (actualCurrentStock <= 0) {
+            stock_status = 'OUT_OF_STOCK';
+          } else if (actualCurrentStock <= LOW_STOCK_THRESHOLD) {
+            stock_status = 'LOW';
+          }
+          
           return {
             ...product,
-            sizes: sizes || []
+            current_stock: actualCurrentStock, // Use calculated actual stock
+            sizes: sizes || [],
+            stock_status: stock_status
           };
         } catch (error) {
           console.error(`Error fetching sizes for product ${product.id}:`, error);
+          // Fallback: use base stock for status
+          const baseStock = parseInt(product.current_stock) || 0;
+          let stock_status = 'IN_STOCK';
+          if (baseStock <= 0) {
+            stock_status = 'OUT_OF_STOCK';
+          } else if (baseStock <= LOW_STOCK_THRESHOLD) {
+            stock_status = 'LOW';
+          }
           return {
             ...product,
-            sizes: []
+            sizes: [],
+            stock_status: stock_status
           };
         }
       })
@@ -191,11 +218,11 @@ const addStockIn = async (req, res) => {
           console.log(`⚠️ User ID ${userId} not found, setting created_by to NULL`);
         }
       }
-      // If size is provided, update product_sizes table
+      
+      // Get current stock BEFORE updating (for previous_stock)
+      let currentStock = 0;
       if (size && size.trim() !== '') {
-        console.log(`📦 Updating size-specific stock for size: ${size}`);
-        
-        // Check if size exists for this product
+        // Get size-specific stock
         const [sizeExists] = await connection.query(
           'SELECT id, stock FROM product_sizes WHERE product_id = ? AND size = ? AND is_active = 1',
           [productId, size.trim()]
@@ -205,6 +232,8 @@ const addStockIn = async (req, res) => {
           throw new Error(`Size "${size}" not found for this product`);
         }
         
+        currentStock = parseInt(sizeExists[0].stock) || 0;
+        
         // Update size-specific stock
         await connection.query(
           'UPDATE product_sizes SET stock = stock + ? WHERE product_id = ? AND size = ?',
@@ -212,14 +241,81 @@ const addStockIn = async (req, res) => {
         );
         
         console.log(`✅ Updated stock for size ${size} by +${quantity}`);
+      } else {
+        // Get base product stock
+        const [productStock] = await connection.query(
+          'SELECT stock FROM products WHERE id = ?',
+          [productId]
+        );
+        currentStock = parseInt(productStock[0]?.stock) || 0;
       }
       
-      // Call stored procedure for main product stock (this handles products table and transactions)
+      // Calculate new stock
+      const newStock = currentStock + quantity;
+      
+      // Check if previous_stock and new_stock columns exist
+      let hasStockColumns = false;
+      try {
+        const [columns] = await connection.query(`
+          SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE() 
+          AND TABLE_NAME = 'stock_transactions' 
+          AND COLUMN_NAME IN ('previous_stock', 'new_stock')
+        `);
+        hasStockColumns = columns.length === 2;
+        
+        if (!hasStockColumns && columns.length > 0) {
+          if (!columns.find(c => c.COLUMN_NAME === 'previous_stock')) {
+            await connection.query('ALTER TABLE stock_transactions ADD COLUMN previous_stock INT NULL AFTER quantity');
+          }
+          if (!columns.find(c => c.COLUMN_NAME === 'new_stock')) {
+            await connection.query('ALTER TABLE stock_transactions ADD COLUMN new_stock INT NULL AFTER previous_stock');
+          }
+          hasStockColumns = true;
+        } else if (!hasStockColumns) {
+          await connection.query('ALTER TABLE stock_transactions ADD COLUMN previous_stock INT NULL AFTER quantity');
+          await connection.query('ALTER TABLE stock_transactions ADD COLUMN new_stock INT NULL AFTER previous_stock');
+          hasStockColumns = true;
+        }
+      } catch (columnError) {
+        console.log('⚠️ Error checking/adding stock columns:', columnError.message);
+      }
+      
+      // Call stored procedure for main product stock (this handles products table update)
       // Note: userId can be NULL if user is not found or not authenticated
       await connection.query(
         'CALL sp_stock_in(?, ?, ?, ?, ?, ?, ?, ?)',
         [productId, quantity, referenceNo || null, batchNo || null, expiryDate || null, source, note || null, userId]
       );
+      
+      // Update the transaction record with previous_stock and new_stock
+      // Get the most recent transaction for this product (just created by sp_stock_in)
+      if (hasStockColumns) {
+        // First, get the transaction ID that was just created
+        const [recentTransaction] = await connection.query(
+          `SELECT id FROM stock_transactions 
+           WHERE product_id = ? 
+           AND transaction_type = 'IN'
+           AND quantity = ?
+           AND (reference_no = ? OR (? IS NULL AND reference_no IS NULL))
+           AND created_at >= DATE_SUB(NOW(), INTERVAL 5 SECOND)
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [productId, quantity, referenceNo || null, referenceNo || null]
+        );
+        
+        if (recentTransaction.length > 0) {
+          await connection.query(
+            `UPDATE stock_transactions 
+             SET previous_stock = ?, new_stock = ?
+             WHERE id = ?`,
+            [currentStock, newStock, recentTransaction[0].id]
+          );
+          console.log(`✅ Updated stock transaction ID ${recentTransaction[0].id} with previous_stock=${currentStock}, new_stock=${newStock}`);
+        } else {
+          console.log(`⚠️ Could not find recent transaction to update for product ${productId}`);
+        }
+      }
       
       await connection.commit();
       
@@ -456,6 +552,37 @@ const getStockHistory = async (req, res) => {
       stockMovementsExists = false;
     }
     
+    // Check if previous_stock and new_stock columns exist in stock_transactions
+    let hasStockColumns = false;
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'stock_transactions' 
+        AND COLUMN_NAME IN ('previous_stock', 'new_stock')
+      `);
+      hasStockColumns = columns.length === 2;
+      if (!hasStockColumns && columns.length > 0) {
+        console.log('⚠️ Some stock columns missing in stock_transactions, adding them...');
+        // Add missing columns
+        if (!columns.find(c => c.COLUMN_NAME === 'previous_stock')) {
+          await pool.query('ALTER TABLE stock_transactions ADD COLUMN previous_stock INT NULL AFTER quantity');
+        }
+        if (!columns.find(c => c.COLUMN_NAME === 'new_stock')) {
+          await pool.query('ALTER TABLE stock_transactions ADD COLUMN new_stock INT NULL AFTER previous_stock');
+        }
+        hasStockColumns = true;
+      } else if (!hasStockColumns) {
+        console.log('⚠️ Adding previous_stock and new_stock columns to stock_transactions...');
+        await pool.query('ALTER TABLE stock_transactions ADD COLUMN previous_stock INT NULL AFTER quantity');
+        await pool.query('ALTER TABLE stock_transactions ADD COLUMN new_stock INT NULL AFTER previous_stock');
+        hasStockColumns = true;
+      }
+    } catch (columnError) {
+      console.log('⚠️ Error checking/adding stock columns:', columnError.message);
+      hasStockColumns = false;
+    }
+    
     // Build WHERE clauses and parameters
     let stWhereClause = 'WHERE 1=1';
     let smWhereClause = 'WHERE 1=1';
@@ -538,8 +665,8 @@ const getStockHistory = async (req, res) => {
             p.name as product_name,
             st.transaction_type,
             st.quantity,
-            NULL as previous_stock,
-            NULL as new_stock,
+            ${hasStockColumns ? 'st.previous_stock' : 'NULL'} as previous_stock,
+            ${hasStockColumns ? 'st.new_stock' : 'NULL'} as new_stock,
             st.reference_no,
             st.batch_no,
             st.expiry_date,
@@ -607,8 +734,8 @@ const getStockHistory = async (req, res) => {
           p.name as product_name,
           st.transaction_type,
           st.quantity,
-          NULL as previous_stock,
-          NULL as new_stock,
+          ${hasStockColumns ? 'st.previous_stock' : 'NULL'} as previous_stock,
+          ${hasStockColumns ? 'st.new_stock' : 'NULL'} as new_stock,
           st.reference_no,
           st.batch_no,
           st.expiry_date,
@@ -771,6 +898,20 @@ const getLowStockAlerts = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
     
+    // Build WHERE clause with deleted_at check
+    let productWhereClause = 'WHERE p.is_active = TRUE';
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'deleted_at'
+      `);
+      if (columns.length > 0) {
+        productWhereClause += ' AND p.deleted_at IS NULL';
+      }
+    } catch (err) {
+      // Column doesn't exist yet, continue without the condition
+    }
+    
     // Get all active products with their base stock
     const [allProducts] = await pool.query(`
       SELECT 
@@ -785,7 +926,7 @@ const getLowStockAlerts = async (req, res) => {
         p.max_stock
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.is_active = TRUE
+      ${productWhereClause}
       ORDER BY p.stock ASC, p.name
     `);
     
@@ -794,6 +935,8 @@ const getLowStockAlerts = async (req, res) => {
     
     // Use consistent threshold of 10 to match product table display
     const LOW_STOCK_THRESHOLD = 10;
+    
+    console.log(`🔍 Checking ${allProducts.length} products for low stock alerts (threshold: ${LOW_STOCK_THRESHOLD})`);
     
     for (const product of allProducts) {
       let isLowStock = false;
@@ -812,9 +955,11 @@ const getLowStockAlerts = async (req, res) => {
       if (sizes.length > 0) {
         // Product has sizes - use sum of all size stocks as current stock
         actualCurrentStock = sizes.reduce((sum, size) => sum + (parseInt(size.stock) || 0), 0);
+        console.log(`📦 Product ${product.id} "${product.name}": Has ${sizes.length} sizes, total stock = ${actualCurrentStock}`);
       } else {
         // Product without sizes - use base stock
         actualCurrentStock = parseInt(product.current_stock) || 0;
+        console.log(`📦 Product ${product.id} "${product.name}": No sizes, base stock = ${actualCurrentStock}`);
       }
       
       // Check if current stock is low (based on actual current stock, not base stock)
@@ -825,6 +970,7 @@ const getLowStockAlerts = async (req, res) => {
         } else {
           alertLevel = 'LOW';
         }
+        console.log(`⚠️ Product ${product.id} "${product.name}": LOW STOCK (${actualCurrentStock} <= ${LOW_STOCK_THRESHOLD})`);
       }
       
       // For products with sizes, also check individual sizes for more detailed alert level
@@ -882,6 +1028,14 @@ const getLowStockAlerts = async (req, res) => {
     const paginatedProducts = lowStockProducts.slice(offset, offset + parseInt(limit));
     
     console.log(`📊 Low Stock Alerts: Found ${total} products with stock <= ${LOW_STOCK_THRESHOLD} (showing page ${page}, ${paginatedProducts.length} items)`);
+    
+    // Log all low stock products for debugging
+    if (total > 0) {
+      console.log(`📋 Low Stock Products List:`);
+      lowStockProducts.forEach((p, idx) => {
+        console.log(`  ${idx + 1}. Product ID ${p.id} "${p.name}": Stock = ${p.current_stock}, Status = ${p.status}, Alert Level = ${p.alert_level}`);
+      });
+    }
     
     res.json({ 
       success: true, 

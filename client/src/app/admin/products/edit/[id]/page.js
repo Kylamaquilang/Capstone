@@ -264,37 +264,33 @@ export default function EditProductPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    Cost Price <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={costPrice}
-                    onChange={(e) => setCostPrice(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter cost price"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium mb-2 text-gray-700">
+                     Cost Price <span className="text-red-500">*</span>
+                   </label>
+                   <input
+                     type="text"
+                     value={costPrice}
+                     onChange={(e) => setCostPrice(e.target.value)}
+                     className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                     placeholder="Enter cost price"
+                     required
+                   />
+                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    Selling Price <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter selling price"
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                </div>
+                 <div>
+                   <label className="block text-sm font-medium mb-2 text-gray-700">
+                     Selling Price <span className="text-red-500">*</span>
+                   </label>
+                   <input
+                     type="text"
+                     value={price}
+                     onChange={(e) => setPrice(e.target.value)}
+                     className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                     placeholder="Enter selling price"
+                     required
+                   />
+                 </div>
 
                 {/* Profit Analysis Display */}
                 {costPrice && price && Number(costPrice) > 0 && Number(price) > 0 && (

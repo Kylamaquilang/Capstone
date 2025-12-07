@@ -12,9 +12,11 @@ import { getImageUrl } from '@/utils/imageUtils';
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import Swal from '@/lib/sweetalert-config';
 import { ArrowDownTrayIcon, PrinterIcon } from '@heroicons/react/24/outline';
+import { useSocket } from '@/context/SocketContext';
 
 const ProductPageContent = () => {
   const { user, isAuthenticated } = useAuth();
+  const { socket, isConnected, joinUserRoom } = useSocket();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -29,21 +31,25 @@ const ProductPageContent = () => {
 
   // Helper function to get the current price (size-specific or base price)
   const getCurrentPrice = () => {
-    if (!product) return 0;
+    if (!product) return null;
+    
+    // Check if product has sizes (excluding NONE)
+    const hasSizes = sizes && sizes.length > 0 && 
+                     !(sizes.length === 1 && sizes[0].size === 'NONE');
     
     // If no sizes or only NONE size, use base price
-    if (!sizes || sizes.length === 0) {
+    if (!hasSizes) {
       return parseFloat(product.price);
     }
     
-    // If no size selected, show base price
+    // If sizes are available but no size selected, return null (don't show price)
     if (!selectedSize) {
-      return parseFloat(product.price);
+      return null;
     }
     
     // Find the selected size and return its price
     const selectedSizeData = sizes.find(size => size.id === selectedSize);
-    return selectedSizeData ? parseFloat(selectedSizeData.price) : parseFloat(product.price);
+    return selectedSizeData ? parseFloat(selectedSizeData.price) : null;
   };
 
   const fetchProduct = useCallback(async () => {
@@ -78,6 +84,43 @@ const ProductPageContent = () => {
       fetchProduct();
     }
   }, [productName, fetchProduct]);
+
+  // Listen for size price updates
+  useEffect(() => {
+    if (socket && isConnected && user?.id) {
+      joinUserRoom(user.id.toString());
+
+      // Listen for size price updates
+      const handleSizeUpdate = (sizeData) => {
+        console.log('📦 Real-time size price update received:', sizeData);
+        if (product && (product.id === sizeData.productId || product.id === parseInt(sizeData.productId))) {
+          // Update sizes array
+          setSizes(prevSizes => prevSizes.map(size => {
+            const sizeIdMatch = size.id === sizeData.sizeId || 
+                               size.id === parseInt(sizeData.sizeId) ||
+                               String(size.id) === String(sizeData.sizeId);
+            
+            if (sizeIdMatch) {
+              console.log(`✅ Updating size ${size.size} price from ${size.price} to ${sizeData.newPrice}`);
+              return { ...size, price: sizeData.newPrice };
+            }
+            return size;
+          }));
+          
+          // Refresh product data to ensure consistency
+          setTimeout(() => {
+            fetchProduct();
+          }, 500);
+        }
+      };
+
+      socket.on('size-updated', handleSizeUpdate);
+
+      return () => {
+        socket.off('size-updated', handleSizeUpdate);
+      };
+    }
+  }, [socket, isConnected, user?.id, joinUserRoom, product, fetchProduct]);
 
   const handleDecrease = () => {
     if (quantity > 1) setQuantity(quantity - 1);
@@ -172,6 +215,18 @@ const ProductPageContent = () => {
       return;
     }
 
+    // Check if price is available (size selected if sizes exist)
+    const currentPrice = getCurrentPrice();
+    if (currentPrice === null) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Size Required',
+        text: 'Please select a size to proceed.',
+        confirmButtonColor: '#000C50'
+      });
+      return false;
+    }
+
     try {
       // For BUY NOW, don't add to cart - go directly to checkout
       // Create product data for direct checkout
@@ -180,7 +235,7 @@ const ProductPageContent = () => {
         product_id: product.id,
         product_name: product.name,
         product_image: getImageUrl(product.image),
-        price: getCurrentPrice(),
+        price: currentPrice,
         quantity: quantity,
         size: selectedSize || null,
         size_id: sizes.length > 0 && selectedSize ? selectedSize : null
@@ -423,9 +478,15 @@ const ProductPageContent = () => {
                         </span>
                       </div>
                       <h1 className="text-xl font-medium text-gray-900 leading-tight uppercase">{product.name}</h1>
-                      <div className="text-2xl font-medium text-gray-900">
-                        ₱{getCurrentPrice().toFixed(2)}
-                      </div>
+                      {getCurrentPrice() !== null ? (
+                        <div className="text-2xl font-medium text-gray-900">
+                          ₱{getCurrentPrice().toFixed(2)}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500 italic">
+                          Select a size to see price
+                        </div>
+                      )}
                     </div>
 
                     {/* Description */}

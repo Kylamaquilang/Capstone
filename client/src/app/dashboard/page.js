@@ -164,11 +164,21 @@ export default function UserDashboard() {
           }
         };
 
+        // Listen for size price updates
+        const handleSizeUpdate = (sizeData) => {
+          console.log('📦 Real-time size price update received on dashboard:', sizeData);
+          if (isMounted) {
+            // Refresh products to show updated prices
+            fetchProducts();
+          }
+        };
+
         socket.on('new-product', handleNewProduct);
         socket.on('product-updated', handleProductUpdate);
         socket.on('product-deleted', handleProductDelete);
         socket.on('order-status-updated', handleOrderUpdate);
         socket.on('new-notification', handleNewNotification);
+        socket.on('size-updated', handleSizeUpdate);
 
         return () => {
           isMounted = false;
@@ -177,6 +187,7 @@ export default function UserDashboard() {
           socket.off('product-deleted', handleProductDelete);
           socket.off('order-status-updated', handleOrderUpdate);
           socket.off('new-notification', handleNewNotification);
+          socket.off('size-updated', handleSizeUpdate);
         };
       }
     }

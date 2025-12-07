@@ -73,6 +73,7 @@ export const getAllProductsSimple = async (req, res) => {
         p.stock,
         p.base_stock,
         p.image,
+        p.is_active,
         p.created_at,
         p.last_restock_date,
         p.category_id,
@@ -122,6 +123,7 @@ export const getAllProductsSimple = async (req, res) => {
             base_stock: parseInt(product.base_stock || 0),
             image_url: product.image ? product.image : null,
             image: product.image ? product.image : null,
+            is_active: product.is_active !== undefined ? (product.is_active === 1 || product.is_active === true) : true,
             unit_of_measure: 'pcs',
             supplier: 'N/A',
             reorder_level: 5,
@@ -149,14 +151,17 @@ export const getAllProductsSimple = async (req, res) => {
             price: parseFloat(product.price),
             original_price: parseFloat(product.original_price || 0),
             stock: parseInt(product.stock),
+            base_stock: parseInt(product.base_stock || 0),
             image_url: product.image ? product.image : null,
             image: product.image ? product.image : null,
+            is_active: product.is_active !== undefined ? (product.is_active === 1 || product.is_active === true) : true,
             unit_of_measure: 'pcs',
             supplier: 'N/A',
             reorder_level: 5,
             updated_by: 'N/A',
             created_at: product.created_at,
             last_restock_date: product.last_restock_date,
+            category_id: product.category_id || null,
             category_name: product.category_name,
             category: product.category || product.category_name || 'Other',
             sizes: []
@@ -360,22 +365,63 @@ export const createProduct = async (req, res) => {
         // Get the currently logged-in user's ID (admin who created the product)
         const createdBy = req.user?.id || null;
         
-        // Insert initial stock transaction
-        await connection.query(
-          `INSERT INTO stock_transactions (product_id, transaction_type, quantity, reference_no, source, note, created_by, created_at)
-           VALUES (?, 'IN', ?, ?, 'initial_stock', 'Initial stock for new product', ?, NOW())`,
-          [productId, parseInt(stock), `INIT-${productId}`, createdBy]
-        );
+        // Check if previous_stock and new_stock columns exist
+        let hasStockColumns = false;
+        try {
+          const [columns] = await connection.query(`
+            SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() 
+            AND TABLE_NAME = 'stock_transactions' 
+            AND COLUMN_NAME IN ('previous_stock', 'new_stock')
+          `);
+          hasStockColumns = columns.length === 2;
+          
+          if (!hasStockColumns && columns.length > 0) {
+            if (!columns.find(c => c.COLUMN_NAME === 'previous_stock')) {
+              await connection.query('ALTER TABLE stock_transactions ADD COLUMN previous_stock INT NULL AFTER quantity');
+            }
+            if (!columns.find(c => c.COLUMN_NAME === 'new_stock')) {
+              await connection.query('ALTER TABLE stock_transactions ADD COLUMN new_stock INT NULL AFTER previous_stock');
+            }
+            hasStockColumns = true;
+          } else if (!hasStockColumns) {
+            await connection.query('ALTER TABLE stock_transactions ADD COLUMN previous_stock INT NULL AFTER quantity');
+            await connection.query('ALTER TABLE stock_transactions ADD COLUMN new_stock INT NULL AFTER previous_stock');
+            hasStockColumns = true;
+          }
+        } catch (columnError) {
+          console.log('⚠️ Error checking/adding stock columns:', columnError.message);
+        }
+        
+        const initialStock = parseInt(stock);
+        const previousStock = 0; // New product starts at 0
+        const newStock = initialStock; // New stock is the initial stock amount
+        
+        // Insert initial stock transaction with previous_stock and new_stock
+        if (hasStockColumns) {
+          await connection.query(
+            `INSERT INTO stock_transactions (product_id, transaction_type, quantity, previous_stock, new_stock, reference_no, source, note, created_by, created_at)
+             VALUES (?, 'IN', ?, ?, ?, ?, 'initial_stock', 'Initial stock for new product', ?, NOW())`,
+            [productId, initialStock, previousStock, newStock, `INIT-${productId}`, createdBy]
+          );
+        } else {
+          // Fallback: insert without stock columns
+          await connection.query(
+            `INSERT INTO stock_transactions (product_id, transaction_type, quantity, reference_no, source, note, created_by, created_at)
+             VALUES (?, 'IN', ?, ?, 'initial_stock', 'Initial stock for new product', ?, NOW())`,
+            [productId, initialStock, `INIT-${productId}`, createdBy]
+          );
+        }
 
         // Initialize stock balance
         await connection.query(
           `INSERT INTO stock_balance (product_id, qty, updated_at)
            VALUES (?, ?, NOW())
            ON DUPLICATE KEY UPDATE qty = qty + VALUES(qty), updated_at = NOW()`,
-          [productId, parseInt(stock)]
+          [productId, initialStock]
         );
 
-        console.log(`✅ Initial stock transaction created for Product ID ${productId}`);
+        console.log(`✅ Initial stock transaction created for Product ID ${productId} with previous_stock=${previousStock}, new_stock=${newStock}`);
       }
 
     // Store sizes in product_sizes table
@@ -422,6 +468,10 @@ export const createProduct = async (req, res) => {
         console.log('🔍 Processing size item:', sizeItem);
         if (sizeItem.size && sizeItem.size.trim() !== '') {
           const sizeStock = parseInt(sizeItem.stock) || parseInt(stock);
+          // Use size-specific price if provided and valid, otherwise use base product price
+          const sizePrice = sizeItem.price && sizeItem.price !== '' && parseFloat(sizeItem.price) > 0
+            ? parseFloat(sizeItem.price)
+            : parseFloat(price);
           await connection.query(
             `INSERT INTO product_sizes (product_id, size, stock, base_stock, price, is_active) 
              VALUES (?, ?, ?, ?, ?, TRUE)`,
@@ -430,7 +480,7 @@ export const createProduct = async (req, res) => {
               sizeItem.size.trim(),
               sizeStock, // Use size-specific stock or fallback to base stock
               sizeStock, // Set base_stock = initial stock for this size
-              parseFloat(sizeItem.price) || parseFloat(price) // Use size-specific price or fallback to base price
+              sizePrice // Use size-specific price if set, otherwise use base price
             ]
           );
           console.log(`✅ Size ${sizeItem.size} stored for product ${productId}`);
@@ -619,7 +669,11 @@ export const getAllProducts = async (req, res) => {
     });
   } catch (err) {
     console.error('Get Products Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error stack:', err.stack);
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: err.message || 'Failed to fetch products'
+    });
   }
 };
 
@@ -631,9 +685,16 @@ export const getProductById = asyncHandler(async (req, res) => {
     // Ensure deleted_at column exists
     await ensureDeletedAtColumn();
     
+    // Validate and parse the product ID
     const validatedId = validateId(id);
     
-    // Build WHERE clause conditionally
+    if (!validatedId || isNaN(validatedId)) {
+      throw new ValidationError('Invalid product ID');
+    }
+    
+    console.log(`🔍 Fetching product with ID: ${validatedId}`);
+    
+    // Build WHERE clause conditionally - CRITICAL: Use WHERE p.id = ? to get ONLY this specific product
     let whereClause = 'WHERE p.id = ?';
     try {
       const [columns] = await pool.query(`
@@ -647,6 +708,7 @@ export const getProductById = asyncHandler(async (req, res) => {
       // Column doesn't exist yet, continue without the condition
     }
     
+    // CRITICAL: Query uses WHERE p.id = ? to ensure ONLY this specific product is returned
     const [rows] = await pool.query(`
       SELECT p.*, c.name AS category_name 
       FROM products p 
@@ -655,12 +717,27 @@ export const getProductById = asyncHandler(async (req, res) => {
     `, [validatedId]);
 
     if (rows.length === 0) {
+      console.log(`❌ Product with ID ${validatedId} not found`);
       throw new NotFoundError('Product');
+    }
+
+    if (rows.length > 1) {
+      console.error(`⚠️ WARNING: Multiple products returned for ID ${validatedId} - this should not happen!`);
+      throw new AppError('Multiple products found for the same ID');
     }
 
     const product = rows[0];
     
+    // Verify the returned product ID matches the requested ID
+    if (product.id !== validatedId) {
+      console.error(`⚠️ Product ID mismatch: requested ${validatedId}, got ${product.id}`);
+      throw new AppError('Product ID mismatch');
+    }
+    
+    console.log(`✅ Product found: ID ${product.id}, Name: ${product.name}`);
+    
     // Try to get product sizes if the table exists, otherwise set empty array
+    // CRITICAL: Use WHERE product_id = ? to get ONLY sizes for THIS specific product
     try {
       const [sizes] = await pool.query(
         `SELECT id, size, stock, base_stock, price, is_active 
@@ -679,6 +756,9 @@ export const getProductById = asyncHandler(async (req, res) => {
            END`,
         [validatedId]
       );
+      
+      console.log(`✅ Found ${sizes.length} sizes for product ID ${validatedId}`);
+      
       product.sizes = sizes.map(size => ({
         id: size.id,
         size: size.size,
@@ -694,6 +774,7 @@ export const getProductById = asyncHandler(async (req, res) => {
     }
 
     // Try to get product images if the table exists
+    // CRITICAL: Use WHERE product_id = ? to get ONLY images for THIS specific product
     try {
       // Ensure product_images table exists
       await ensureProductImagesTable();
@@ -717,7 +798,19 @@ export const getProductById = asyncHandler(async (req, res) => {
       product.images = product.image ? [{ id: 'primary', url: product.image, is_primary: true }] : [];
     }
 
-    logger.info('Product retrieved successfully', { productId: validatedId });
+    // Final verification: ensure product ID matches
+    if (product.id !== validatedId) {
+      throw new AppError('Product data integrity error');
+    }
+    
+    logger.info('Product retrieved successfully', { productId: validatedId, productName: product.name });
+    console.log(`✅ Returning product data for ID ${validatedId}:`, {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      sizesCount: product.sizes?.length || 0
+    });
+    
     res.json(product);
   } catch (error) {
     if (error instanceof ValidationError || error instanceof NotFoundError) {
@@ -1109,39 +1202,139 @@ export const updateProduct = async (req, res) => {
 
       // Update product sizes if provided
       if (sizes && Array.isArray(sizes)) {
-        // Get existing sizes to preserve base_stock and stock
+        // Get existing sizes with their IDs to preserve base_stock and stock
         const [existingSizes] = await connection.query(
-          'SELECT size, stock, base_stock FROM product_sizes WHERE product_id = ?',
+          'SELECT id, size, stock, base_stock, price FROM product_sizes WHERE product_id = ?',
           [id]
         );
-        const existingSizeData = {};
+        
+        // Create maps for easy lookup
+        const existingSizeDataBySize = {};
+        const existingSizeDataById = {};
         existingSizes.forEach(s => {
-          existingSizeData[s.size.toUpperCase()] = {
+          const sizeKey = s.size.toUpperCase();
+          existingSizeDataBySize[sizeKey] = {
+            id: s.id,
             stock: s.stock,
-            base_stock: s.base_stock
+            base_stock: s.base_stock,
+            price: s.price
+          };
+          existingSizeDataById[s.id] = {
+            size: sizeKey,
+            stock: s.stock,
+            base_stock: s.base_stock,
+            price: s.price
           };
         });
 
-        // Delete existing sizes
-        await connection.query('DELETE FROM product_sizes WHERE product_id = ?', [id]);
+        // Process each size in the update
+        const sizesToUpdate = [];
+        const sizesToInsert = [];
+        const sizeIdsToKeep = new Set();
 
-        // Insert new sizes
         for (const sizeData of sizes) {
           if (!validateSize(sizeData.size)) {
             throw new Error(`Invalid size: ${sizeData.size}. Valid sizes are: XXS, XS, S, M, L, XL, XXL, NONE`);
           }
 
           const sizeKey = sizeData.size.toUpperCase();
-          const existingData = existingSizeData[sizeKey];
           
-          // Preserve existing stock and base_stock, or use 0 for new sizes
-          const sizeStock = existingData ? existingData.stock : 0;
-          const baseStock = existingData ? existingData.base_stock : 0;
+          // If size has an ID, it's an existing size - UPDATE it
+          if (sizeData.id && sizeData.id !== null) {
+            const existingData = existingSizeDataById[sizeData.id];
+            if (existingData) {
+              // Verify this ID belongs to this product
+              const [verifySize] = await connection.query(
+                'SELECT id FROM product_sizes WHERE id = ? AND product_id = ?',
+                [sizeData.id, id]
+              );
+              
+              if (verifySize.length > 0) {
+                // Use size-specific price if provided and valid, otherwise use existing price or base product price
+                const sizePrice = sizeData.price !== undefined && sizeData.price !== null && sizeData.price !== '' && parseFloat(sizeData.price) > 0
+                  ? parseFloat(sizeData.price)
+                  : (existingData.price || parseFloat(price));
+                sizesToUpdate.push({
+                  id: sizeData.id,
+                  size: sizeKey,
+                  stock: sizeData.stock !== undefined ? sizeData.stock : existingData.stock,
+                  base_stock: existingData.base_stock, // Preserve base_stock
+                  price: sizePrice
+                });
+                sizeIdsToKeep.add(sizeData.id);
+              }
+            }
+          } else {
+            // No ID means it's a new size - check if size already exists for this product
+            const existingData = existingSizeDataBySize[sizeKey];
+            if (existingData) {
+              // Size exists but wasn't in the update with ID - update it anyway
+              // Use size-specific price if provided, otherwise use base product price
+              const sizePrice = sizeData.price !== undefined && sizeData.price !== null && parseFloat(sizeData.price) > 0
+                ? parseFloat(sizeData.price)
+                : (existingData.price || parseFloat(price));
+              sizesToUpdate.push({
+                id: existingData.id,
+                size: sizeKey,
+                stock: sizeData.stock !== undefined ? sizeData.stock : existingData.stock,
+                base_stock: existingData.base_stock,
+                price: sizePrice
+              });
+              sizeIdsToKeep.add(existingData.id);
+            } else {
+              // Truly new size - INSERT it
+              // Use size-specific price if provided, otherwise use base product price
+              const sizePrice = sizeData.price !== undefined && sizeData.price !== null && parseFloat(sizeData.price) > 0
+                ? parseFloat(sizeData.price)
+                : parseFloat(price);
+              sizesToInsert.push({
+                size: sizeKey,
+                stock: sizeData.stock !== undefined ? sizeData.stock : 0,
+                base_stock: 0,
+                price: sizePrice
+              });
+            }
+          }
+        }
 
-          await connection.query(
-            `INSERT INTO product_sizes (product_id, size, stock, base_stock, price, is_active) VALUES (?, ?, ?, ?, ?, TRUE)`,
-            [id, sizeKey, sizeStock, baseStock, parseFloat(sizeData.price) || parseFloat(price), 1]
+        // Update existing sizes by ID - ONLY use id, NOT product_id
+        // CRITICAL: Using WHERE id = ? ensures only ONE specific size is updated, not all sizes of the product
+        // This is essential when editing a specific size (e.g., XS) - only that size should be updated
+        for (const sizeUpdate of sizesToUpdate) {
+          const [result] = await connection.query(
+            `UPDATE product_sizes 
+             SET size = ?, stock = ?, price = ?, updated_at = CURRENT_TIMESTAMP 
+             WHERE id = ?`,
+            [sizeUpdate.size, sizeUpdate.stock, sizeUpdate.price, sizeUpdate.id]
           );
+          console.log(`✅ Updated size ID ${sizeUpdate.id} (${sizeUpdate.size}) for product ${id} - using WHERE id = ? only (NOT product_id)`);
+          
+          // Verify only one row was affected
+          if (result.affectedRows !== 1) {
+            console.error(`⚠️ WARNING: Updated ${result.affectedRows} rows for size ID ${sizeUpdate.id} - expected exactly 1`);
+          }
+        }
+
+        // Insert new sizes
+        for (const sizeInsert of sizesToInsert) {
+          await connection.query(
+            `INSERT INTO product_sizes (product_id, size, stock, base_stock, price, is_active) 
+             VALUES (?, ?, ?, ?, ?, TRUE)`,
+            [id, sizeInsert.size, sizeInsert.stock, sizeInsert.base_stock, sizeInsert.price]
+          );
+          console.log(`✅ Inserted new size ${sizeInsert.size} for product ${id}`);
+        }
+
+        // Delete sizes that are no longer selected (soft delete by setting is_active = 0)
+        const allExistingIds = existingSizes.map(s => s.id);
+        const idsToDelete = allExistingIds.filter(id => !sizeIdsToKeep.has(id));
+        
+        if (idsToDelete.length > 0) {
+          await connection.query(
+            `UPDATE product_sizes SET is_active = 0 WHERE id IN (${idsToDelete.map(() => '?').join(',')}) AND product_id = ?`,
+            [...idsToDelete, id]
+          );
+          console.log(`✅ Soft-deleted ${idsToDelete.length} size(s) for product ${id}`);
         }
       }
 
@@ -1590,6 +1783,95 @@ export const getProductSizes = async (req, res) => {
     res.json(sizes);
   } catch (err) {
     console.error('Get product sizes error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+// ✅ Update Single Size Price by size_id
+export const updateProductSize = async (req, res) => {
+  try {
+    const { size_id } = req.params;
+    const { price } = req.body;
+
+    // Validate size_id
+    if (!validateId(size_id)) {
+      return res.status(400).json({ error: 'Invalid size ID' });
+    }
+
+    // Validate price
+    if (price === undefined || price === null) {
+      return res.status(400).json({ error: 'Price is required' });
+    }
+
+    if (!validatePrice(price)) {
+      return res.status(400).json({ error: 'Valid price is required' });
+    }
+
+    // Check if size exists
+    const [existingSize] = await pool.query(
+      'SELECT id, product_id, size, price FROM product_sizes WHERE id = ? AND is_active = 1',
+      [size_id]
+    );
+
+    if (existingSize.length === 0) {
+      return res.status(404).json({ error: 'Size not found' });
+    }
+
+    const oldPrice = existingSize[0].price;
+    const sizeName = existingSize[0].size;
+    const productId = existingSize[0].product_id;
+
+    // Update ONLY this specific size using size_id (NOT product_id)
+    // CRITICAL: Use WHERE id = ? ONLY - do NOT include product_id in WHERE clause
+    // This ensures only ONE row is updated, not all sizes of the product
+    const [result] = await pool.query(
+      `UPDATE product_sizes 
+       SET price = ?, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = ?`,
+      [parseFloat(price), size_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Size not found or could not be updated' });
+    }
+
+    if (result.affectedRows > 1) {
+      console.error(`⚠️ WARNING: Updated ${result.affectedRows} rows instead of 1 for size_id ${size_id}`);
+      return res.status(500).json({ error: 'Multiple rows updated - this should not happen' });
+    }
+
+    console.log(`✅ Updated size ID ${size_id} (${sizeName}) price from ${oldPrice} to ${price} for product ${productId}`);
+    console.log(`✅ UPDATE query: UPDATE product_sizes SET price = ${parseFloat(price)} WHERE id = ${size_id}`);
+    console.log(`✅ Affected rows: ${result.affectedRows} (should be exactly 1)`);
+
+    // Get updated size data
+    const [updatedSize] = await pool.query(
+      'SELECT id, size, stock, price, is_active FROM product_sizes WHERE id = ?',
+      [size_id]
+    );
+
+    // Emit socket event for real-time update
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('size-updated', {
+        sizeId: size_id,  // The unique size ID
+        productId: productId,  // The product ID this size belongs to
+        size: sizeName,  // The size name (XS, S, M, etc.)
+        newPrice: parseFloat(price),  // The new price
+        oldPrice: oldPrice,  // The old price
+        action: 'price-updated',
+        timestamp: new Date().toISOString()
+      });
+      console.log(`📡 Emitted size-updated event: sizeId=${size_id}, productId=${productId}, size=${sizeName}, newPrice=${price}`);
+    }
+
+    res.json({
+      success: true,
+      message: `Size ${sizeName} price updated successfully`,
+      size: updatedSize[0]
+    });
+  } catch (err) {
+    console.error('Update product size error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 };

@@ -12,10 +12,12 @@ import { getImageUrl } from '@/utils/imageUtils';
 import { useUserAutoRefresh } from '@/hooks/useAutoRefresh';
 import { ArrowDownTrayIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import ProductImageCarousel from '@/components/product/ProductImageCarousel';
+import { useSocket } from '@/context/SocketContext';
 
 export default function ProductDetailPage() {
   const { name } = useParams();
   const { user, isAuthenticated } = useAuth();
+  const { socket, isConnected, joinUserRoom } = useSocket();
   const router = useRouter();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,50 @@ export default function ProductDetailPage() {
   // Auto-refresh for product details
   useUserAutoRefresh(fetchProduct, 'products');
 
+  // Listen for size price updates
+  useEffect(() => {
+    if (socket && isConnected && user?.id) {
+      joinUserRoom(user.id.toString());
+
+      // Listen for size price updates
+      const handleSizeUpdate = (sizeData) => {
+        console.log('📦 Real-time size price update received:', sizeData);
+        if (product && (product.id === sizeData.productId || product.id === parseInt(sizeData.productId))) {
+          setProduct(prevProduct => {
+            if (!prevProduct) return prevProduct;
+            
+            // Update the specific size's price in the sizes array
+            const updatedSizes = prevProduct.sizes?.map(size => {
+              // Match by size ID or size name
+              const sizeIdMatch = size.id === sizeData.sizeId || 
+                                 size.id === parseInt(sizeData.sizeId) ||
+                                 String(size.id) === String(sizeData.sizeId);
+              const sizeNameMatch = size.size === sizeData.size;
+              
+              if (sizeIdMatch || sizeNameMatch) {
+                console.log(`✅ Updating size ${size.size} price from ${size.price} to ${sizeData.newPrice}`);
+                return { ...size, price: sizeData.newPrice };
+              }
+              return size;
+            }) || [];
+            
+            return { ...prevProduct, sizes: updatedSizes };
+          });
+          
+          // Refresh product data to ensure consistency
+          setTimeout(() => {
+            fetchProduct();
+          }, 500);
+        }
+      };
+
+      socket.on('size-updated', handleSizeUpdate);
+
+      return () => {
+        socket.off('size-updated', handleSizeUpdate);
+      };
+    }
+  }, [socket, isConnected, user?.id, joinUserRoom, product, fetchProduct]);
 
   // Download image from carousel
   const handleDownloadCarouselImage = async (imageUrl) => {
@@ -191,22 +237,25 @@ export default function ProductDetailPage() {
 
   // Helper function to get the current price (size-specific or base price)
   const getCurrentPrice = () => {
-    if (!product) return 0;
+    if (!product) return null;
+    
+    // Check if product has sizes (excluding NONE)
+    const hasSizes = product.sizes && product.sizes.length > 0 && 
+                     !(product.sizes.length === 1 && product.sizes[0].size === 'NONE');
     
     // If no sizes or only NONE size, use base price
-    if (!product.sizes || product.sizes.length === 0 || 
-        (product.sizes.length === 1 && product.sizes[0].size === 'NONE')) {
+    if (!hasSizes) {
       return parseFloat(product.price);
     }
     
-    // If no size selected, show base price
+    // If sizes are available but no size selected, return null (don't show price)
     if (!selectedSize) {
-      return parseFloat(product.price);
+      return null;
     }
     
     // Find the selected size and return its price
     const selectedSizeData = product.sizes.find(size => size.size === selectedSize);
-    return selectedSizeData ? parseFloat(selectedSizeData.price) : parseFloat(product.price);
+    return selectedSizeData ? parseFloat(selectedSizeData.price) : null;
   };
 
   const handleAddToCart = async () => {
@@ -403,12 +452,24 @@ export default function ProductDetailPage() {
         }
       }
       
+      // Check if price is available (size selected if sizes exist)
+      const currentPrice = getCurrentPrice();
+      if (currentPrice === null) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Size Required',
+          text: 'Please select a size to proceed.',
+          confirmButtonColor: '#000C50',
+        });
+        return;
+      }
+
       const productItem = {
         id: Date.now(), // Temporary ID for checkout
         product_id: sizeInfo ? sizeInfo.product_id : product.id,
         product_name: product.name,
         product_image: getImageUrl(product.image) || '/images/polo.png',
-        price: getCurrentPrice(),
+        price: currentPrice,
         quantity: quantity,
         size: sizeInfo ? sizeInfo.size : null,
         size_id: sizeInfo ? sizeInfo.id : null
@@ -546,9 +607,15 @@ export default function ProductDetailPage() {
                       </span>
                     </div>
                     <h1 className="text-lg sm:text-xl lg:text-2xl font-medium text-gray-900 leading-tight uppercase">{product.name}</h1>
-                    <div className="text-xl sm:text-2xl font-medium text-gray-900">
-                      ₱{getCurrentPrice().toFixed(2)}
-                    </div>
+                    {getCurrentPrice() !== null ? (
+                      <div className="text-xl sm:text-2xl font-medium text-gray-900">
+                        ₱{getCurrentPrice().toFixed(2)}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500 italic">
+                        Select a size to see price
+                      </div>
+                    )}
                   </div>
 
                   {/* Description */}

@@ -431,6 +431,9 @@ export const updateOrderStatus = async (req, res) => {
       // Record the sale when order is claimed or completed
       await logSalesMovement(id, 'sale', totalAmount, paymentMethod, `Order ${status} - Sale recorded`)
       
+      // Ensure stock transaction record exists in inventory history for claimed/completed orders
+      await ensureStockTransactionForClaimedOrder(id)
+      
       // Automatically mark payment as paid when order is claimed or completed
       if (paymentStatus !== 'paid') {
         await pool.query(
@@ -641,6 +644,237 @@ const logSalesMovement = async (orderId, movementType, amount, paymentMethod, de
     `, [orderId, movementType, amount, paymentMethod, description])
   } catch (error) {
     console.error('Error logging sales movement:', error)
+  }
+}
+
+// Helper function to ensure stock transaction exists for claimed/completed orders
+const ensureStockTransactionForClaimedOrder = async (orderId) => {
+  try {
+    // Get order details including user_id (student)
+    const [order] = await pool.query(`
+      SELECT o.id, o.order_number, o.payment_method, o.user_id
+      FROM orders o
+      WHERE o.id = ?
+    `, [orderId])
+    
+    if (order.length === 0) {
+      console.log(`⚠️ Order ${orderId} not found for stock transaction`)
+      return
+    }
+    
+    const orderNumber = order[0].order_number
+    const paymentMethod = order[0].payment_method || 'unknown'
+    
+    // Get order items with product and size information
+    const [orderItems] = await pool.query(`
+      SELECT 
+        oi.product_id,
+        oi.size_id,
+        oi.quantity,
+        oi.product_name,
+        oi.size,
+        ps.size as size_name
+      FROM order_items oi
+      LEFT JOIN product_sizes ps ON oi.size_id = ps.id
+      WHERE oi.order_id = ?
+    `, [orderId])
+    
+    if (orderItems.length === 0) {
+      console.log(`⚠️ No order items found for order ${orderId}`)
+      return
+    }
+    
+    // Check if previous_stock and new_stock columns exist
+    let hasStockColumns = false
+    try {
+      const [columns] = await pool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'stock_transactions' 
+        AND COLUMN_NAME IN ('previous_stock', 'new_stock')
+      `)
+      hasStockColumns = columns.length === 2
+      
+      if (!hasStockColumns && columns.length > 0) {
+        if (!columns.find(c => c.COLUMN_NAME === 'previous_stock')) {
+          await pool.query('ALTER TABLE stock_transactions ADD COLUMN previous_stock INT NULL AFTER quantity')
+        }
+        if (!columns.find(c => c.COLUMN_NAME === 'new_stock')) {
+          await pool.query('ALTER TABLE stock_transactions ADD COLUMN new_stock INT NULL AFTER previous_stock')
+        }
+        hasStockColumns = true
+      } else if (!hasStockColumns) {
+        await pool.query('ALTER TABLE stock_transactions ADD COLUMN previous_stock INT NULL AFTER quantity')
+        await pool.query('ALTER TABLE stock_transactions ADD COLUMN new_stock INT NULL AFTER previous_stock')
+        hasStockColumns = true
+      }
+    } catch (columnError) {
+      console.log('⚠️ Error checking/adding stock columns:', columnError.message)
+    }
+    
+    // Check if size_id column exists
+    let hasSizeIdColumn = false
+    try {
+      const [sizeColumns] = await pool.query(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() 
+        AND TABLE_NAME = 'stock_transactions' 
+        AND COLUMN_NAME = 'size_id'
+      `)
+      hasSizeIdColumn = sizeColumns.length > 0
+      
+      if (!hasSizeIdColumn) {
+        await pool.query('ALTER TABLE stock_transactions ADD COLUMN size_id INT NULL AFTER product_id')
+        await pool.query('ALTER TABLE stock_transactions ADD FOREIGN KEY (size_id) REFERENCES product_sizes(id) ON DELETE SET NULL')
+        await pool.query('ALTER TABLE stock_transactions ADD INDEX idx_size_id (size_id)')
+        hasSizeIdColumn = true
+      }
+    } catch (sizeColumnError) {
+      console.log('⚠️ Error checking/adding size_id column:', sizeColumnError.message)
+    }
+    
+    // Process each order item
+    for (const item of orderItems) {
+      // Check if transaction already exists for this order item
+      const [existingTransactions] = await pool.query(`
+        SELECT id FROM stock_transactions
+        WHERE product_id = ? 
+        AND reference_no = ?
+        AND transaction_type = 'OUT'
+        ${hasSizeIdColumn ? 'AND (size_id = ? OR (size_id IS NULL AND ? IS NULL))' : ''}
+        LIMIT 1
+      `, hasSizeIdColumn 
+        ? [item.product_id, orderNumber, item.size_id || null, item.size_id || null]
+        : [item.product_id, orderNumber]
+      )
+      
+      // If transaction doesn't exist, create it
+      if (existingTransactions.length === 0) {
+        const productName = item.product_name || 'Unknown Product'
+        const sizeName = item.size || item.size_name || null
+        const transactionNote = `Order #${orderNumber} - ${productName}${sizeName ? ` (Size: ${sizeName})` : ''}`
+        const transactionSource = paymentMethod ? `sale_${paymentMethod}` : 'sale'
+        
+        // Get current stock (for reference, though stock was already deducted during checkout)
+        let currentStock = 0
+        let newStock = 0
+        
+        if (item.size_id) {
+          const [sizeStock] = await pool.query(
+            'SELECT stock FROM product_sizes WHERE id = ?',
+            [item.size_id]
+          )
+          currentStock = sizeStock[0]?.stock || 0
+          // Stock was already deducted, so new stock is current stock
+          newStock = currentStock
+          // Previous stock would have been currentStock + item.quantity
+          currentStock = currentStock + item.quantity
+        } else {
+          const [productStock] = await pool.query(
+            'SELECT stock FROM products WHERE id = ?',
+            [item.product_id]
+          )
+          currentStock = productStock[0]?.stock || 0
+          // Stock was already deducted, so new stock is current stock
+          newStock = currentStock
+          // Previous stock would have been currentStock + item.quantity
+          currentStock = currentStock + item.quantity
+        }
+        
+        // Insert stock transaction record with student's user_id as created_by
+        if (hasStockColumns && hasSizeIdColumn) {
+          await pool.query(
+            `INSERT INTO stock_transactions (
+              product_id,
+              size_id,
+              transaction_type,
+              quantity,
+              previous_stock,
+              new_stock,
+              reference_no,
+              source,
+              note,
+              created_by
+            ) VALUES (?, ?, 'OUT', ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              item.product_id,
+              item.size_id || null,
+              item.quantity,
+              currentStock,
+              newStock,
+              orderNumber,
+              transactionSource,
+              transactionNote,
+              userId // Set created_by to the student's user_id
+            ]
+          )
+        } else if (hasStockColumns) {
+          await pool.query(
+            `INSERT INTO stock_transactions (
+              product_id,
+              transaction_type,
+              quantity,
+              previous_stock,
+              new_stock,
+              reference_no,
+              source,
+              note,
+              created_by
+            ) VALUES (?, 'OUT', ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              item.product_id,
+              item.quantity,
+              currentStock,
+              newStock,
+              orderNumber,
+              transactionSource,
+              transactionNote,
+              userId // Set created_by to the student's user_id
+            ]
+          )
+        } else {
+          // Fallback: insert without stock columns
+          await pool.query(
+            `INSERT INTO stock_transactions (
+              product_id,
+              transaction_type,
+              quantity,
+              reference_no,
+              source,
+              note,
+              created_by
+            ) VALUES (?, 'OUT', ?, ?, ?, ?, ?)`,
+            [
+              item.product_id,
+              item.quantity,
+              orderNumber,
+              transactionSource,
+              transactionNote,
+              userId // Set created_by to the student's user_id
+            ]
+          )
+        }
+        
+        console.log(`✅ Created stock transaction for claimed order ${orderId}, product ${item.product_id}, size ${item.size_id || 'N/A'}`)
+      } else {
+        console.log(`ℹ️ Stock transaction already exists for order ${orderId}, product ${item.product_id}`)
+      }
+    }
+    
+    // Emit inventory update to refresh admin inventory history
+    const io = req.app.get('io')
+    if (io) {
+      io.to('admin-room').emit('inventory-updated', {
+        orderId: orderId,
+        orderNumber: orderNumber,
+        action: 'claimed',
+        timestamp: new Date().toISOString()
+      })
+      console.log(`📡 Emitted inventory update for claimed order ${orderId}`)
+    }
+  } catch (error) {
+    console.error(`❌ Error ensuring stock transaction for claimed order ${orderId}:`, error)
+    // Don't throw - this is a non-critical operation
   }
 }
 

@@ -32,10 +32,34 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
     try {
       setLoading(true);
       setError('');
+      
+      // Validate productId before making the request
+      if (!productId) {
+        setError('Product ID is required');
+        setLoading(false);
+        return;
+      }
+      
+      console.log(`🔍 Fetching product data for ID: ${productId}`);
       const { data } = await API.get(`/products/${productId}`);
+      
+      // Verify the returned product ID matches the requested ID
+      if (data.id !== parseInt(productId)) {
+        console.error(`⚠️ Product ID mismatch: requested ${productId}, got ${data.id}`);
+        setError('Product data mismatch - wrong product returned');
+        setLoading(false);
+        return;
+      }
+      
       setProduct(data);
       
-      console.log('🔍 Product data received:', data);
+      console.log('🔍 Product data received for ID:', productId, {
+        id: data.id,
+        name: data.name,
+        price: data.price,
+        sizesCount: data.sizes?.length || 0,
+        sizes: data.sizes?.map(s => ({ id: s.id, size: s.size, price: s.price })) || []
+      });
       console.log('🔍 Product image path:', data.image);
       
       const imageUrl = data.image ? getImageUrl(data.image) : '';
@@ -61,9 +85,14 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
         setProductImages([]);
       }
       
-      // Handle sizes
+      // Handle sizes - store full size objects with IDs
       if (data.sizes && data.sizes.length > 0) {
-        setSelectedSizes(data.sizes.map(size => size.size));
+        setSelectedSizes(data.sizes.map(size => ({
+          id: size.id,           // Store the unique size ID
+          size: size.size,       // Store the size name
+          stock: size.stock || 0,
+          price: size.price || parseFloat(data.price) || 0
+        })));
       } else {
         setSelectedSizes([]);
       }
@@ -86,8 +115,19 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
 
   useEffect(() => {
     if (isOpen && productId) {
+      // Validate productId before loading
+      const parsedId = parseInt(productId);
+      if (isNaN(parsedId) || parsedId <= 0) {
+        console.error('Invalid product ID:', productId);
+        setError('Invalid product ID');
+        return;
+      }
+      console.log(`🔍 Modal opened for product ID: ${productId}`);
       loadProduct();
       loadCategories();
+    } else if (isOpen && !productId) {
+      console.error('Modal opened but productId is missing');
+      setError('Product ID is required');
     }
   }, [isOpen, productId, loadProduct, loadCategories]);
 
@@ -95,12 +135,22 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
   const availableSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
   // Handle size selection
-  const handleSizeChange = (size) => {
-    setSelectedSizes(prev => 
-      prev.includes(size) 
-        ? prev.filter(s => s !== size)
-        : [...prev, size]
-    );
+  const handleSizeChange = (sizeName) => {
+    setSelectedSizes(prev => {
+      const isSelected = prev.some(s => (typeof s === 'object' ? s.size : s) === sizeName);
+      if (isSelected) {
+        // Remove the size
+        return prev.filter(s => (typeof s === 'object' ? s.size : s) !== sizeName);
+      } else {
+        // Add the size (new size without ID, will be created)
+        return [...prev, {
+          id: null,  // New size, no ID yet
+          size: sizeName,
+          stock: 0,
+          price: parseFloat(price) || 0
+        }];
+      }
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -147,12 +197,23 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
         finalImageUrl = productImages[0].url;
       }
 
-      // Prepare sizes data
-      const sizesData = selectedSizes.map(size => ({
-        size: size,
-        stock: 0, // Auto-set to 0, managed by inventory
-        price: Number(price) // Use base price
-      }));
+      // Prepare sizes data - include IDs for existing sizes
+      // IMPORTANT: Each size is updated individually by its size_id, not by product_id
+      // This ensures that when editing a specific size (e.g., XS), only that size is updated
+      const sizesData = selectedSizes.map(sizeObj => {
+        // Handle both object format (with ID) and string format (legacy)
+        const sizeData = typeof sizeObj === 'object' ? sizeObj : { id: null, size: sizeObj, stock: 0, price: null };
+        // If size price is not set (null, empty, or 0), use base selling price
+        const sizePrice = sizeData.price && sizeData.price !== '' && sizeData.price !== null && parseFloat(sizeData.price) > 0 
+          ? parseFloat(sizeData.price) 
+          : Number(price);
+        return {
+          id: sizeData.id || null,  // CRITICAL: Include size ID - this ensures only THIS specific size is updated
+          size: sizeData.size,       // Size name
+          stock: sizeData.stock || 0,  // Preserve existing stock
+          price: sizePrice  // Use size-specific price if set, otherwise use base selling price
+        };
+      });
 
       const productData = {
         name: name.trim(),
@@ -300,20 +361,19 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
-                      <input
-                        type=""
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter selling price"
-                        min="0"
-                        step="0.01"
-                        required
-                        disabled={saving}
-                      />
-                    </div>
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                       <input
+                         type="text"
+                         value={price}
+                         onChange={(e) => setPrice(e.target.value)}
+                         className="w-full border border-gray-300 px-3 py-2 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-100 cursor-not-allowed"
+                         placeholder="Enter selling price"
+                         required
+                         disabled={true}
+                         title="Price field is disabled when editing. Edit individual size prices below."
+                       />
+                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
@@ -374,7 +434,7 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                             <label key={size} className="flex items-center space-x-2 cursor-pointer">
                               <input
                                 type="checkbox"
-                                checked={selectedSizes.includes(size)}
+                                checked={selectedSizes.some(s => (typeof s === 'object' ? s.size : s) === size)}
                                 onChange={() => handleSizeChange(size)}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                 disabled={saving}
@@ -385,10 +445,153 @@ export default function EditProductModal({ isOpen, onClose, productId, onSuccess
                         </div>
                         {selectedSizes.length > 0 && (
                           <p className="text-xs text-gray-500 mt-2">
-                            Selected sizes: {selectedSizes.join(', ')}
+                            Selected sizes: {selectedSizes.map(s => typeof s === 'object' ? s.size : s).join(', ')}
                           </p>
                         )}
                       </div>
+
+                      {/* Size Prices Section */}
+                      {selectedSizes.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Size Prices (Optional - defaults to selling price if not set)
+                          </label>
+                          <div className="space-y-2 border border-gray-200 rounded-md p-3 bg-gray-50">
+                            {selectedSizes.map((sizeObj, index) => {
+                              const sizeData = typeof sizeObj === 'object' ? sizeObj : { id: null, size: sizeObj, stock: 0, price: null };
+                              // Only show price if it's explicitly set for this size, otherwise show empty (will use base price)
+                              const displayPrice = sizeData.price && sizeData.price !== '' && sizeData.price !== null ? sizeData.price : '';
+                              return (
+                                <div key={index} className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-medium text-gray-700 w-16">
+                                    {sizeData.size}:
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={displayPrice}
+                                    onChange={(e) => {
+                                      const newPrice = e.target.value;
+                                      setSelectedSizes(prev => 
+                                        prev.map(s => {
+                                          const sData = typeof s === 'object' ? s : { id: null, size: s, stock: 0, price: null };
+                                          if (sData.size === sizeData.size) {
+                                            return { ...sData, price: newPrice === '' ? null : newPrice };
+                                          }
+                                          return s;
+                                        })
+                                      );
+                                    }}
+                                    onBlur={async (e) => {
+                                      // Only update if this is an existing size (has an ID) and the price changed
+                                      if (!sizeData.id) {
+                                        // New size, will be saved on form submit
+                                        return;
+                                      }
+                                      
+                                      const newPrice = e.target.value.trim();
+                                      const oldPrice = sizeData.price;
+                                      
+                                      // Parse prices for comparison
+                                      const parsedNewPrice = newPrice === '' ? null : parseFloat(newPrice);
+                                      const parsedOldPrice = oldPrice === null || oldPrice === '' ? null : parseFloat(oldPrice);
+                                      
+                                      // Only update if price actually changed
+                                      if (parsedNewPrice === parsedOldPrice) {
+                                        return;
+                                      }
+                                      
+                                      // Validate price if provided
+                                      if (newPrice !== '' && (isNaN(parsedNewPrice) || parsedNewPrice < 0)) {
+                                        Swal.fire({
+                                          title: 'Invalid Price',
+                                          text: 'Please enter a valid price (0 or greater)',
+                                          icon: 'error',
+                                          confirmButtonColor: '#000C50',
+                                          timer: 2000
+                                        });
+                                        // Revert to old price
+                                        setSelectedSizes(prev => 
+                                          prev.map(s => {
+                                            const sData = typeof s === 'object' ? s : { id: null, size: s, stock: 0, price: null };
+                                            if (sData.size === sizeData.size) {
+                                              return { ...sData, price: oldPrice };
+                                            }
+                                            return s;
+                                          })
+                                        );
+                                        return;
+                                      }
+                                      
+                                      try {
+                                        console.log(`🔍 Updating size ${sizeData.size} (ID: ${sizeData.id}) price from ${oldPrice} to ${newPrice}`);
+                                        
+                                        // Call the specific size update endpoint
+                                        const priceToSend = newPrice === '' ? null : parsedNewPrice;
+                                        await API.put(`/products/sizes/${sizeData.id}`, { price: priceToSend });
+                                        
+                                        // Update local state to reflect the change
+                                        setSelectedSizes(prev => 
+                                          prev.map(s => {
+                                            const sData = typeof s === 'object' ? s : { id: null, size: s, stock: 0, price: null };
+                                            if (sData.id === sizeData.id) {
+                                              return { ...sData, price: priceToSend };
+                                            }
+                                            return s;
+                                          })
+                                        );
+                                        
+                                        Swal.fire({
+                                          title: 'Success!',
+                                          text: `Price for size ${sizeData.size} updated successfully`,
+                                          icon: 'success',
+                                          confirmButtonColor: '#000C50',
+                                          timer: 2000,
+                                          showConfirmButton: false
+                                        });
+                                        
+                                        // Trigger success callback to refresh product list
+                                        // This will refresh the table to show the updated price
+                                        onSuccess?.();
+                                        
+                                        // Also refresh the product data in the modal to show updated price
+                                        loadProduct();
+                                      } catch (err) {
+                                        console.error('Error updating size price:', err);
+                                        const errorMessage = err?.response?.data?.error || 'Failed to update size price';
+                                        
+                                        Swal.fire({
+                                          title: 'Error',
+                                          text: errorMessage,
+                                          icon: 'error',
+                                          confirmButtonColor: '#000C50'
+                                        });
+                                        
+                                        // Revert to old price on error
+                                        setSelectedSizes(prev => 
+                                          prev.map(s => {
+                                            const sData = typeof s === 'object' ? s : { id: null, size: s, stock: 0, price: null };
+                                            if (sData.size === sizeData.size) {
+                                              return { ...sData, price: oldPrice };
+                                            }
+                                            return s;
+                                          })
+                                        );
+                                      }
+                                    }}
+                                    className="flex-1 border border-gray-300 px-2 py-1 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder={`Default: ₱${price || '0.00'}`}
+                                    disabled={saving}
+                                  />
+                                  <span className="text-xs text-gray-500">₱</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Leave empty to use the base selling price ({price ? `₱${price}` : 'set above'}) for this size.
+                          </p>
+                        </div>
+                      )}
 
                       {/* Multiple Images Section */}
                       <div>
