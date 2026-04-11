@@ -307,8 +307,9 @@ export const addStudentsBulk = async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    const fileSizeMB = (req.file.size / (1024 * 1024)).toFixed(2);
     console.log('📁 Processing file:', req.file.filename);
-    console.log('📁 File size:', req.file.size, 'bytes');
+    console.log('📁 File size:', fileSizeMB, 'MB (', req.file.size, 'bytes)');
     console.log('📁 File type:', req.file.mimetype);
 
     const results = [];
@@ -685,6 +686,7 @@ export const addStudentsBulk = async (req, res) => {
     } else if (fileExtension === 'csv') {
       // Handle CSV files
       try {
+        const csvStartTime = Date.now();
         console.log('📊 Processing CSV file...');
         
         // Read CSV file to get headers first
@@ -697,8 +699,14 @@ export const addStudentsBulk = async (req, res) => {
             }))
             .on('data', (data) => {
               csvData.push(data);
+              // Log progress for large files
+              if (csvData.length % 1000 === 0) {
+                console.log(`📊 Read ${csvData.length} rows so far...`);
+              }
             })
             .on('end', () => {
+              const csvEndTime = Date.now();
+              console.log(`✅ CSV parsing completed: ${csvData.length} rows in ${csvEndTime - csvStartTime}ms`);
               resolve();
             })
             .on('error', (error) => {
@@ -754,29 +762,17 @@ export const addStudentsBulk = async (req, res) => {
           const row = csvData[i];
           const cleanedData = {};
           
-          // Debug: Show raw row data for first few rows
-          if (i < 3) {
-            console.log(`🔍 Raw CSV row ${i + 1}:`, row);
-            console.log(`🔍 Raw row keys:`, Object.keys(row));
-          }
-          
-          // Map headers to cleaned data
+          // Map headers to cleaned data (reduced logging for performance)
           Object.keys(row).forEach(key => {
             const cleanKey = key.trim().toLowerCase();
             const mappedKey = csvHeaderMapping[cleanKey] || cleanKey;
             const cleanValue = row[key] ? row[key].trim() : '';
             cleanedData[mappedKey] = cleanValue;
-            
-            // Debug: Show mapping for first few rows
-            if (i < 3) {
-              console.log(`  ${key} -> ${mappedKey}: "${cleanValue}"`);
-            }
           });
           
           // Handle "Course and Section" column (separate from email)
           if (cleanedData['course and section']) {
             const courseSectionValue = cleanedData['course and section'];
-            console.log(`🔍 Processing course and section: "${courseSectionValue}"`);
             
             // Parse course and section (e.g., "BSIT 4B")
             const courseMatch = courseSectionValue.match(/^([A-Z]{4,5})\s*(\d)([A-Z])$/i);
@@ -795,8 +791,6 @@ export const addStudentsBulk = async (req, res) => {
               cleanedData.degree = degree;
               cleanedData.year_level = yearMap[yearNum] || '1st Year';
               cleanedData.section = section;
-              
-              console.log(`🔍 Parsed: degree="${degree}", year_level="${cleanedData.year_level}", section="${section}"`);
             } else {
               // Fallback: try to extract just the degree
               const degreeMatch = courseSectionValue.match(/^([A-Z]{4,5})/i);
@@ -804,7 +798,6 @@ export const addStudentsBulk = async (req, res) => {
                 cleanedData.degree = degreeMatch[1].toUpperCase();
                 cleanedData.year_level = '1st Year'; // Default
                 cleanedData.section = 'A'; // Default
-                console.log(`🔍 Fallback parsing: degree="${cleanedData.degree}"`);
               }
             }
             
@@ -815,7 +808,6 @@ export const addStudentsBulk = async (req, res) => {
           // Handle combined "Course and Email Address" column (if it exists)
           if (cleanedData.course_and_email) {
             const combinedValue = cleanedData.course_and_email;
-            console.log(`🔍 Processing combined column: "${combinedValue}"`);
             
             // Split by space to separate course and email
             const parts = combinedValue.split(' ');
@@ -862,15 +854,6 @@ export const addStudentsBulk = async (req, res) => {
           }
           if (!cleanedData.section) {
             cleanedData.section = 'A'; // Default section
-          }
-          
-          // Debug: Show first few processed rows
-          if (i < 3) {
-            console.log(`🔍 Processing CSV row ${i + 1}:`, {
-              originalData: row,
-              cleanedData: cleanedData,
-              availableFields: Object.keys(cleanedData)
-            });
           }
           
           results.push(cleanedData);
@@ -940,26 +923,12 @@ export const addStudentsBulk = async (req, res) => {
       
       console.log(`🔍 Found ${existingStudents.size} existing student IDs and ${existingEmails.size} existing emails`);
       
-      // Prepare batch insert data
-      const batchInsertData = [];
+      // Prepare batch insert data - validate first, then hash passwords in parallel
+      const validRows = [];
       
       for (let i = 0; i < results.length; i++) {
         const row = results[i];
         const rowNumber = i + 2; // +2 because file starts at row 2 (row 1 is header)
-
-        // Debug: Log first few rows to see data structure
-        if (i < 3) {
-          console.log(`🔍 Debug Row ${rowNumber}:`, JSON.stringify(row, null, 2));
-          console.log(`🔍 Available fields in row:`, Object.keys(row));
-          console.log(`🔍 Required fields check:`, {
-            student_id: !!row.student_id,
-            first_name: !!row.first_name,
-            last_name: !!row.last_name,
-            email: !!row.email,
-            degree: !!row.degree,
-            status: !!row.status
-          });
-        }
 
         try {
           // Validate required fields with better error messages
@@ -1088,30 +1057,27 @@ export const addStudentsBulk = async (req, res) => {
           // Create full name
           const fullName = `${row.first_name} ${row.middle_name ? row.middle_name + ' ' : ''}${row.last_name}${row.suffix ? ' ' + row.suffix : ''}`;
 
-          // Hash default password
-          const hashedPassword = await bcrypt.hash(DEFAULT_STUDENT_PASSWORD, SALT_ROUNDS);
-
-          // Add to batch insert data instead of individual insert
-          batchInsertData.push([
-            row.student_id.trim(),
-            row.email.trim(),
-            fullName,
-            hashedPassword,
-            'student',
-            row.first_name.trim(),
-            row.last_name.trim(),
-            row.middle_name?.trim() || null,
-            row.suffix?.trim() || null,
-            mappedDegree,
-            row.year_level || '1st Year',
-            row.section || 'A',
-            mappedStatus,
-            1, // is_active (active by default)
-            1  // must_change_password
-          ]);
-
-          successCount++;
-          console.log(`✅ Prepared student for batch insert: ${row.student_id} - ${fullName}`);
+          // Store validated row data (password will be hashed in parallel later)
+          validRows.push({
+            rowNumber,
+            data: [
+              row.student_id.trim(),
+              row.email.trim(),
+              fullName,
+              null, // password placeholder - will be filled after hashing
+              'student',
+              row.first_name.trim(),
+              row.last_name.trim(),
+              row.middle_name?.trim() || null,
+              row.suffix?.trim() || null,
+              mappedDegree,
+              row.year_level || '1st Year',
+              row.section || 'A',
+              mappedStatus,
+              1, // is_active (active by default)
+              1  // must_change_password
+            ]
+          });
 
         } catch (rowError) {
           console.error(`❌ Error processing row ${rowNumber}:`, rowError.message);
@@ -1124,38 +1090,38 @@ export const addStudentsBulk = async (req, res) => {
         }
       }
 
+      // Hash all passwords in parallel (much faster than sequential)
+      console.log(`🔐 Hashing passwords for ${validRows.length} students in parallel...`);
+      const hashStartTime = Date.now();
+      const passwordHashes = await Promise.all(
+        validRows.map(() => bcrypt.hash(DEFAULT_STUDENT_PASSWORD, SALT_ROUNDS))
+      );
+      const hashEndTime = Date.now();
+      console.log(`✅ Password hashing completed in ${hashEndTime - hashStartTime}ms`);
+
+      // Prepare batch insert data with hashed passwords
+      const batchInsertData = validRows.map((row, index) => {
+        row.data[3] = passwordHashes[index]; // Replace password placeholder
+        return row.data;
+      });
+
+      successCount = validRows.length;
+
       // Perform batch insert if we have valid data
       if (batchInsertData.length > 0) {
         console.log(`📊 Performing batch insert for ${batchInsertData.length} students...`);
+        const insertStartTime = Date.now();
         try {
-          await pool.query(
-            `INSERT INTO users (
-              student_id, 
-              email, 
-              name, 
-              password, 
-              role, 
-              first_name,
-              last_name,
-              middle_name,
-              suffix,
-              degree,
-              year_level,
-              section,
-              status,
-              is_active, 
-              must_change_password
-            ) VALUES ?`,
-            [batchInsertData]
-          );
-          console.log(`✅ Batch insert completed: ${batchInsertData.length} students added`);
-        } catch (batchError) {
-          console.error('❌ Batch insert failed:', batchError);
-          // If batch insert fails, try individual inserts as fallback
-          console.log('🔄 Falling back to individual inserts...');
-          for (const studentData of batchInsertData) {
-            try {
-              await pool.query(
+          // Use connection pool with transaction for better performance
+          const connection = await pool.getConnection();
+          await connection.beginTransaction();
+          
+          try {
+            // Insert in chunks to avoid query size limits (1000 rows per chunk)
+            const chunkSize = 1000;
+            for (let i = 0; i < batchInsertData.length; i += chunkSize) {
+              const chunk = batchInsertData.slice(i, i + chunkSize);
+              await connection.query(
                 `INSERT INTO users (
                   student_id, 
                   email, 
@@ -1172,12 +1138,91 @@ export const addStudentsBulk = async (req, res) => {
                   status,
                   is_active, 
                   must_change_password
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
-                studentData
+                ) VALUES ?`,
+                [chunk]
               );
-            } catch (individualError) {
-              console.error(`❌ Failed to insert individual student ${studentData[0]}:`, individualError.message);
             }
+            
+            await connection.commit();
+            connection.release();
+            
+            const insertEndTime = Date.now();
+            console.log(`✅ Batch insert completed: ${batchInsertData.length} students added in ${insertEndTime - insertStartTime}ms`);
+          } catch (transactionError) {
+            await connection.rollback();
+            connection.release();
+            throw transactionError;
+          }
+        } catch (batchError) {
+          console.error('❌ Batch insert failed:', batchError.message);
+          // If batch insert fails, try smaller chunks as fallback
+          console.log('🔄 Falling back to smaller chunk inserts...');
+          const connection = await pool.getConnection();
+          await connection.beginTransaction();
+          
+          try {
+            const chunkSize = 100;
+            for (let i = 0; i < batchInsertData.length; i += chunkSize) {
+              const chunk = batchInsertData.slice(i, i + chunkSize);
+              try {
+                await connection.query(
+                  `INSERT INTO users (
+                    student_id, 
+                    email, 
+                    name, 
+                    password, 
+                    role, 
+                    first_name,
+                    last_name,
+                    middle_name,
+                    suffix,
+                    degree,
+                    year_level,
+                    section,
+                    status,
+                    is_active, 
+                    must_change_password
+                  ) VALUES ?`,
+                  [chunk]
+                );
+              } catch (chunkError) {
+                console.error(`❌ Failed to insert chunk ${Math.floor(i / chunkSize) + 1}:`, chunkError.message);
+                // Try individual inserts for this chunk
+                for (const studentData of chunk) {
+                  try {
+                    await connection.query(
+                      `INSERT INTO users (
+                        student_id, 
+                        email, 
+                        name, 
+                        password, 
+                        role, 
+                        first_name,
+                        last_name,
+                        middle_name,
+                        suffix,
+                        degree,
+                        year_level,
+                        section,
+                        status,
+                        is_active, 
+                        must_change_password
+                      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
+                      studentData
+                    );
+                  } catch (individualError) {
+                    console.error(`❌ Failed to insert individual student ${studentData[0]}:`, individualError.message);
+                  }
+                }
+              }
+            }
+            
+            await connection.commit();
+            connection.release();
+          } catch (fallbackError) {
+            await connection.rollback();
+            connection.release();
+            throw fallbackError;
           }
         }
       }

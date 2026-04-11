@@ -1,9 +1,5 @@
--- Migration: Add product_images table
--- This script safely adds the product_images table if it doesn't exist
-
 USE capstone;
 
--- Check if table exists, if not create it
 CREATE TABLE IF NOT EXISTS product_images (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,

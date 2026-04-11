@@ -1,10 +1,7 @@
-DROP DATABASE IF EXISTS capstone;
-CREATE DATABASE capstone CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE capstone;
 USE capstone;
 
--- ============================================================
 -- USERS TABLE
--- ============================================================
 
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -35,9 +32,7 @@ CREATE TABLE users (
     INDEX idx_status (status)
 );
 
--- ============================================================
 -- CATEGORIES
--- ============================================================
 
 CREATE TABLE categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -48,9 +43,7 @@ CREATE TABLE categories (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- ============================================================
 -- PRODUCTS
--- ============================================================
 
 CREATE TABLE products (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -78,9 +71,7 @@ CREATE TABLE products (
     INDEX idx_deleted_at (deleted_at)
 );
 
--- ============================================================
 -- PRODUCT IMAGES
--- ============================================================
 
 CREATE TABLE product_images (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -96,9 +87,7 @@ CREATE TABLE product_images (
     INDEX idx_is_primary (is_primary)
 );
 
--- ============================================================
 -- PRODUCT SIZES
--- ============================================================
 
 CREATE TABLE product_sizes (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -116,9 +105,7 @@ CREATE TABLE product_sizes (
     INDEX idx_size (size)
 );
 
--- ============================================================
 -- STOCK TRANSACTIONS
--- ============================================================
 
 CREATE TABLE stock_transactions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -140,9 +127,7 @@ CREATE TABLE stock_transactions (
     INDEX idx_reference_no (reference_no)
 );
 
--- ============================================================
 -- STOCK BALANCE
--- ============================================================
 
 CREATE TABLE stock_balance (
     product_id INT PRIMARY KEY,
@@ -151,9 +136,7 @@ CREATE TABLE stock_balance (
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
--- ============================================================
 -- STOCK ITEMS
--- ============================================================
 
 CREATE TABLE stock_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -170,9 +153,7 @@ CREATE TABLE stock_items (
     INDEX idx_remaining_qty (remaining_quantity)
 );
 
--- ============================================================
 -- STOCK MOVEMENTS
--- ============================================================
 
 CREATE TABLE stock_movements (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -198,9 +179,7 @@ CREATE TABLE stock_movements (
     INDEX idx_stock_movements_date (created_at)
 );
 
--- ============================================================
 -- CART ITEMS
--- ============================================================
 
 CREATE TABLE cart_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -217,9 +196,7 @@ CREATE TABLE cart_items (
     INDEX idx_product_id (product_id)
 );
 
--- ============================================================
 -- ORDERS
--- ============================================================
 
 CREATE TABLE orders (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -243,9 +220,7 @@ CREATE TABLE orders (
     INDEX idx_orders_created_at (created_at)
 );
 
--- ============================================================
 -- ORDER ITEMS
--- ============================================================
 
 CREATE TABLE order_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -268,9 +243,7 @@ CREATE TABLE order_items (
     INDEX idx_order_items_order_product (order_id, product_id)
 );
 
--- ============================================================
 -- ORDER STATUS LOGS
--- ============================================================
 
 CREATE TABLE order_status_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -287,9 +260,7 @@ CREATE TABLE order_status_logs (
     INDEX idx_created_at (created_at)
 );
 
--- ============================================================
 -- PAYMENT TRANSACTIONS
--- ============================================================
 
 CREATE TABLE payment_transactions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -308,9 +279,7 @@ CREATE TABLE payment_transactions (
     INDEX idx_status (status)
 );
 
--- ============================================================
 -- INVENTORY MOVEMENTS
--- ============================================================
 
 CREATE TABLE inventory_movements (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -328,9 +297,7 @@ CREATE TABLE inventory_movements (
     INDEX idx_created_at (created_at)
 );
 
--- ============================================================
 -- NOTIFICATIONS
--- ============================================================
 
 CREATE TABLE notifications (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -350,9 +317,7 @@ CREATE TABLE notifications (
     INDEX idx_notifications_user_read (user_id, is_read)
 );
 
--- ============================================================
 -- PASSWORD RESET CODES
--- ============================================================
 
 CREATE TABLE password_reset_codes (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -369,9 +334,7 @@ CREATE TABLE password_reset_codes (
     INDEX idx_verified (verified)
 );
 
--- ============================================================
 -- DEGREE SHIFTS
--- ============================================================
 
 CREATE TABLE IF NOT EXISTS degree_shifts (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -392,17 +355,13 @@ CREATE TABLE IF NOT EXISTS degree_shifts (
     INDEX idx_new_degree (new_degree)
 );
 
--- ============================================================
 -- DEFAULT INDEXES
--- ============================================================
 
 CREATE INDEX idx_stock_transactions_product_type ON stock_transactions(product_id, transaction_type);
 CREATE INDEX idx_stock_transactions_created_at ON stock_transactions(created_at);
 CREATE INDEX idx_cart_items_user_product ON cart_items(user_id, product_id);
 
--- ============================================================
 -- INSERT DEFAULT ADMIN
--- ============================================================
 
 INSERT INTO users (name, email, password, role, first_name, last_name, created_at)
 VALUES (
@@ -415,9 +374,7 @@ VALUES (
   NOW()
 );
 
--- ============================================================
 -- VIEWS
--- ============================================================
 
 CREATE VIEW v_order_summary AS
 SELECT 
@@ -523,9 +480,7 @@ LEFT JOIN products p ON st.product_id = p.id
 LEFT JOIN users u ON st.created_by = u.id
 ORDER BY st.created_at DESC;
 
--- ============================================================
--- STORED PROCEDURE (NO DELIMITER REQUIRED)
--- ============================================================
+-- STORED PROCEDURE
 
 DROP PROCEDURE IF EXISTS GenerateOrderNumber;
 
@@ -683,15 +638,3 @@ BEGIN
         p_user_id
     );
 END;
-
--- ============================================================
--- CONFIRMATION
--- ============================================================
-
-SELECT 'CPC ESSEN DATABASE SCHEMA CREATED SUCCESSFULLY!' AS message;
-SELECT 'Default admin created: acounting.office.cpc@gmail.com' AS admin_info;
-SELECT 'Stored Procedures Created:' AS procedure_info;
-SELECT '  - GenerateOrderNumber()' AS procedure_list;
-SELECT '  - sp_stock_in()' AS procedure_list;
-SELECT '  - sp_stock_out()' AS procedure_list;
-SELECT '  - sp_stock_adjustment()' AS procedure_list;
